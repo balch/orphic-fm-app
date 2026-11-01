@@ -239,6 +239,16 @@ enum class PulsarSymbol(
     TRACK_6_FM_FREE_HZ("track_6_fm_free_hz"),
     TRACK_7_FM_FREE_HZ("track_7_fm_free_hz"),
 
+    // Per-track OSC FM: depth, 0..1; morph is the detune on OSC (8 entries, EDM slot)
+    TRACK_0_FM_DEPTH("track_0_fm_depth"),
+    TRACK_1_FM_DEPTH("track_1_fm_depth"),
+    TRACK_2_FM_DEPTH("track_2_fm_depth"),
+    TRACK_3_FM_DEPTH("track_3_fm_depth"),
+    TRACK_4_FM_DEPTH("track_4_fm_depth"),
+    TRACK_5_FM_DEPTH("track_5_fm_depth"),
+    TRACK_6_FM_DEPTH("track_6_fm_depth"),
+    TRACK_7_FM_DEPTH("track_7_fm_depth"),
+
     // Per-track Mist grain engine: how a note becomes grains (8 entries, EDM slot)
     TRACK_0_GRAIN_MODE("track_0_grain_mode"),
     TRACK_1_GRAIN_MODE("track_1_grain_mode"),
@@ -1660,6 +1670,16 @@ enum class PulsarSymbol(
     TRACK_5_FM_FREE_HZ_SPACE("track_5_fm_free_hz_space"),
     TRACK_6_FM_FREE_HZ_SPACE("track_6_fm_free_hz_space"),
     TRACK_7_FM_FREE_HZ_SPACE("track_7_fm_free_hz_space"),
+
+    // Per-track OSC FM: depth, 0..1; morph is the detune on OSC (8 entries, SPACE slot)
+    TRACK_0_FM_DEPTH_SPACE("track_0_fm_depth_space"),
+    TRACK_1_FM_DEPTH_SPACE("track_1_fm_depth_space"),
+    TRACK_2_FM_DEPTH_SPACE("track_2_fm_depth_space"),
+    TRACK_3_FM_DEPTH_SPACE("track_3_fm_depth_space"),
+    TRACK_4_FM_DEPTH_SPACE("track_4_fm_depth_space"),
+    TRACK_5_FM_DEPTH_SPACE("track_5_fm_depth_space"),
+    TRACK_6_FM_DEPTH_SPACE("track_6_fm_depth_space"),
+    TRACK_7_FM_DEPTH_SPACE("track_7_fm_depth_space"),
 
     // Per-track Mist grain engine: how a note becomes grains (8 entries, SPACE slot)
     TRACK_0_GRAIN_MODE_SPACE("track_0_grain_mode_space"),

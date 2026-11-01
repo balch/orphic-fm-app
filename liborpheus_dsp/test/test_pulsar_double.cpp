@@ -36,6 +36,11 @@ struct DoubleSetup {
     float volume = -1.0f;   // the soloed track's volume, both slots, when >= 0
     int lpg_mode = -1;   // both slots when >= 0
     float lpg_decay = 0.0f;
+    float morph = -1.0f;   // pinned on both slots when >= 0; on OSC it is the duo detune
+    // OSC FM and the per-note morph rise, both slots, through the ports.
+    float fm_ratio = 0.0f;
+    float fm_depth = 0.0f;
+    float morph_rise = 0.0f;
     // Live writes: from each switch's block on, both slots double at its detune and spread.
     struct Switch { int block; float detune; float spread; };
     std::vector<Switch> switches;
@@ -112,6 +117,16 @@ static DoubleRun run_double(const DoubleSetup& s) {
         set_port_both(engine, "grain_size", 0.75f);
         set_port_both(engine, "grain_blend", 0.45f);
         set_port_both(engine, "grain_fx", 1.0f);
+    }
+    if (s.morph >= 0.0f) {
+        set_port_both(engine, "pin_morph", 1.0f);
+        set_port_both(engine, "morph", s.morph);
+    }
+    set_port_both(engine, "fm_ratio", s.fm_ratio);
+    set_port_both(engine, "fm_depth", s.fm_depth);
+    if (s.morph_rise != 0.0f) {
+        set_port_both(engine, "morph_rise", s.morph_rise);
+        set_port_both(engine, "morph_rise_time", 0.5f);
     }
     if (s.lpg_mode >= 0) {
         engine->pulsar_track_lpg_mode[kDblTrack].store(s.lpg_mode, std::memory_order_relaxed);
@@ -247,6 +262,7 @@ static bool test_double_detune_zero_is_bit_identical() {
     for (int eng : {kVa, kSpk, kBraids, kChaos, kOsc}) {
         DoubleSetup s;
         s.engine_edm = s.engine_space = eng;
+        if (eng == kOsc) s.morph = 0.0f;   // OSC morph doubles the voice too
         s.spread_edm = s.spread_space = 1.0f;
         const DoubleRun a = run_double(s);
         const DoubleRun b = run_double(single_twin(s));
@@ -334,6 +350,7 @@ static bool test_double_renders_every_family() {
     for (int eng : {kVa, kSpk, kBraids, kChaos, kOsc}) {
         DoubleSetup s;
         s.engine_edm = s.engine_space = eng;
+        if (eng == kOsc) s.morph = 0.0f;
         s.detune_edm = s.detune_space = 15.0f;
         s.spread_edm = s.spread_space = 0.5f;
         const DoubleRun dbl = run_double(s);
@@ -611,6 +628,72 @@ static bool test_double_glides_to_new_settings() {
     return ok;
 }
 
+// OSC morph is the Orpheus panel's duo detune, +-morph*25 cents, rendered as the double: morph m
+// sounds exactly like doubleDetune 50m, adds to an authored doubleDetune, and caps at 50 cents.
+// FM on, so this also shows morph no longer reaches the FM index.
+static bool test_osc_morph_is_the_double_detune() {
+    printf("\n=== Test: OSC morph m renders as doubleDetune 50m, added to the authored one ===\n");
+    struct Case { float morph, detune, same_as; };
+    const Case cases[] = {
+        {0.25f, 0.0f, 12.5f},
+        {1.0f, 0.0f, 50.0f},
+        {0.5f, 10.0f, 35.0f},   // additive
+        {1.0f, 20.0f, 50.0f},   // capped at kDoubleDetuneMaxCents
+    };
+    bool ok = true;
+    for (const Case& c : cases) {
+        DoubleSetup s;
+        s.engine_edm = s.engine_space = kOsc;
+        s.spread_edm = s.spread_space = 0.5f;
+        s.fm_ratio = 2.0f;
+        s.fm_depth = 0.3f;
+        s.morph = c.morph;
+        s.detune_edm = s.detune_space = c.detune;
+        DoubleSetup ref = s;
+        ref.morph = 0.0f;
+        ref.detune_edm = ref.detune_space = c.same_as;
+        const DoubleRun a = run_double(s);
+        const bool same = bit_identical(a, run_double(ref));
+        const bool differs = !bit_identical(a, run_double(single_twin(ref)));
+        printf("  morph %.2f + detune %.1f vs detune %.1f: identical=%d, differs from single=%d\n",
+               c.morph, c.detune, c.same_as, same ? 1 : 0, differs ? 1 : 0);
+        ok &= same && differs;
+    }
+    printf("OSC morph detune: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// The FM index is its own field now: depth 0 is FM off whatever the ratio, depth > 0 is FM.
+// The per-note morph rise on OSC moves that depth, not the detune.
+static bool test_osc_fm_depth_and_rise() {
+    printf("\n=== Test: OSC FM rides fm_depth, and morph rise moves it instead of the detune ===\n");
+    DoubleSetup off;
+    off.engine_edm = off.engine_space = kOsc;
+    off.morph = 0.0f;
+    DoubleSetup zero_depth = off;
+    zero_depth.fm_ratio = 2.0f;
+    DoubleSetup fm = zero_depth;
+    fm.fm_depth = 0.5f;
+    const DoubleRun base = run_double(off);
+    const bool depth0_off = bit_identical(base, run_double(zero_depth));
+    const bool depth_fm = !bit_identical(base, run_double(fm));
+
+    // FM off (ratio 0): a rise that moved the detune would double the voice. It moves the
+    // inert depth instead, so the render is unchanged.
+    DoubleSetup rise = off;
+    rise.morph_rise = 0.5f;
+    const bool rise_no_detune = bit_identical(base, run_double(rise));
+    // With FM on the same rise is heard.
+    DoubleSetup fm_rise = fm;
+    fm_rise.morph_rise = -0.4f;
+    const bool rise_moves_fm = !bit_identical(run_double(fm), run_double(fm_rise));
+    printf("  depth 0 = off: %d, depth 0.5 = FM: %d, rise without FM unchanged: %d, rise with FM heard: %d\n",
+           depth0_off ? 1 : 0, depth_fm ? 1 : 0, rise_no_detune ? 1 : 0, rise_moves_fm ? 1 : 0);
+    const bool ok = depth0_off && depth_fm && rise_no_detune && rise_moves_fm && peak_of(base) > 0.01f;
+    printf("OSC FM depth: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_double_tests() {
     printf("\n=== Pulsar Double Voice Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -627,5 +710,7 @@ bool run_pulsar_double_tests() {
     if (test_double_side_follows_pan()) suite_pass++; else suite_fail++;
     if (test_double_centre_pan_unchanged()) suite_pass++; else suite_fail++;
     if (test_double_glides_to_new_settings()) suite_pass++; else suite_fail++;
+    if (test_osc_morph_is_the_double_detune()) suite_pass++; else suite_fail++;
+    if (test_osc_fm_depth_and_rise()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

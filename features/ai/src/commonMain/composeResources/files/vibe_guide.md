@@ -1370,8 +1370,11 @@ into a vibe as a bass, keys or lead.
   tune; fractions (1.5, 2.7) turn clangy and bell-like. fmShape (0..1): sine through triangle to
   square, brighter as it rises. fmFreeHz (0..2000) replaces the ratio with a fixed rate, only to
   copy a panel preset exactly; the tone then changes with every note.
-- FM depth is morph. Unpinned it follows SPACE through spaceDecay, so set pinMorph true to make the
-  written morph the depth. Accent never reaches morph.
+- fmDepth (0..1, 0 is FM off) is how much FM, used as written. morphRise moves fmDepth on OSC, so a
+  negative rise is a pluck's FM bite fading over each note.
+- morph is the panel's detune: the voice plays twice, morph x 25 cents either side (morph 0.3 is a
+  gentle chorus, 1 a wide one). It adds to doubleDetune (morph 1 = doubleDetune 50, the cap).
+  Unpinned it follows SPACE through spaceDecay, so set pinMorph true to fix it; morph 0 is one voice.
 - Notes below 40 fold up an octave, so keep noteRangeLow at 40 or above.
 
 ### MST and grainFx in detail

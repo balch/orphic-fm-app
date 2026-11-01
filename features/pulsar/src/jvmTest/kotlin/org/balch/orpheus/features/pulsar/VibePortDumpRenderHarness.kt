@@ -59,7 +59,7 @@ class VibePortDumpRenderHarness {
     @Test
     fun dumpVibePortWrites() = runTest(testDispatcher) {
         val requested = System.getenv("RECORD_VIBE")?.takeIf { it.isNotBlank() } ?: "Orphic Lore"
-        val all = VibeCatalogScan.allProviders()
+        val all = VibeCatalogScan.allProviders(subpackages = true)
         val providers = if (requested == "live") {
             val live = VibeCatalog.entries.filterValues { it.status == VibeStatus.LIVE }.keys
             live.map { name -> all.first { it.name == name } }

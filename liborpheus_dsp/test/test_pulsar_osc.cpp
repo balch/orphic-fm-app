@@ -22,7 +22,8 @@ static void make_osc_unit(GraphUnit& unit) {
 
 // Track 0 on OSC in both slots, soloed, RNGs pinned. solo_track overwrites
 // pulsar_track_volume[0] with 1.0f, so it runs BEFORE the per-track settings
-// rather than after them.
+// rather than after them. Morph is pinned at 0: on OSC it is the duo detune, which
+// renders a second voice (pulsar_double covers it), and these tests read one voice.
 static void setup_osc_track0(OrpheusEngine* engine) {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
@@ -34,6 +35,10 @@ static void setup_osc_track0(OrpheusEngine* engine) {
     engine->pulsar_track_engine_space[0].store(-1, std::memory_order_relaxed);
     engine->pulsar_track_volume[0].store(0.85f, std::memory_order_relaxed);
     engine->pulsar_track_volume_space[0].store(0.85f, std::memory_order_relaxed);
+    engine->pulsar_track_pin_morph[0].store(1, std::memory_order_relaxed);
+    engine->pulsar_track_pin_morph_space[0].store(1, std::memory_order_relaxed);
+    engine->pulsar_track_morph[0].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_track_morph_space[0].store(0.0f, std::memory_order_relaxed);
 }
 
 static bool test_pulsar_track_renders_osc() {
@@ -53,8 +58,8 @@ static bool test_pulsar_track_renders_osc() {
     engine->pulsar_track_harmonics_space[0].store(0.9f, std::memory_order_relaxed);
     engine->pulsar_track_timbre[0].store(0.5f, std::memory_order_relaxed);
     engine->pulsar_track_timbre_space[0].store(0.5f, std::memory_order_relaxed);
-    engine->pulsar_track_morph[0].store(0.5f, std::memory_order_relaxed);
-    engine->pulsar_track_morph_space[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_fm_depth[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_fm_depth_space[0].store(0.5f, std::memory_order_relaxed);
     engine->pulsar_track_fm_ratio[0].store(2.0f, std::memory_order_relaxed);
     engine->pulsar_track_fm_ratio_space[0].store(2.0f, std::memory_order_relaxed);
     engine->pulsar_track_fm_shape[0].store(0.0f, std::memory_order_relaxed);
@@ -137,8 +142,8 @@ static bool test_pulsar_osc_respects_trigger_offset() {
     const float mod_inc = kFreeHz / 48000.0f;   // exactly 1/512
     engine->pulsar_track_harmonics[0].store(0.0f, std::memory_order_relaxed);
     engine->pulsar_track_harmonics_space[0].store(0.0f, std::memory_order_relaxed);
-    engine->pulsar_track_morph[0].store(1.0f, std::memory_order_relaxed);
-    engine->pulsar_track_morph_space[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_fm_depth[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_fm_depth_space[0].store(1.0f, std::memory_order_relaxed);
     engine->pulsar_track_fm_free_hz[0].store(kFreeHz, std::memory_order_relaxed);
     engine->pulsar_track_fm_free_hz_space[0].store(kFreeHz, std::memory_order_relaxed);
 
@@ -162,9 +167,8 @@ static bool test_pulsar_osc_respects_trigger_offset() {
                             ? ts0.trigger_offset : 0;
         const int g_pre = ts0.gate_pre_boundary ? 1 : 0;
         const int g_post = ts0.voice_active ? 1 : 0;
-        // The kernel only advances the modulator while FM is on.
-        const bool fm_on =
-            engine->pulsar_track_mod_morph_debug[0].load(std::memory_order_relaxed) > 0.0f;
+        // The kernel only advances the modulator while FM is on: depth 1 holds it on.
+        const bool fm_on = true;
 
         if (off > 0) {
             split_blocks++;

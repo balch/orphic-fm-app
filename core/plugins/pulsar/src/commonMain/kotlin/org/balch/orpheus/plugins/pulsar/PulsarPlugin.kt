@@ -83,6 +83,8 @@ class PulsarPlugin : DspPlugin {
     private val _trackFmShapeSpace = FloatArray(8) { 0f }
     private val _trackFmFreeHz = FloatArray(8) { 0f }
     private val _trackFmFreeHzSpace = FloatArray(8) { 0f }
+    private val _trackFmDepth = FloatArray(8) { 0f }
+    private val _trackFmDepthSpace = FloatArray(8) { 0f }
     // Mist grain engine, both slots. Defaults mirror OrpheusEngine.kt.
     private val _trackGrainMode = IntArray(8) { 0 }
     private val _trackGrainModeSpace = IntArray(8) { 0 }
@@ -399,6 +401,18 @@ class PulsarPlugin : DspPlugin {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + t]) {
                 floatType { default = 0f; min = 0f; max = 2000f
                     get { _trackFmFreeHzSpace[t] }; set { _trackFmFreeHzSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_DEPTH.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackFmDepth[t] }; set { _trackFmDepth[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_DEPTH_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackFmDepthSpace[t] }; set { _trackFmDepthSpace[t] = it } }
             }
         }
         // Mist grain engine. Declared for the same reason as the FM families above:

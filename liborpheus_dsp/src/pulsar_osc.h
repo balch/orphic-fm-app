@@ -28,8 +28,8 @@ static constexpr EngineModRange kOscModRange =
 
 namespace osc {
 
-// Modulation index at morph = 1, in radians (DX7 indices run to ~10).
-// I = morph * kFmIndexMax.
+// Modulation index at fm_depth = 1, in radians (DX7 indices run to ~10).
+// I = fm_depth * kFmIndexMax.
 constexpr float kFmIndexMax = 8.0f;
 
 // OscCore's phase is in cycles, so a radian index converts by 1/2pi.
@@ -69,7 +69,7 @@ inline float mod_wave(float phase, float shape) {
 //
 // The two modes modulate different things, deliberately.
 //
-// Ratio mode is PHASE modulation at index I = morph * kFmIndexMax, so the
+// Ratio mode is PHASE modulation at index I = fm_depth * kFmIndexMax, so the
 // carrier rate is untouched and the pitch is the written note at every index.
 // Linear FM at that index would drive the carrier negative and OscCore's 1Hz
 // floor would half-rectify it, lifting perceived pitch by octaves.
@@ -77,6 +77,9 @@ inline float mod_wave(float phase, float shape) {
 // Free-run mode (fm_free_hz > 0) stays on the FREQUENCY path with the Orpheus
 // panel's literal +-200Hz, floor clamping included, so a pasted panel preset
 // transfers exactly. It is pitch-bending by design and ratio mode is the default.
+//
+// Morph is not an argument: on OSC it is the duo detune, which the caller renders
+// as Pulsar's double voice (two calls at +-morph*25 cents), as the panel does.
 //
 // kEngine0OutGain is the same trim the three main-synth OSC sites apply. Without
 // it a Pulsar OSC track runs 1.54x hotter than the panel voice it reproduces and
@@ -86,7 +89,7 @@ inline void process_osc_block(
         float note,
         float harmonics,
         float timbre,
-        float morph,
+        float fm_depth,
         float fm_ratio,
         float fm_shape,
         float fm_free_hz,
@@ -101,10 +104,10 @@ inline void process_osc_block(
     const float carrier_hz = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
     const bool free_run = fm_free_hz > 0.0f;
     const float mod_hz = free_run ? fm_free_hz : carrier_hz * fm_ratio;
-    const bool fm_on = mod_hz > 0.0f && morph > 0.0f;
+    const bool fm_on = mod_hz > 0.0f && fm_depth > 0.0f;
     const float mod_inc = mod_hz / sample_rate;
-    const float deviation_hz = morph * 200.0f;                      // free-run only
-    const float pm_cycles = morph * kFmIndexMax * kIndexToCycles;   // ratio only
+    const float deviation_hz = fm_depth * 200.0f;                      // free-run only
+    const float pm_cycles = fm_depth * kFmIndexMax * kIndexToCycles;   // ratio only
     // Pulsar opts into the self-feedback DC blocker; the Orpheus panel's own
     // call sites pass nothing and keep the untuned behaviour they shipped with.
     const float fb_hp_coeff =

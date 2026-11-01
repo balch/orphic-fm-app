@@ -18,13 +18,14 @@ class OrpheusEngineFmTest {
         assertEquals(0f, e.fmRatio)
         assertEquals(0f, e.fmShape)
         assertEquals(0f, e.fmFreeHz)
+        assertEquals(0f, e.fmDepth)
     }
 
     @Test
     fun `fm fields survive a serialization round trip`() {
         val e = OrpheusEngine(
             engineId = OrpheusEngineId.OSC,
-            fmRatio = 2.5f, fmShape = 0.3f, fmFreeHz = 180f,
+            fmRatio = 2.5f, fmShape = 0.3f, fmFreeHz = 180f, fmDepth = 0.4f,
         )
         val encoded = json.encodeToString(e)
         assertEquals(e, json.decodeFromString<OrpheusEngine>(encoded))
@@ -40,6 +41,9 @@ class OrpheusEngineFmTest {
         }
         assertFailsWith<IllegalArgumentException> {
             OrpheusEngine(engineId = OrpheusEngineId.OSC, fmFreeHz = -1f)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            OrpheusEngine(engineId = OrpheusEngineId.OSC, fmDepth = 1.1f)
         }
     }
 }

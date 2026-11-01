@@ -643,7 +643,7 @@ class FifthSymphonyVibe : VibeProvider {
                 //
                 // The OSC tone is PINNED on all three knobs, because its whole point is to stay
                 // pure: unpinned, Mood would walk timbre toward square, tension would sweep the
-                // self-feedback, and the SPACE knob would sweep FM depth (morph IS FM index).
+                // self-feedback, and the SPACE knob would sweep morph (the detune).
                 // The custom moodTimbre window below therefore only reaches the brass side.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
@@ -652,7 +652,8 @@ class FifthSymphonyVibe : VibeProvider {
                     pinHarmonics = true,
                     timbre = 0.12f,     // almost all triangle; square adds the odd-harmonic buzz
                     pinTimbre = true,
-                    morph = 0.12f,      // FM depth: just enough edge for the motif's hits to speak
+                    fmDepth = 0.12f,    // just enough edge for the motif's hits to speak
+                    morph = 0f,
                     pinMorph = true,
                     fmRatio = 2f,       // octave modulator — integer, so it stays in tune
                     fmShape = 0.05f,    // near-sine modulator, fewest sidebands
@@ -673,7 +674,7 @@ class FifthSymphonyVibe : VibeProvider {
                             // brass keeps its Mood/tension movement. (DX harmonics re-pin itself.)
                             timbre = 0.5f, pinTimbre = false,
                             morph = 0.5f, pinMorph = false,
-                            fmRatio = 0f, fmShape = 0f,
+                            fmRatio = 0f, fmShape = 0f, fmDepth = 0f,
                             reverbBrightness = 0.6f,
                             reverbSend = 0.35f,
                             glideRate = 0.0f, // brass fanfare hits, no slide

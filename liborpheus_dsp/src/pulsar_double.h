@@ -21,6 +21,9 @@ struct PulsarTrackDouble {
 };
 
 constexpr float kDoubleDetuneMaxCents = 50.0f;
+// OSC morph at 1 doubles the voice this many cents apart: the Orpheus panel duo's +-25 cents.
+// Added to the track's doubleDetune and capped at kDoubleDetuneMaxCents.
+constexpr float kOscMorphDetuneCents = 50.0f;
 // A live change of detune or spread glides over this time constant.
 constexpr float kDoubleGlideSeconds = 0.05f;
 

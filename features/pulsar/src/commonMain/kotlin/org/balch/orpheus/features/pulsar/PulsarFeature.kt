@@ -897,6 +897,9 @@ class PulsarViewModel(
     private val trackFmFreeHzIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ.ordinal + i].controlId)
     }
+    private val trackFmDepthIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_DEPTH.ordinal + i].controlId)
+    }
     // Per-track Mist grain engine (EDM slot). Effective only when the track's engine is MST.
     private val trackGrainModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE.ordinal + it].controlId) }
     private val trackGrainScatterModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE.ordinal + it].controlId) }
@@ -1100,6 +1103,7 @@ class PulsarViewModel(
     private val trackFmRatioSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO_SPACE.ordinal + it].controlId) }
     private val trackFmShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE_SPACE.ordinal + it].controlId) }
     private val trackFmFreeHzSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + it].controlId) }
+    private val trackFmDepthSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_DEPTH_SPACE.ordinal + it].controlId) }
     private val trackGrainModeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE_SPACE.ordinal + it].controlId) }
     private val trackGrainScatterModeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE_SPACE.ordinal + it].controlId) }
     private val trackGrainScatterSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_SPACE.ordinal + it].controlId) }
@@ -1830,14 +1834,15 @@ class PulsarViewModel(
             trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
             trackMorphIds[i].value = FloatValue(edm.morph)
             trackMorphSpaceIds[i].value = FloatValue(spa.morph)
-            // OSC FM: ratio/shape/freeHz. Depth rides morph above, not a field here,
-            // so an unpinned OSC track takes its FM index from the SPACE macro.
+            // OSC FM: ratio/shape/freeHz/depth. Morph above is the OSC detune, not FM.
             trackFmRatioIds[i].value = FloatValue(edm.fmRatio)
             trackFmRatioSpaceIds[i].value = FloatValue(spa.fmRatio)
             trackFmShapeIds[i].value = FloatValue(edm.fmShape)
             trackFmShapeSpaceIds[i].value = FloatValue(spa.fmShape)
             trackFmFreeHzIds[i].value = FloatValue(edm.fmFreeHz)
             trackFmFreeHzSpaceIds[i].value = FloatValue(spa.fmFreeHz)
+            trackFmDepthIds[i].value = FloatValue(edm.fmDepth)
+            trackFmDepthSpaceIds[i].value = FloatValue(spa.fmDepth)
             // Mist grain engine. Both slots, always: C++ reads whichever is live.
             trackGrainModeIds[i].value = IntValue(edm.grainMode.id)
             trackGrainModeSpaceIds[i].value = IntValue(spa.grainMode.id)

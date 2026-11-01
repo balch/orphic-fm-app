@@ -865,6 +865,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_fm_shape_space[8]{};
     std::atomic<float> pulsar_track_fm_free_hz[8]{};
     std::atomic<float> pulsar_track_fm_free_hz_space[8]{};
+    // OSC FM depth, 0..1. Morph is the detune on OSC, as on the Orpheus panel.
+    std::atomic<float> pulsar_track_fm_depth[8]{};
+    std::atomic<float> pulsar_track_fm_depth_space[8]{};
     // Mist grain engine, per track, per engine slot. Read by the engine id 300 branch
     // in unit_process_pulsar; ignored by every other engine. rate, shape and blend
     // are seeded non-zero in orpheus_engine_create.

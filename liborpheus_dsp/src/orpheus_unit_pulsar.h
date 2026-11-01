@@ -303,6 +303,7 @@ struct PulsarTrackState {
     float fm_ratio = 0.0f;
     float fm_shape = 0.0f;
     float fm_free_hz = 0.0f;
+    float fm_depth = 0.0f;
     // Mist params resolved per block from the active engine slot.
     int   grain_mode = 0;
     int   grain_scatter_mode = 0;
