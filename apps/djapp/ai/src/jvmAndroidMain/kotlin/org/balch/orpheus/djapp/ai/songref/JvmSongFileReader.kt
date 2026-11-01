@@ -12,9 +12,10 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 @Inject
 class JvmSongFileReader(private val dispatchers: DispatcherProvider) : SongFileReader {
     override suspend fun read(path: String): String = withContext(dispatchers.io) {
+        val home = System.getProperty("user.home").orEmpty()
         val expanded = when {
-            path == "~" -> System.getProperty("user.home")
-            path.startsWith("~/") -> System.getProperty("user.home") + path.substring(1)
+            path == "~" -> home
+            path.startsWith("~/") -> home + path.substring(1)
             else -> path
         }
         // Extension first, with no filesystem access, so a refusal doesn't reveal whether the file exists.

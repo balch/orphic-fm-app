@@ -816,7 +816,7 @@ internal fun SectionChips(
         val looping = looped != null
         Pill(
             modifier = agentMark(flashes?.count(FlashTarget.Loop) ?: 0, glow = false, corner = 12.dp),
-            text = if (looping) "Looping " + (sections.getOrNull(looped ?: -1) ?: "section") else "Loop section",
+            text = if (looping) "Looping " + (sections.getOrNull(looped) ?: "section") else "Loop section",
             fill = if (looping) MixerInk.changed else MixerInk.chip,
             textColor = if (looping) MixerInk.onBright else MixerInk.text,
             border = MixerInk.line,

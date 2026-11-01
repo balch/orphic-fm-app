@@ -221,7 +221,7 @@ private fun melodyOnsets(system: TabSystem): List<Onset> {
         val top = if (lineTop == null) col.notes.maxBy { it.midi } else col.notes.filter { it.string >= lineTop }.minByOrNull { it.midi } ?: continue
         val last = out.lastOrNull()
         val sameString = last != null && (last.bends.lastOrNull() ?: last.note).string == top.string
-        if ((top.technique == "bend" || top.technique == "release") && sameString) last!!.bends += top else out += Onset(col.column, top)
+        if ((top.technique == "bend" || top.technique == "release") && sameString) last.bends += top else out += Onset(col.column, top)
     }
     return out
 }

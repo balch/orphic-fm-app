@@ -110,7 +110,7 @@ fun capture(vibe: Vibe, layers: BenchLayers): List<CaptureRow> {
             val sDb = sl?.levelDb?.getOrNull(t) ?: 0f
             val gain = layers.auditionGain(t, s)
             if (o?.volume != null) {
-                volumeRow(Scope.SECTION, s, name, t, CaptureField.VOLUME, o.volume!!, o.volume!! * gain)?.let(rows::add)
+                volumeRow(Scope.SECTION, s, name, t, CaptureField.VOLUME, o.volume, o.volume * gain)?.let(rows::add)
             } else if (abs(sDb) > 0f) {
                 volumeRow(Scope.SECTION, s, name, t, CaptureField.VOLUME, edm.volume, edm.volume * gain)?.let(rows::add)
             }
