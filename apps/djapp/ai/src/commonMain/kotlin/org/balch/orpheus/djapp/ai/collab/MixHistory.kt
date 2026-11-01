@@ -1,5 +1,7 @@
 package org.balch.orpheus.djapp.ai.collab
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.LayerWrite
@@ -8,12 +10,15 @@ import org.balch.orpheus.features.pulsar.bench.with
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 /** One row of the Mixer's History timeline: a change or a marked point. */
+@Serializable
 sealed interface HistoryItem {
     val id: Int
     val atMs: Long
 }
 
 /** One Mixer edit: the layer fields it wrote and the text the Mixer showed. Off changes are skipped in replay. */
+@Serializable
+@SerialName("change")
 data class HistoryChange(
     override val id: Int,
     override val atMs: Long,
@@ -28,11 +33,19 @@ data class HistoryChange(
     val on: Boolean = true,
 ) : HistoryItem
 
-/** A marked point in the timeline that the mix can be previewed at or rolled back to. */
+/** A user's ◆ Mark, or a CAPTURE the mix was saved at. */
+@Serializable
+enum class PointKind { MARK, CAPTURE }
+
+/** A point in the timeline that the mix can be previewed at or rolled back to; a CAPTURE names its saved [captureFile]. */
+@Serializable
+@SerialName("point")
 data class HistoryPoint(
     override val id: Int,
     override val atMs: Long,
     val label: String,
+    val kind: PointKind = PointKind.MARK,
+    val captureFile: String? = null,
 ) : HistoryItem
 
 /**
@@ -59,9 +72,22 @@ data class MixHistory(
     val changes: List<HistoryChange> get() = items.filterIsInstance<HistoryChange>()
     val onCount: Int get() = changes.count { it.on }
 
+    /** Index in [items] of the newest CAPTURE point, or -1. */
+    val newestCaptureIndex: Int
+        get() = items.indexOfLast { it is HistoryPoint && it.kind == PointKind.CAPTURE }
+
+    /** The changes above the newest capture, the ones a capture would still save. */
+    val uncaptured: List<HistoryChange> get() = items.drop(newestCaptureIndex + 1).filterIsInstance<HistoryChange>()
+
+    /** True when the change sits at or below the newest capture, so it is frozen. */
+    fun isCaptured(id: Int): Boolean {
+        val i = items.indexOfFirst { it.id == id }
+        return i in 0..newestCaptureIndex
+    }
+
     /**
-     * Adds a change, folding it into the last one when a drag of the same control by the same origin continues.
-     * A drag that folds back to where it began is dropped.
+     * Adds a change. An edit of the same control and section above the newest point (Mark or capture) merges into that
+     * row, whoever made it; a row that merges back to where it began is dropped. An off row never merges.
      */
     fun record(
         origin: EditOrigin,
@@ -74,14 +100,19 @@ data class MixHistory(
         nowMs: Long,
     ): MixHistory {
         if (writes.isEmpty()) return this
-        val last = items.lastOrNull() as? HistoryChange
-        if (last != null && last.on && last.origin == origin && last.control == control &&
-            last.section == section && last.writes.keys == writes.keys && nowMs - last.updatedMs <= FOLD_MS
-        ) {
-            val merged = last.writes.mapValues { (f, w) -> LayerWrite(w.before, writes.getValue(f).after) }
-            if (merged.values.all { it.before == it.after }) return copy(items = items.dropLast(1))
-            val folded = last.copy(after = after, writes = merged, updatedMs = nowMs)
-            return copy(items = items.dropLast(1) + folded)
+        // Folding across a point would change what that point plays and what rolling back to it keeps.
+        val from = items.indexOfLast { it is HistoryPoint } + 1
+        val at = (from until items.size).lastOrNull { i ->
+            val c = items[i] as? HistoryChange
+            c != null && c.on && c.control == control && c.section == section && c.writes.keys == writes.keys
+        }
+        if (at != null) {
+            val old = items[at] as HistoryChange
+            val merged = old.writes.mapValues { (f, w) -> LayerWrite(w.before, writes.getValue(f).after) }
+            val rest = items.filterIndexed { i, _ -> i != at }
+            if (merged.values.all { it.before == it.after }) return copy(items = rest)
+            val folded = old.copy(origin = origin, after = after, writes = merged, updatedMs = nowMs)
+            return copy(items = rest + folded)
         }
         val change = HistoryChange(
             id = nextId, atMs = nowMs, origin = origin, control = control, section = section,
@@ -89,6 +120,12 @@ data class MixHistory(
         )
         return copy(items = items + change, nextId = nextId + 1)
     }
+
+    /** Appends a CAPTURE point that names the saved [file]; it does not count as a Mark. */
+    fun capture(nowMs: Long, label: String, file: String?): MixHistory = copy(
+        items = items + HistoryPoint(nextId, nowMs, label, PointKind.CAPTURE, file),
+        nextId = nextId + 1,
+    )
 
     fun toggle(id: Int): MixHistory =
         copy(items = items.map { if (it is HistoryChange && it.id == id) it.copy(on = !it.on) else it })
@@ -146,6 +183,5 @@ data class MixHistory(
         const val FILE = 0
         /** The id of [beforeApply]: the vibe and mix the apply replaced. */
         const val BEFORE_APPLY = -1
-        const val FOLD_MS = 2000L
     }
 }

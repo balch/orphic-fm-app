@@ -27,7 +27,6 @@ import org.balch.orpheus.djapp.ai.tools.vibe
 import org.balch.orpheus.features.ai.NoOpAiVibeArchive
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.ai.tools.VibeApplyArgs
-import org.balch.orpheus.features.ai.tools.VibeApplyGuard
 import org.balch.orpheus.features.ai.tools.VibeApplyTool
 import org.balch.orpheus.features.ai.tools.vibeApplyJson
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
@@ -65,41 +64,16 @@ class WipeGuardTest {
     }
 
     @Test
-    fun applyRefusedWithLiveEditsUntilConfirmed() = runTest {
+    fun applyWithLiveEditsIsNotRefused() = runTest {
         val r = rig()
         r.userEdits()
-        val apply = applyTool(r)
-        val refused = apply.execute(VibeApplyArgs(json("Low Tide")))
-        assertFalse(refused.success)
-        assertEquals("WIPE_UNCONFIRMED", refused.refusal)
-        assertEquals("This would clear the user's live mix (2 changes). Ask them first; they confirm with a button.", refused.message)
-        assertEquals(listOf<CollabEvent>(CollabEvent.WipeConfirmRequested(2)), r.events)
-        assertEquals("Night Drive", pulsar.vibeFlow.value.name)
-        assertEquals(-4f, r.controller.layers.value.vibe.levelDb[1])
-        assertEquals(0, r.collab.capture.calls)
-
-        r.collab.collab.confirmWipe()
-        val applied = apply.execute(VibeApplyArgs(json("Low Tide")))
+        assertNull(r.collab.guard.refusal())
+        val applied = applyTool(r).execute(VibeApplyArgs(json("Low Tide")))
         assertTrue(applied.success, applied.message)
         assertNull(applied.refusal)
         assertEquals("Low Tide", pulsar.vibeFlow.value.name)
-        // The confirmed wipe keeps the user's mix as a capture first.
-        assertEquals(1, r.collab.capture.calls)
-    }
-
-    @Test
-    fun refusedAppliesLeaveTheBudgetForTheConfirmedOne() = runTest {
-        val r = rig()
-        r.userEdits()
-        val apply = applyTool(r)
-        repeat(TurnBudget.MAX_APPLIES) {
-            val refused = apply.execute(VibeApplyArgs(json("Low Tide")))
-            assertEquals("WIPE_UNCONFIRMED", refused.refusal)
-            assertFalse(refused.budgetSpent)
-        }
-        r.collab.collab.confirmWipe()
-        val applied = apply.execute(VibeApplyArgs(json("Low Tide")))
-        assertTrue(applied.success, applied.message)
+        assertTrue(r.events.isEmpty())
+        assertEquals(0, r.collab.capture.calls)
     }
 
     @Test
@@ -107,41 +81,10 @@ class WipeGuardTest {
         val r = rig()
         r.collab.mixer.edit(EditOrigin.AGENT, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
         withContext(TurnBudget.Exempt) { r.collab.mixer.edit(EditOrigin.MCP, MixControl.Pan(2)) { setPan(2, 0.3f) } }
-        assertNull(r.collab.guard.wipeRefusal())
         assertNull(r.collab.guard.resetRefusal())
         assertTrue(applyTool(r).execute(VibeApplyArgs(json("Low Tide"))).success)
         assertTrue(r.events.isEmpty())
         assertEquals(0, r.collab.capture.calls)
-    }
-
-    @Test
-    fun aFailedCaptureNeverBlocksTheConfirmedWipe() = runTest {
-        val r = rig(CountingCapture(fail = true))
-        r.userEdits()
-        r.collab.collab.confirmWipe()
-        assertTrue(applyTool(r).execute(VibeApplyArgs(json("Low Tide"))).success)
-        assertEquals(1, r.collab.capture.calls)
-        assertEquals("Low Tide", pulsar.vibeFlow.value.name)
-    }
-
-    @Test
-    fun confirmationCoversOneApply() = runTest {
-        val r = rig()
-        r.userEdits()
-        r.collab.collab.confirmWipe()
-        assertNull(r.collab.guard.refusal())
-        assertEquals(1, r.collab.capture.calls)
-        assertEquals(VibeApplyGuard.REFUSAL, Refusal.WIPE_UNCONFIRMED.name)
-        assertEquals("This would clear the user's live mix (2 changes). Ask them first; they confirm with a button.", r.collab.guard.refusal())
-
-        // After a confirmed apply the new vibe's mix is the user's to edit again, and the next wipe asks again.
-        r.collab.collab.confirmWipe()
-        val apply = applyTool(r)
-        assertTrue(apply.execute(VibeApplyArgs(json("Low Tide"))).success)
-        runCurrent()
-        r.userEdits()
-        assertEquals("WIPE_UNCONFIRMED", apply.execute(VibeApplyArgs(json("Red Dust"))).refusal)
-        assertEquals("Low Tide", pulsar.vibeFlow.value.name)
     }
 
     @Test
@@ -185,30 +128,16 @@ class WipeGuardTest {
     }
 
     @Test
-    fun aLevelMoveAfterASectionJumpCountsOneChange() = runTest {
-        pulsar.section(0)
-        val r = rig()
-        r.collab.mixer.edit(EditOrigin.USER, MixControl.Section, shown = "chorus") { jumpTo(2) }
-        r.collab.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
-        val refused = applyTool(r).execute(VibeApplyArgs(json("Low Tide")))
-        assertEquals("WIPE_UNCONFIRMED", refused.refusal)
-        assertEquals(DjVibeApplyGuard.reason(1), refused.message)
-        assertEquals(listOf<CollabEvent>(CollabEvent.WipeConfirmRequested(1)), r.events)
-    }
-
-    @Test
-    fun vibeLoadAsksFirst() = runTest {
+    fun vibeLoadWithLiveEditsIsNotRefused() = runTest {
         val r = rig()
         r.userEdits()
         val load = VibeLoadTool({ pulsar }, OneDispatcher(UnconfinedTestDispatcher(testScheduler)), r.collab.guard).tool
-        val refused = load.execute(VibeLoadArgs("Low Tide"))
-        assertFalse(refused.ok)
-        assertEquals("WIPE_UNCONFIRMED", refused.refusal)
-        assertEquals("Night Drive", pulsar.vibeFlow.value.name)
-        r.collab.collab.confirmWipe()
-        assertTrue(load.execute(VibeLoadArgs("Low Tide")).ok)
+        val loaded = load.execute(VibeLoadArgs("Low Tide"))
+        assertTrue(loaded.ok, loaded.message)
+        assertNull(loaded.refusal)
         assertEquals("Low Tide", pulsar.vibeFlow.value.name)
-        assertEquals(1, r.collab.capture.calls)
+        assertTrue(r.events.isEmpty())
+        assertEquals(0, r.collab.capture.calls)
     }
 
     @Test

@@ -5,7 +5,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
+import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.LayerWrite
 import org.balch.orpheus.features.pulsar.bench.Macro
@@ -38,34 +41,123 @@ class MixHistoryTest {
     }
 
     @Test
-    fun dragsFoldWithinTwoSeconds() {
-        val c = MixControl.Level(2)
+    fun repeatEditAboveCaptureFoldsIntoOneRow() {
         val h = MixHistory()
-            .rec(c, level2, null, -1f, at = 0)
-            .rec(c, level2, -1f, -2f, at = 900)
-            .rec(c, level2, -2f, -3f, at = 1800)
-        assertEquals(1, h.changes.size)
-        assertEquals(LayerWrite(null, -3f), h.changes.single().writes.getValue(level2))
-        assertEquals(1800L, h.changes.single().updatedMs)
-        assertEquals(0L, h.changes.single().atMs)
-        val h2 = h.rec(c, level2, -3f, -4f, at = 4000)
-        assertEquals(2, h2.changes.size)
+            .rec(MixControl.Level(2), level2, null, -3f, at = 0)
+            .rec(MixControl.Level(3), LayerField.VibeLevel(3), null, -1f, at = 10_000)
+            .rec(MixControl.Level(2), level2, -3f, -6f, at = 20_000)
+        assertEquals(listOf(MixControl.Level(3), MixControl.Level(2)), h.changes.map { it.control })
+        assertEquals(LayerWrite(null, -6f), h.changes.last().writes.getValue(level2))
+        assertEquals(1, h.changes.last().id)
     }
 
     @Test
-    fun differentOriginNeverFolds() {
+    fun aMarkStopsTheFold() {
+        val c = MixControl.Level(2)
+        val h = MixHistory().rec(c, level2, null, -3f, at = 0).mark(5_000)
+            .rec(c, level2, -3f, -6f, at = 10_000)
+        val mark = h.items.filterIsInstance<HistoryPoint>().single()
+        assertEquals(2, h.changes.size)
+        assertEquals(mark, h.items[1])
+        assertEquals(-3f, h.layersAt(mark.id).valueOf(level2))
+        val back = h.rollBackTo(mark.id)
+        assertEquals(listOf(h.changes[0]), back.changes)
+        assertEquals(-3f, back.layers().valueOf(level2))
+    }
+
+    @Test
+    fun editFoldingBackToStartIsDropped() {
+        val c = MixControl.Level(2)
+        val h = MixHistory().rec(c, level2, null, -3f, at = 0).rec(c, level2, -3f, null, at = 10_000)
+        assertTrue(h.changes.isEmpty())
+    }
+
+    @Test
+    fun captureFreezesRowsBelowIt() {
+        val c = MixControl.Level(2)
+        val h = MixHistory().rec(c, level2, null, -3f, at = 0).capture(5_000, "Capture 1", "a.json")
+            .rec(c, level2, -3f, -6f, at = 10_000)
+        assertEquals(2, h.changes.size)
+        assertTrue(h.isCaptured(h.changes[0].id))
+        assertFalse(h.isCaptured(h.changes[1].id))
+        assertEquals(1, h.newestCaptureIndex)
+        assertEquals(listOf(h.changes[1]), h.uncaptured)
+        assertEquals(0, h.pointCount)
+    }
+
+    @Test
+    fun offRowIsNeverFolded() {
+        val c = MixControl.Level(2)
+        val one = MixHistory().rec(c, level2, null, -3f, at = 0)
+        val h = one.toggle(one.changes.single().id).rec(c, level2, null, -6f, at = 10_000)
+        assertEquals(2, h.changes.size)
+    }
+
+    @Test
+    fun foldIgnoresOrigin() {
         val c = MixControl.Level(2)
         val h = MixHistory()
             .rec(c, level2, null, -1f, at = 0, origin = EditOrigin.USER)
             .rec(c, level2, -1f, -2f, at = 500, origin = EditOrigin.AGENT)
-        assertEquals(2, h.changes.size)
+        assertEquals(1, h.changes.size)
+        assertEquals(EditOrigin.AGENT, h.changes.single().origin)
+    }
+
+    @Test
+    fun rollBackToCaptureDropsRowsAbove() {
+        val c = MixControl.Level(2)
+        val h = MixHistory().rec(c, level2, null, -3f, at = 0).capture(5_000, "Capture 1", "a.json")
+            .rec(c, level2, -3f, -6f, at = 10_000)
+        val cap = h.items.filterIsInstance<HistoryPoint>().single()
+        assertEquals(PointKind.CAPTURE, cap.kind)
+        assertEquals("a.json", cap.captureFile)
+        assertEquals(h.items.take(2), h.rollBackTo(cap.id).items)
+    }
+
+    @Test
+    fun layersAtCaptureIsMixAtCapture() {
+        val c = MixControl.Level(2)
+        val h = MixHistory().rec(c, level2, null, -3f, at = 0).capture(5_000, "Capture 1", null)
+            .rec(c, level2, -3f, -6f, at = 10_000)
+        val cap = h.items.filterIsInstance<HistoryPoint>().single()
+        assertEquals(-3f, h.layersAt(cap.id).valueOf(level2))
+    }
+
+    @Test
+    fun historyRoundTripsThroughJson() {
+        fun change(i: Int, control: MixControl, field: LayerField) = HistoryChange(
+            id = i, atMs = i * 10L, origin = EditOrigin.AGENT, control = control, section = null, sectionName = "x",
+            before = "b", after = "a", writes = mapOf(field to LayerWrite(null, 0.5f)), updatedMs = i * 10L,
+            on = i % 2 == 0,
+        )
+        val items: List<HistoryItem> = listOf(
+            change(1, MixControl.Level(1), LayerField.VibeLevel(1)),
+            change(2, MixControl.Pan(1), LayerField.VibePan(1)),
+            change(3, MixControl.Send(1, true), LayerField.SectionReverb(2, 1)),
+            change(4, MixControl.Send(1, false), LayerField.SectionDelay(2, 1)),
+            change(5, MixControl.Mute(1), LayerField.VibeLevel(1)),
+            change(6, MixControl.Solo(1), LayerField.VibeLevel(1)),
+            change(7, MixControl.MacroKnob(Macro.ENERGY), LayerField.VibeMacro(Macro.ENERGY)),
+            change(8, MixControl.DelaySetting(DelayFx.TIME_A), LayerField.VibeDelayFx(DelayFx.TIME_A)),
+            change(9, MixControl.Section, LayerField.SectionMacro(1, Macro.ENERGY)),
+            change(10, MixControl.Loop, LayerField.SectionDelayFx(1, DelayFx.FEEDBACK)),
+            change(11, MixControl.EditScope, LayerField.VibeDelay(1)),
+            change(12, MixControl.ClearAll, LayerField.VibeReverb(1)),
+            HistoryPoint(13, 130L, "Point 1"),
+            HistoryPoint(14, 140L, "Capture 1", PointKind.CAPTURE, "a.json"),
+        )
+        val json = Json { allowStructuredMapKeys = true }
+        val text = json.encodeToString(ListSerializer(HistoryItem.serializer()), items)
+        assertEquals(items, json.decodeFromString(ListSerializer(HistoryItem.serializer()), text))
     }
 
     @Test
     fun coveredChangeRevealsWhenLaterTurnsOff() {
         val c = MixControl.Level(2)
+        // The capture freezes the first row, so the second is a separate, covering row.
         val h = MixHistory()
             .rec(c, level2, null, -2f, at = 0)
+            .capture(5_000, "Capture 1", null)
             .rec(c, level2, -2f, -6f, at = 10_000)
         val first = h.changes[0]
         val second = h.changes[1]

@@ -5,8 +5,7 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 
 /**
- * Turns the live Mix Bench layers into a capture: the rows, a capture file, and for an AI-made vibe
- * (one not in the catalog) the same change written back into the vibe, archived and re-applied.
+ * Turns the live Mix Bench layers into a capture: the rows and a capture file. The live mix and the vibe are untouched.
  */
 interface MixCaptureService {
     suspend fun capture(): CaptureOutcome
@@ -20,7 +19,7 @@ interface MixCaptureService {
 
 /**
  * [file] is the capture's absolute path, null when none was written. [stale] is null with no source file
- * to compare. [appliedToAiVibe] means the AI vibe now holds the rows and plays again with no bench layers.
+ * to compare.
  */
 data class CaptureOutcome(
     val ok: Boolean,
@@ -29,7 +28,6 @@ data class CaptureOutcome(
     val rows: List<CaptureRow>,
     val stale: Boolean?,
     val aiVibe: Boolean,
-    val appliedToAiVibe: Boolean,
 )
 
 /** Default where no capture writer exists: iOS, and the og/core edition (the writer ships with desktop and Android ai). */
@@ -43,6 +41,5 @@ class UnavailableMixCaptureService : MixCaptureService {
         rows = emptyList(),
         stale = null,
         aiVibe = false,
-        appliedToAiVibe = false,
     )
 }

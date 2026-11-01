@@ -305,7 +305,7 @@ class MixerWidgetsTest {
     fun agentResetSkipsPinnedStrips() {
         val edits = MutableSharedFlow<MixControl>(extraBufferCapacity = 8)
         mixerScene(1280, 1000, 1f, feature(agentEdits = edits)) {
-            edits.tryEmit(MixControl.ResetToFile)
+            edits.tryEmit(MixControl.ClearAll)
             repeat(4) { frame() }
             assertEquals(false, mark(stripTag(3), AgentFlashing), "a reset skips the pinned strip, so it must not flash")
             assertEquals(true, mark(stripTag(2), AgentFlashing), "a reset should flash the unpinned strips")
@@ -332,7 +332,7 @@ class MixerWidgetsTest {
     fun captureResultIsOneDismissableLine() {
         var dismissed = 0
         val long = mixState.copy(
-            capture = MixerCapture(true, "", "/a/very/long/path/".repeat(8) + "capture.json", 2, stale = false, appliedToAiVibe = true),
+            capture = MixerCapture(true, "", "/a/very/long/path/".repeat(8) + "capture.json", 2, stale = false),
         )
         mixerScene(1280, 1000, 1f, feature(AiMixerActions.EMPTY.copy(dismissCapture = { dismissed++ }), state = long)) {
             val line = nodes().first { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text.startsWith("Wrote 2 rows") } }
@@ -386,7 +386,7 @@ class MixerWidgetsTest {
             CaptureRow(Scope.VIBE, null, null, 3, CaptureField.VOLUME, null, 0.5f, 0.315f),
             CaptureRow(Scope.SECTION, 1, "groove", 4, CaptureField.VOLUME, null, 0.9f, 1f, clampedDb = 1.5f),
         ),
-        capture = MixerCapture(ok = true, message = "", file = "capture.json", rows = 2, stale = false, appliedToAiVibe = false),
+        capture = MixerCapture(ok = true, message = "", file = "capture.json", rows = 2, stale = false),
         notice = "This send is 0 here.",
         pins = setOf(3),
         agentTouched = setOf(5),

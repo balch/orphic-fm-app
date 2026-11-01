@@ -36,7 +36,8 @@ disown
 - `mix_mute`, `mix_solo`: toggle one track (0-7).
 - `mix_reset`: the whole mix back to the vibe as written: levels, pans, sends, section layers, mutes, solos and the four macro knobs. Pinned strips keep their edits, mutes and solos.
 - `section_jump`, `section_loop`: move to a section at the next bar line, or hold the current one.
-- `mix_capture`: save the mix edits as a capture file (see below).
+- `mix_capture`: save the mix edits as a capture file and a History checkpoint (see below).
+- `mix_clear_changes`: clear a vibe's saved mix change set (default: the playing vibe; ignores pins). Use it after the rows are in the vibe's source.
 - `ports_list`, `port_get`, `port_set`: raw engine control ports, keyed `uri:symbol`.
 - `vibe_list`, `vibe_load`, `transport`: pick a vibe, and play, pause or read state.
 - `pulsar_vibe_guide`: the composition guide, plus a catalog of shipped vibes for ideas only.
@@ -87,8 +88,8 @@ The same loop the in-app agent follows (its "Creating Pulsar vibes" prompt in `O
 2. **Tweak of the vibe playing now** ("slower", "swap the lead to a bell"): `pulsar_get_vibe` with `'current'`, change only what was asked, and go to step 4. Do not cast.
 3. **Compose on the skeleton** per the guide: the frame (`name`, `bpm`, `rootNote`, `scaleType`), the groove, the progression (`genre.customProgression`), the melodies, the arrangement's sections and the effects. Keep the guide's section B rules and the skeleton's `cast` block (it records the roll, so the archived vibe can be cast again). Invent an original name (no real artist, band, song or album).
 4. **`pulsar_apply_vibe`** with the complete JSON. It applies and plays at once. On `success: false`, fix the JSON per the message and apply again.
-5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. A re-apply clears the live mix edits, so call `mix_capture` before any re-apply (for example a `levelDb` change). The guide's section 11 has the targets and the pass in full.
-6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. The user may be mixing at the same time, so see the next section for the rules your edits follow. `mix_capture` keeps the mix, archives the vibe in `~/.config/orpheus-dj/ai-vibes/` and restarts the song.
+5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. A re-apply of an edited vibe (a `levelDb` change) starts with a clean mix, so call `mix_capture` first to write the user's edits to a capture file. The guide's section 11 has the targets and the pass in full.
+6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. The user may be mixing at the same time, so see the next section for the rules your edits follow. `mix_capture` saves the mix as a capture file and a checkpoint; the vibe and the song are untouched.
 
 The in-app agent is capped per turn (3 applies and 12 mix edits; `TurnBudget`). MCP calls are exempt, since no agent turn ever resets them, so the cap is yours to keep: stick to one or two passes and let the user judge.
 
@@ -101,7 +102,7 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 - **Pins:** the user can pin a strip in the Mixer. Edits to a pinned strip are refused with `PINNED`, over MCP too, and the message says the user pinned it. Do not retry: ask the user. `mix_reset` skips pinned strips. Pins last until the user unpins or another vibe loads.
 - **Moves made mid-turn:** the in-app agent skips a control the user just moved (`USER_MOVED`). MCP has no turn, so this does not apply: your edit lands and overwrites the user's value. Read before you set, and leave a control alone if the user is on it.
 - **The Mixer need not be open** for MCP edits (`MIXER_CLOSED` is for the in-app agent), but the user sees nothing move unless it is. Say what you changed.
-- **Wipes:** a re-apply or `vibe_load` clears the live mix edits and pins, and MCP is not asked to confirm. Call `mix_capture` first when the user has moved things, and say so before you load.
+- **Loads keep the mix:** change sets persist per vibe and come back when the same unchanged vibe loads again. A re-apply of an edited vibe starts clean (History's "before apply" row can roll it back, and capture files stay on disk). Pins clear on a load. Only Clear All and `mix_clear_changes` empty a change set.
 - Your edits flash on the strips like the in-app agent's, and the in-app agent sees them marked (Claude Code).
 
 ## Mixing workflow
@@ -111,15 +112,14 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 3. Ask the user to listen. They judge the sound, not you.
 4. `mix_read` again to confirm the numbers and the meters. To check the sound itself, `audio_analyze` for numbers, `audio_capture` plus Python for anything deeper (`soundfile` or `scipy.io.wavfile` read 32-bit float).
 5. When the user likes it, `mix_capture`. It returns the rows and the file path.
-6. Hand the file to the `apply-mix-capture` skill. It edits the vibe's Kotlin source.
+6. Hand the file to the `apply-mix-capture` skill. It edits the vibe's Kotlin source (or the `ai-vibes/` JSON for an AI vibe), then clears the change set with `mix_clear_changes`.
 
 ## Gotchas
 
 - `port_set` is never captured. Use `mix_set` for level, pan, sends, the four macros and the delay's time and feedback (port_set refuses those delay ports). A vibe load can overwrite port writes.
 - Meters idle off after about 10 s. The first `mix_read` after that starts them and shows silence. Do your other checks (`audio_analyze` takes its N seconds), then read again.
 - The TRACKS view in the app shares this mix. Faders the user moves show up in `mix_read`.
-- Capture on a catalog vibe writes a file only. The live mix stays as it is.
-- Capture on an AI vibe also writes the rows into the vibe, archives it in `~/.config/orpheus-dj/ai-vibes/`, and restarts the song. Mutes, solos and the loop clear.
+- Capture writes a file and a History checkpoint on any vibe. The vibe, the live mix and the song stay as they are.
 - Captures land in `~/.config/orpheus-dj/mix-captures/` (on the phone, `files/mix-captures/`; use `android.sh pull`). `stale` is true, false or null. Do not apply a stale or null one without asking the user.
 - Audio tools need Pulsar playing. Stopped, they refuse.
 - One recording at a time, across MCP and the in-app agent. A second is refused at once, never queued.

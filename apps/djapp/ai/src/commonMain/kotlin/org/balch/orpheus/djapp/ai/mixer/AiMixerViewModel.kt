@@ -42,7 +42,6 @@ import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
-import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
 
@@ -68,7 +67,6 @@ private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCou
 class AiMixerViewModel(
     private val controllerProvider: () -> MixBenchController,
     private val pulsarFeature: PulsarFeature,
-    private val captureService: MixCaptureService,
     private val collabMixer: CollabMixer,
     private val collab: MixCollab,
     private val scope: FeatureCoroutineScope,
@@ -158,7 +156,7 @@ class AiMixerViewModel(
         // The jump lands at the next bar line, so the move shows the section it is going to.
         jumpTo = { s -> edit(MixControl.Section, shown = sectionName(s)) { jumpTo(s) } },
         setLoop = { on -> edit(MixControl.Loop) { setLoop(on) } },
-        reset = { edit(MixControl.ResetToFile, shown = "file") { resetToFile(keep = collab.pins.value) } },
+        reset = { edit(MixControl.ClearAll, shown = "file") { resetToFile(keep = collab.pins.value) } },
         capture = ::capture,
         dismissNotice = { local.update { it.copy(notice = null) } },
         togglePin = collab::togglePin,
@@ -210,16 +208,14 @@ class AiMixerViewModel(
         clearNotice()
         scope.launch(dispatchers.default) {
             val result = try {
-                // A capture reads the controller's layers, so it saves the history, not a point being heard.
-                collabMixer.endHear()
-                val o = captureService.capture()
-                if (o.ok && o.rows.isNotEmpty() && !o.appliedToAiVibe) collabMixer.markPoint(MixCaptureTool.CAPTURED)
-                MixerCapture(o.ok, o.message, o.file, o.rows.size, o.stale, o.appliedToAiVibe)
+                val o = collabMixer.capture()
+                if (o == null) MixerCapture(true, MixCaptureTool.NOTHING_NEW, null, 0, null)
+                else MixerCapture(o.ok, o.message, o.file, o.rows.size, o.stale)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log.error(e) { "capture failed" }
-                MixerCapture(false, e.message ?: "capture failed", null, 0, null, false)
+                MixerCapture(false, e.message ?: "capture failed", null, 0, null)
             }
             local.update { it.copy(capture = result, capturing = false) }
         }

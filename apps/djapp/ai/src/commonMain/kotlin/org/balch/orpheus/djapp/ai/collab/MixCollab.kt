@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.flow.update
 
 /** One recorded change to a mixer control, with the values as the mixer shows them. */
@@ -78,23 +79,32 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
         _pins.update { if (track in it) it - track else it + track }
     }
 
-    /** The turn's label and whether its History point was taken, held together so the claim is one atomic step. */
-    private data class TurnPoint(val label: String? = null, val used: Boolean = false)
+    /** The turn's id (0 outside a turn), its label and whether its History point was taken, held together so the claim is one atomic step. */
+    private data class TurnPoint(val id: Int = 0, val label: String? = null, val used: Boolean = false)
 
     private val turnPoint = MutableStateFlow(TurnPoint())
+    private val lastTurnId = MutableStateFlow(0)
+    private val _endedTurnId = MutableStateFlow(0)
+
+    /** The id of the newest turn that has ended. Unlike [turnActive], a turn ended and another begun at once still moves it. */
+    val endedTurnId: StateFlow<Int> = _endedTurnId.asStateFlow()
 
     /** What the turn is about, for the History point before its first move; null outside a turn. */
     val turnLabel: String? get() = turnPoint.value.label
 
-    /** The turn's label the first time it is asked, null after that: one History point per turn. */
-    fun claimTurnLabel(): String? {
+    /** A turn's id and the label its captures carry. */
+    data class ClaimedTurn(val id: Int, val label: String)
+
+    /** The turn the first time it is asked, null after that or outside a turn: one History point per turn. */
+    fun claimTurn(): ClaimedTurn? {
         val was = turnPoint.getAndUpdate { it.copy(used = true) }
-        return was.label.takeUnless { was.used }
+        if (was.used || was.id == 0) return null
+        return ClaimedTurn(was.id, was.label ?: REFERENCE_ONLY_LABEL)
     }
 
     /** A confirmation from an earlier turn never authorises a wipe in this one. */
     fun beginTurn(label: String? = null) {
-        turnPoint.value = TurnPoint(label)
+        turnPoint.value = TurnPoint(lastTurnId.updateAndGet { it + 1 }, label)
         userMovedThisTurn.value = emptySet()
         wipeConfirmed.value = false
         _turnActive.value = true
@@ -103,6 +113,7 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
     /** A confirmation the turn never spent goes with it. */
     fun endTurn() {
         turnPoint.value = TurnPoint()
+        _endedTurnId.value = lastTurnId.value
         _turnActive.value = false
         userMovedThisTurn.value = emptySet()
         _agentTouched.value = emptySet()
@@ -160,12 +171,12 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
         return _userChanged.value.count { it.clearedByReset() && it.track !in pins }
     }
 
-    /** The user's changes an apply or a vibe load would clear: the mix itself, not where they are in the song. */
-    fun userChangesWipedByLoad(): Int = _userChanged.value.count { it.wipedByLoad() }
-
-    /** A new vibe replaces the tracks, so pins, the glow, this turn's user moves, the pending log and a wipe confirmation go. */
+    /**
+     * A new vibe replaces the tracks, so pins, the glow, this turn's user moves, the pending log and a wipe confirmation go.
+     * The turn stays, unclaimed again, so its next edit on the new vibe opens a fresh capture bracket.
+     */
     fun clearForNewVibe() {
-        turnPoint.value = TurnPoint()
+        turnPoint.update { it.copy(used = false) }
         _pins.value = emptySet()
         userMovedThisTurn.value = emptySet()
         _agentTouched.value = emptySet()
@@ -180,7 +191,7 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
      */
     private fun trackUserChanges(origin: EditOrigin, control: MixControl, changed: Boolean) {
         when {
-            control == MixControl.ResetToFile -> {
+            control == MixControl.ClearAll -> {
                 val pins = _pins.value
                 _userChanged.update { set -> set.filterNot { it.clearedByReset() && it.track !in pins }.toSet() }
                 if (origin == EditOrigin.USER) wipeConfirmed.value = false
@@ -189,14 +200,11 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
         }
     }
 
-    // A section jump, the loop and the edit scope lose nothing the user would miss.
-    private fun MixControl.wipedByLoad() =
+    // A section jump, the loop and the edit scope lose nothing the user would miss; pinned strips are left out by the callers.
+    private fun MixControl.clearedByReset() =
         this is MixControl.Level || this is MixControl.Pan || this is MixControl.Send ||
             this is MixControl.Mute || this is MixControl.Solo || this is MixControl.MacroKnob ||
             this is MixControl.DelaySetting
-
-    // A reset clears what a load does; pinned strips are left out by the callers.
-    private fun MixControl.clearedByReset() = wipedByLoad()
 
     /** Folds a move into the pending entry for its (origin, control): first before, last after and time. */
     private fun log(move: MixMove) {
@@ -210,3 +218,6 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
         }
     }
 }
+
+/** What a turn with no text of its own (a fresh song reference alone) is called in History. */
+private const val REFERENCE_ONLY_LABEL = "song reference"

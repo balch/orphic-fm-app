@@ -65,7 +65,6 @@ class AiMixerViewModelTest {
             },
             stale = false,
             aiVibe = true,
-            appliedToAiVibe = false,
         )
     }
 
@@ -92,8 +91,7 @@ class AiMixerViewModelTest {
         val vm = AiMixerViewModel(
             controllerProvider = { controller },
             pulsarFeature = pulsar,
-            captureService = capture,
-            collabMixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope),
+            collabMixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope, captureService = { capture }),
             collab = collab,
             scope = FeatureCoroutineScope(),
             dispatchers = OneDispatcher(testDispatcher),
@@ -191,12 +189,26 @@ class AiMixerViewModelTest {
     @Test
     fun captureStoresOutcome() = runTest(testDispatcher) {
         val r = rig()
+        r.vm.actions.setLevelDb(3, -6f)
+        advanceUntilIdle()
         r.vm.actions.capture()
         advanceUntilIdle()
         val s = r.vm.stateFlow.value
         assertEquals(2, s.capture?.rows)
         assertEquals("/tmp/capture.json", s.capture?.file)
         assertFalse(s.capturing)
+    }
+
+    @Test
+    fun captureWithNoNewChangesWritesNothing() = runTest(testDispatcher) {
+        val r = rig()
+        r.vm.actions.capture()
+        advanceUntilIdle()
+        val c = r.vm.stateFlow.value.capture
+        assertEquals(true, c?.ok)
+        assertNull(c?.file)
+        assertEquals("No new mix changes since the last capture; nothing written.", c?.message)
+        assertTrue(r.vm.stateFlow.value.history.isEmpty())
     }
 
     @Test
@@ -297,7 +309,7 @@ class AiMixerViewModelTest {
         runCurrent()
         val move = moves.last()
         assertEquals(EditOrigin.USER, move.origin)
-        assertEquals(MixControl.ResetToFile, move.control)
+        assertEquals(MixControl.ClearAll, move.control)
         assertEquals("edited" to "file", move.before to move.after)
         assertEquals(0f, r.controller.layers.value.vibe.levelDb[3])
     }

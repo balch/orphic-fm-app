@@ -131,6 +131,7 @@ class AiMixerStateTest {
 
         val h = MixHistory()
             .rec(EditOrigin.USER, MixControl.Pan(2), LayerField.VibePan(2), null, null, 1_000L)
+            .capture(10_000L, "Capture 1", null)
             .rec(EditOrigin.AGENT, MixControl.Pan(2), LayerField.VibePan(2), null, null, 20_000L)
             .mark(30_000L)
             .rec(EditOrigin.MCP, MixControl.Level(3), LayerField.VibeLevel(3), 1, "groove", 40_000L)
@@ -142,8 +143,8 @@ class AiMixerStateTest {
         assertTrue(a.covered, "a later on change sets the same pan")
         assertFalse(b.covered)
         assertEquals("Orpheus", b.who)
-        assertEquals(PointRow(h.items[2].id, "Point 1", 30_000L), rows[2])
-        val mcp = rows[3] as ChangeRow
+        assertEquals(PointRow(h.items[3].id, "Point 1", 30_000L), rows[3])
+        val mcp = rows[4] as ChangeRow
         assertEquals("Claude Code", mcp.who)
         assertEquals("groove", mcp.where)
         assertEquals("0.00", mcp.before)
@@ -155,6 +156,7 @@ class AiMixerStateTest {
         val h = MixHistory()
             .record(EditOrigin.USER, MixControl.Level(3), null, null, "0.0 dB", "-4.0 dB", mapOf(LayerField.VibeLevel(3) to LayerWrite(null, -4f)), 1_000L)
             .record(EditOrigin.USER, MixControl.Pan(2), null, null, "0.00", "0.30", mapOf(LayerField.VibePan(2) to LayerWrite(null, 0.3f)), 10_000L)
+            .capture(15_000L, "Capture 1", null)
             .record(EditOrigin.AGENT, MixControl.Pan(2), null, null, "0.30", "0.50", mapOf(LayerField.VibePan(2) to LayerWrite(0.3f, 0.5f)), 20_000L)
             .record(EditOrigin.USER, MixControl.Pan(5), null, null, "0.00", "0.20", mapOf(LayerField.VibePan(5) to LayerWrite(null, 0.2f)), 30_000L)
         val off = h.toggle(h.changes.last().id)
@@ -167,5 +169,23 @@ class AiMixerStateTest {
         assertEquals(listOf(CaptureRow(Scope.VIBE, null, null, 2, CaptureField.PAN, null, v.tracks[2].pan, 0.5f)), pan.writes)
         assertEquals(emptyList(), offPan.writes, "an off change writes nothing")
         assertEquals(all.toSet(), (level.writes + pan.writes).toSet(), "together the rows account for all Capture writes")
+    }
+
+    @Test
+    fun capturedRowsAreTagged() {
+        fun MixHistory.rec(track: Int, at: Long) =
+            record(EditOrigin.USER, MixControl.Pan(track), null, null, "0.00", "0.40", mapOf(LayerField.VibePan(track) to LayerWrite(0f, 0.4f)), at)
+
+        val none = MixHistory().rec(1, 1_000L).rec(2, 2_000L)
+        assertEquals(null, uncapturedOn(historyRows(none) { "T$it" }), "no capture keeps today's header")
+        assertEquals(listOf(false, false), historyRows(none) { "T$it" }.filterIsInstance<ChangeRow>().map { it.captured })
+
+        val h = none.capture(3_000L, "Captured", "a.json").rec(3, 4_000L)
+        val rows = historyRows(h) { "T$it" }
+        assertEquals(listOf(true, true, false), rows.filterIsInstance<ChangeRow>().map { it.captured })
+        assertEquals(PointRow(h.items[2].id, "Captured", 3_000L, capture = true), rows[2])
+        assertEquals(1, uncapturedOn(rows))
+        assertEquals(" · 1 uncaptured of 3 changes on", nowDetail(rows, h.onCount))
+        assertEquals(" · 3 of 3 changes on", nowDetail(historyRows(none.rec(3, 4_000L)) { "T$it" }, 3))
     }
 }

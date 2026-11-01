@@ -30,14 +30,18 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.Macro
+import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
+import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
 import org.balch.orpheus.features.pulsar.bench.diff
 import org.balch.orpheus.features.pulsar.bench.heardDelay
 import org.balch.orpheus.features.pulsar.bench.macroView
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
+import org.balch.orpheus.features.pulsar.models.Vibe
 
 /** How [CollabMixer.edit] went: the edit's own result, or the refusal that stopped it. */
 sealed interface CollabResult<out T> {
@@ -57,19 +61,28 @@ class CollabMixer internal constructor(
     controllerProvider: () -> MixBenchController,
     pulsarProvider: () -> PulsarFeature,
     private val collab: MixCollab,
-    scope: CoroutineScope,
+    private val jobs: CoroutineScope,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    changeStore: () -> MixChangeStore = { NoMixChangeStore() },
+    captureService: () -> MixCaptureService = { UnavailableMixCaptureService() },
 ) {
     @Inject
     constructor(
         controllerProvider: () -> MixBenchController,
         pulsarProvider: () -> PulsarFeature,
         collab: MixCollab,
-    ) : this(controllerProvider, pulsarProvider, collab, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        changeStore: () -> MixChangeStore,
+        captureService: () -> MixCaptureService,
+    ) : this(
+        controllerProvider, pulsarProvider, collab, CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        changeStore = changeStore, captureService = captureService,
+    )
 
     private val log = logging("CollabMixer")
     private val controller by lazy(controllerProvider)
     private val pulsar by lazy(pulsarProvider)
+    private val store by lazy(changeStore)
+    private val captures by lazy(captureService)
 
     /** Knob writes this class made, so the follower in [watchKnobsAndLoads] does not log them as the user's. */
     private data class OwnWrites(val inFlight: Map<Macro, Int> = emptyMap(), val expected: Map<Macro, Float> = emptyMap())
@@ -92,6 +105,42 @@ class CollabMixer internal constructor(
     private val kept = MutableStateFlow<Kept?>(null)
     private val _hearing = MutableStateFlow<Int?>(null)
 
+    // Under [historyLock]. The vibe [history] belongs to, as read at its claim; commits save under it.
+    private var historyVibe: Vibe? = null
+
+    // Under [historyLock]. The turn whose first agent edit passed the check, kept for its after-capture.
+    private var pendingTurn: MixCollab.ClaimedTurn? = null
+
+    // Under [historyLock]. Once per turn: captures the mix as the turn found it (a no-op when nothing is uncaptured).
+    private suspend fun captureBeforeTurn() {
+        val turn = collab.claimTurn() ?: return
+        // A queued turn can begin before the collector sees the last one end; that turn's changes close first.
+        pendingTurn?.let { captureLocked("after: " + cutLabel(it.label)) }
+        pendingTurn = turn
+        captureLocked("before: " + cutLabel(turn.label))
+    }
+
+    // Runs in this class's scope: DjAiChat ends the turn inside a synchronized block, which cannot wait on the lock.
+    private suspend fun captureAfterTurns() {
+        collab.endedTurnId.collect { ended ->
+            try {
+                historyLock.withLock {
+                    val turn = pendingTurn?.takeIf { it.id <= ended } ?: return@withLock
+                    pendingTurn = null
+                    endHearLocked()
+                    captureLocked("after: " + cutLabel(turn.label))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error(e) { "after-turn capture failed" }
+            }
+        }
+    }
+
+    // Under [historyLock]. The load whose restored change set still waits to reach the controller, or -1.
+    private var replayFor = -1
+
     /** Every layer edit made through [edit] since the vibe loaded. */
     val history: StateFlow<MixHistory> = _history.asStateFlow()
 
@@ -99,13 +148,22 @@ class CollabMixer internal constructor(
     val hearing: StateFlow<Int?> = _hearing.asStateFlow()
 
     init {
-        scope.launch {
+        jobs.launch {
             try {
                 watchKnobsAndLoads()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log.error(e) { "knob follower failed" }
+            }
+        }
+        jobs.launch {
+            try {
+                captureAfterTurns()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error(e) { "turn capture follower failed" }
             }
         }
     }
@@ -126,10 +184,11 @@ class CollabMixer internal constructor(
         collab.check(origin, control)?.let { return@withLock CollabResult.Refused(it, reasonFor(it)) }
         val c = controller
         endHearLocked()
+        if (origin == EditOrigin.AGENT) captureBeforeTurn()
         // A reset moves every knob back to the file, so all four are this edit's own writes.
         val macros = when (control) {
             is MixControl.MacroKnob -> listOf(control.macro)
-            MixControl.ResetToFile -> Macro.entries
+            MixControl.ClearAll -> Macro.entries
             else -> emptyList()
         }
         val before = c.show(control)
@@ -162,8 +221,44 @@ class CollabMixer internal constructor(
         historyLock.withLock {
             if (loadPending()) return@withLock
             endHearLocked()
-            _history.update { it.mark(nowMs(), label) }
+            commit(_history.value.mark(nowMs(), label))
         }
+    }
+
+    /**
+     * Ends any hear, then saves the uncaptured changes as a capture file and adds a CAPTURE point that names it. Null,
+     * writing nothing, when there are none. A failed capture adds no point. Holds the lock, so the file matches the history.
+     */
+    suspend fun capture(label: String = CAPTURED): CaptureOutcome? = historyLock.withLock {
+        endHearLocked()
+        captureLocked(label)
+    }
+
+    // Under [historyLock], after [endHearLocked]; the service never calls back into this class.
+    private suspend fun captureLocked(label: String): CaptureOutcome? {
+        if (loadPending() || _history.value.uncaptured.isEmpty()) return null
+        val outcome = captures.capture()
+        // A load during the write took the history; the point would belong to the vibe before it.
+        if (outcome.ok && !syncVibeLoad()) commit(_history.value.capture(nowMs(), label, outcome.file))
+        return outcome
+    }
+
+    /**
+     * Empties a vibe's saved change set, pins or not. The playing vibe (null or its name) also ends any hear and plays
+     * the file; another vibe just loses its stored set. False, changing nothing, during a vibe load.
+     */
+    suspend fun clearChanges(vibeName: String? = null): Boolean = historyLock.withLock {
+        if (loadPending()) return@withLock false
+        if (vibeName != null && !vibeName.equals(pulsar.vibeFlow.value.name, ignoreCase = true)) {
+            // The store keys by exact name; an AI vibe is not in vibeNames, so its given name stands.
+            store.remove(pulsar.vibeNames.firstOrNull { it.equals(vibeName, ignoreCase = true) } ?: vibeName)
+            return@withLock true
+        }
+        endHearLocked()
+        if (!applyLayers(BenchLayers())) return@withLock false
+        replayFor = -1
+        commit(_history.value.copy(items = emptyList(), pointCount = 0))
+        true
     }
 
     /** Plays the mix as it stood at the point ([MixHistory.FILE] for the file) without changing the history. */
@@ -216,7 +311,9 @@ class CollabMixer internal constructor(
         kept.value = null
         pulsar.applyVibe(before.vibe)
         syncVibeLoad()
-        _history.value = before.history
+        commit(before.history)
+        // The replay below covers what the claim restored.
+        replayFor = -1
         val c = controller
         if (!c.awaitLoadFollowed() || !applyLayers(before.history.layers())) {
             log.warn { "rollback to before the apply: '${before.vibe.name}' loaded, but its mix edits did not reach the engine" }
@@ -233,19 +330,38 @@ class CollabMixer internal constructor(
         layersBefore: BenchLayers,
         layersAfter: BenchLayers,
     ) {
-        if (control == MixControl.ResetToFile) {
-            _history.update { it.keepOnly(layersAfter, collab.pins.value) }
+        if (control == MixControl.ClearAll) {
+            commit(_history.value.keepOnly(layersAfter, collab.pins.value))
             return
         }
         val writes = layersBefore.diff(layersAfter)
         val section = writes.keys.firstNotNullOfOrNull(LayerField::section)
         val name = section?.let { pulsar.vibeFlow.value.arrangement?.sections?.getOrNull(it)?.name }
-        _history.update { h ->
-            val marked = if (origin == EditOrigin.AGENT && writes.isNotEmpty()) {
-                collab.claimTurnLabel()?.let { h.mark(nowMs(), "before: " + cutLabel(it)) }
-            } else null
-            (marked ?: h).record(origin, control, section, name, before, after, writes, nowMs())
+        val h = _history.value
+        commit(h.record(origin, control, section, name, before, after, writes, nowMs()))
+    }
+
+    // Under [historyLock]. Every History change but a load's seed goes through here, so the store keeps each vibe's set.
+    private fun commit(next: MixHistory) {
+        if (next == _history.value) return
+        _history.value = next
+        historyVibe?.let { store.put(it, next) }
+    }
+
+    // Under [historyLock]. Plays the change set a claim restored once the controller follows that load. A newer load
+    // or a hear drops it (each replays on its own); a timed-out wait leaves it for the next caller.
+    private suspend fun replayRestored() {
+        val n = replayFor
+        if (n < 0) return
+        if (n != handledLoad.value || n != pulsar.vibeLoadCount.value || _hearing.value != null) {
+            replayFor = -1
+            return
         }
+        if (!controller.awaitLoadFollowed()) {
+            log.warn { "restored mix edits wait on a vibe load the mixer has not followed" }
+            return
+        }
+        if (pulsar.vibeLoadCount.value != n || applyLayers(_history.value.layers())) replayFor = -1
     }
 
     // Under [historyLock]. Plays [next] and keeps it only if the controller took it, then tells the feed what moved.
@@ -253,7 +369,7 @@ class CollabMixer internal constructor(
         val c = controller
         val before = controls.map { c.show(it) }
         if (!applyLayers(next.layers())) return false
-        _history.value = next
+        commit(next)
         controls.forEachIndexed { i, control -> collab.record(EditOrigin.USER, control, before[i], c.show(control)) }
         return true
     }
@@ -262,6 +378,8 @@ class CollabMixer internal constructor(
     private suspend fun endHearLocked() {
         // An unclaimed load must not get the old vibe's replay; claiming it ends the hear.
         syncVibeLoad()
+        // A restored set plays before anything lands on top of it, so an edit's before is the restored mix.
+        replayRestored()
         if (_hearing.value == null) return
         // False only during a load, which clears the layers and the history itself.
         applyLayers(_history.value.layers())
@@ -315,7 +433,8 @@ class CollabMixer internal constructor(
      * Clears [collab] for a vibe load it has not been told about yet. Runs at the top of [edit], so an edit made right
      * after an apply is checked against the new vibe, not refused for the old one's pins or user moves. The compare-and-set
      * makes the clear happen once per load, whether [edit] or the follower in [watchKnobsAndLoads] gets there first.
-     * Under [historyLock]: a claimed load also empties [history] and ends [hear]. True when this call claimed one.
+     * Under [historyLock]: a claimed load also swaps [history] for the vibe's stored change set (or an empty one) and
+     * ends [hear]; a restored set is replayed by [replayRestored] once the controller follows. True when this call claimed one.
      */
     private fun syncVibeLoad(): Boolean {
         val count = pulsar.vibeLoadCount.value
@@ -324,12 +443,27 @@ class CollabMixer internal constructor(
             // Only forward: a caller holding a stale count must not undo a newer claim.
             if (handled >= count) return false
             if (handledLoad.compareAndSet(handled, count)) {
-                if (handled >= 0) collab.clearForNewVibe()
+                if (handled >= 0) {
+                    collab.clearForNewVibe()
+                    // The turn's after-capture belonged to the vibe it replaced.
+                    pendingTurn = null
+                }
                 // At or past its load (other loads may have landed unclaimed since), kept goes into this timeline.
                 val k = kept.value?.takeIf { count >= it.forLoad }
                 if (k != null) kept.value = null
-                _history.value = MixHistory(loadedAtMs = nowMs(), beforeApply = k?.before)
+                val vibe = pulsar.vibeFlow.value
+                val restored = store.get(vibe)
+                historyVibe = vibe
+                _history.value = (restored ?: MixHistory()).copy(loadedAtMs = nowMs(), beforeApply = k?.before)
                 _hearing.value = null
+                replayFor = if (restored != null && restored.onCount > 0) count else -1
+                // Off the caller: the follower's collect must not wait out the load-follow timeout.
+                if (replayFor >= 0) {
+                    jobs.launch {
+                        controller.awaitLoadFollowed()
+                        historyLock.withLock { replayRestored() }
+                    }
+                }
                 return true
             }
         }
@@ -390,7 +524,7 @@ class CollabMixer internal constructor(
             pulsar.vibeFlow.value.arrangement?.sections?.getOrNull(pulsar.arrangementStateFlow.value.sectionIndex)?.name ?: "none"
         MixControl.Loop -> onOff(loopSection.value != null)
         MixControl.EditScope -> if (scope.value == Scope.SECTION) "section" else "whole vibe"
-        MixControl.ResetToFile -> {
+        MixControl.ClearAll -> {
             val vibe = pulsar.vibeFlow.value
             val knobsOff = Macro.entries.count { pulsar.macroKnob(it) != it.vibeDefault(vibe) }
             if (layerEditCount(layers.value) + muted.value.size + soloed.value.size + knobsOff == 0) "file" else "edited"
@@ -417,6 +551,9 @@ class CollabMixer internal constructor(
 
     companion object {
         private const val NA = "n/a"
+
+        /** The label of the History point a capture adds. */
+        const val CAPTURED = "Captured"
 
         const val MIXER_CLOSED = "The Mixer is closed. Ask the user to open it; don't change the mix until they do."
         const val PINNED = "The user pinned this strip. Ask before changing it."

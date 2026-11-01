@@ -565,7 +565,7 @@ class MixResetTool(
             override suspend fun execute(args: NoArgs): MixStatusResult = guarded({ MixStatusResult(false, it) }) {
                 var wipe: CollabResult.Refused? = null
                 // The Mixer check runs first, so a closed Mixer never spends the user's confirmation.
-                val edit = collabMixer.toolEdit(events, MixControl.ResetToFile, shown = "file") {
+                val edit = collabMixer.toolEdit(events, MixControl.ClearAll, shown = "file") {
                     wipe = wipeGuard.resetRefusal()
                     if (wipe != null) return@toolEdit false
                     resetToFile(keep = collab.pins.value)

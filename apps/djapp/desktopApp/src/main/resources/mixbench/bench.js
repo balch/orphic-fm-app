@@ -513,7 +513,6 @@
       if (!j.ok) return;
       const res = $("capres");
       res.textContent = "Wrote " + j.rows.length + " rows to " + j.file +
-        (j.appliedToAiVibe ? "; the AI vibe now holds them, so the song restarts and mutes, solos and the loop clear" : "") +
         (j.stale ? " (STALE: the vibe file changed since load)" : "");
       res.style.color = j.stale ? "#ff6b6b" : "#4dd97a";
     });

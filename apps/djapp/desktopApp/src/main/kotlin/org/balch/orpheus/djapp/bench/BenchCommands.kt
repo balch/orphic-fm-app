@@ -100,7 +100,6 @@ internal class BenchCommands(
             put("rows", BenchJson.rows(o.rows))
             put("stale", o.stale)
             put("aiVibe", o.aiVibe)
-            put("appliedToAiVibe", o.appliedToAiVibe)
             put("message", o.message)
         }
     }

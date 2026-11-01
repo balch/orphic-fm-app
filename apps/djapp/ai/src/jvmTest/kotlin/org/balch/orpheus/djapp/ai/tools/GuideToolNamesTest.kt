@@ -7,12 +7,14 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.SerialDescriptor
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.djapp.ai.mcp.MixClearChangesTool
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.ai.tools.VibeGuideArgs
 import org.balch.orpheus.features.ai.tools.VibeGuideTool
 import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
 import org.balch.orpheus.features.pulsar.bench.UnavailableStemCaptureService
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -41,6 +43,8 @@ class GuideToolNamesTest {
             VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d, r.guard), TransportTool({ error("unused") }, d),
             AudioAnalyzeTool { error("unused") }, AudioCaptureTool(UnavailableStemCaptureService()),
             MixCaptureTool(UnavailableMixCaptureService(), r.mixer),
+            // MCP only, but the app guide explains it to the user.
+            MixClearChangesTool { error("unused") },
         ).map { it.tool.descriptor.name }.toSet()
     }
 
@@ -61,10 +65,12 @@ class GuideToolNamesTest {
     @Test
     fun theAppGuideNamesOnlyRealMixTools() {
         val appGuide = runBlocking { AppGuideTool().tool.execute(NoArgs()).guide }
-        assertTrue(appGuide.contains("Reset to file") && appGuide.contains("Capture"), "the app guide lost its Mixer buttons")
+        assertTrue(appGuide.contains("Clear All") && appGuide.contains("Capture"), "the app guide lost its Mixer buttons")
+        assertFalse(appGuide.contains("Reset to file"), "the app guide still uses the old button name")
+        assertTrue(appGuide.contains("mix_clear_changes"), "the app guide no longer names mix_clear_changes")
         assertTrue(appGuide.contains("## History"), "the app guide lost its History section")
         val named = Regex("""\b(?:mix|audio|section|ports?)_[a-z_]+\b""").findAll(appGuide).map { it.value }.toSet()
-        assertTrue(named.containsAll(setOf("mix_reset", "mix_capture")), "the app guide no longer names mix_reset and mix_capture: $named")
+        assertTrue(named.containsAll(setOf("mix_reset", "mix_capture", "mix_clear_changes")), "the app guide no longer names mix_reset and mix_capture: $named")
         val unknown = named - toolNames
         assertTrue(unknown.isEmpty(), "the app guide names tools the AI edition lacks: $unknown")
         // The numbers table maps the Mixer's readout to mix_read fields, which must stay real.

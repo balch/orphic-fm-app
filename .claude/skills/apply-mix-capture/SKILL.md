@@ -12,7 +12,7 @@ The Mix Bench (desktop DJ app, `./gradlew :apps:djapp:desktopApp:run -Pbench=tru
 - Claude can make a capture itself in the running AI edition with the `orphic-mcp` skill's `mix_capture` tool.
 - Use the file the user named, else the newest of `build/mix-bench/captures/*.json` and `~/.config/orpheus-dj/mix-captures/*.json`.
 - Fields: `vibe`, `slug`, `source` (repo-relative path, may be null), `baselineHash`, `currentHash`, `stale` (null when the app can't tell: no source, or no hash from when the vibe loaded), `aiVibe`, `capturedAt`, `rows`, `vibeJson` (the vibe the rows were read from).
-- If `aiVibe` is true, the vibe is AI-made and has no Kotlin source. The app writes such a capture into the vibe itself and archives it under `~/.config/orpheus-dj/ai-vibes/`. Tell the user, and point them at the grab-ai-vibes skill to import it.
+- If `aiVibe` is true, the vibe is AI-made and has no Kotlin source. The capture does not change it. Apply the rows to its archive instead (step 3b), then point the user at the grab-ai-vibes skill to import it.
 - If `stale` is true, the source changed after the bench loaded the vibe. Stop and ask the user before editing. Old values in the rows may no longer match the file.
 - If `stale` is null (and `source` is set), the app could not tell whether the source changed since load. Say so and ask the user before editing.
 - If `source` is null, the bench could not find the vibe file. Search `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/` for the vibe name (names resolve through `VibeNames.kt`) or ask.
@@ -52,6 +52,10 @@ Vibe files are hand-written. Expect `.copy()` chains, `let` blocks, shared helpe
 - Do not use sed or scripts to apply rows. Edit each value with the edit tool.
 - Never touch musical content (licks, patterns, chords). The capture holds mix values only.
 
+## 3b. An AI vibe
+
+The archive is the JSON file under `~/.config/orpheus-dj/ai-vibes/` for the capture's `vibe` (paths: grab-ai-vibes skill). Use the capture's `vibeJson` as the base, write each row's `new` into the matching field with the same mapping as step 2, and save the file under that name. Skip step 4's measure script; there is no Kotlin source to build.
+
 ## 4. Show and measure
 
 1. Show `git diff` of the vibe file.
@@ -61,6 +65,7 @@ Vibe files are hand-written. Expect `.copy()` chains, `let` blocks, shared helpe
 
 ## 5. Finish
 
+- Clear the vibe's saved change set so the rows are not applied twice: call `mix_clear_changes` (app running), or delete `~/.config/orpheus-dj/mix-changes/<slug>.json` (same slug rule as the capture file). A catalog vibe's source change is heard only after a rebuild.
 - Do not commit. Ask the user. Commit only after an explicit yes.
 - End with a list of ear tests for the user, one line each: the vibe, the sections and tracks that changed, what to listen for (for example "Fire Sky chorus: pad now 3 dB lower, check it still holds the chord bed"). Anything audible must be ear-tested before it lands on main.
 - Mention any stale, clamped or skipped rows again at the end.

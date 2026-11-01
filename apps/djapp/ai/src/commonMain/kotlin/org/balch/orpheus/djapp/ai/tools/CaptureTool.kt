@@ -33,14 +33,12 @@ data class MixCaptureResult(
     val stale: Boolean? = null,
     @property:LLMDescription("True for an AI-made vibe, one not in vibe_list.")
     val aiVibe: Boolean = false,
-    @property:LLMDescription("True: the rows were written into the AI vibe itself, which was archived and re-applied.")
-    val appliedToAiVibe: Boolean = false,
 )
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
-// The service itself, not a provider: building it with the tools starts its load follower early.
-class MixCaptureTool(private val service: MixCaptureService, private val collabMixer: CollabMixer) : ToolProvider {
+// The service itself, not a provider: building it with the tools starts its load follower early. Captures go through [collabMixer].
+class MixCaptureTool(@Suppress("UNUSED_PARAMETER") service: MixCaptureService, private val collabMixer: CollabMixer) : ToolProvider {
     override val tool: Tool<NoArgs, MixCaptureResult> by lazy {
         object : Tool<NoArgs, MixCaptureResult>(
             argsType = typeToken<NoArgs>(),
@@ -49,25 +47,21 @@ class MixCaptureTool(private val service: MixCaptureService, private val collabM
             description = """
                 Save the live mix edits (levels, pans, sends, macros and delay settings from mix_set) as vibe field changes in a
                 capture file, and return the rows. Mutes and solos are not captured.
-                A catalog vibe (in vibe_list): only the file is written, for applying to the vibe's source later;
-                the live mix stays as it is.
-                An AI-made vibe: the rows are also written into the vibe itself, which is archived and re-applied.
-                The song restarts, and mutes, solos, the section loop and the mix edits clear, since the vibe now holds them.
-                Fails (ok=false) if the vibe changes while capturing.
+                Only the file is written, for applying to the vibe's source later; the live mix stays as it is, and the
+                captured rows stay in the History marked captured. Works the same for catalog and AI-made vibes.
+                With no new mix changes since the last capture, or while a vibe is loading, nothing is written (ok=true, no file).
             """.trimIndent(),
         ) {
             override suspend fun execute(args: NoArgs): MixCaptureResult = guarded({ MixCaptureResult(false, it) }) {
-                // A capture reads the controller's layers, so it saves the history, not a point being heard.
-                collabMixer.endHear()
-                val o = service.capture()
-                // A catalog vibe keeps playing the mix, so the History marks where the file was written.
-                if (o.ok && o.rows.isNotEmpty() && !o.appliedToAiVibe) collabMixer.markPoint(CAPTURED)
-                MixCaptureResult(o.ok, o.message, o.file, o.rows, o.stale, o.aiVibe, o.appliedToAiVibe)
+                // The mixer ends any hear and adds the History's CAPTURE point.
+                val o = collabMixer.capture()
+                if (o == null) MixCaptureResult(true, NOTHING_NEW)
+                else MixCaptureResult(o.ok, o.message, o.file, o.rows, o.stale, o.aiVibe)
             }
         }
     }
 
     companion object {
-        const val CAPTURED = "Captured"
+        const val NOTHING_NEW = "No new mix changes since the last capture; nothing written."
     }
 }
