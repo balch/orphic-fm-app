@@ -41,6 +41,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
@@ -205,10 +206,16 @@ class DogHouseVibe : VibeProvider {
                 customProgression = chorusProgression,
                 chordsPerBar = chorusChordsPerBar,
             ),
-            // 5: outro
+            // 5: outro — a short fade that keeps the first bar's punch, then drops away.
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 4,
+                volumeEnvelope = listOf(
+                    VolumePoint(bar = 0f, level = 1f),
+                    VolumePoint(bar = 1f, level = 0.85f),
+                    VolumePoint(bar = 3f, level = 0.3f),
+                    VolumePoint(bar = 3.75f, level = 0f),
+                ),
                 macroOverrides = MacroOverrides(energy = 1.5f, complexity = 0.4f, space = 0.5f),
                 customProgression = chorusProgression,
                 chordsPerBar = chorusChordsPerBar,
