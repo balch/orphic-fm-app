@@ -25,6 +25,8 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.visualizations.viz.shader.PlasmaShader
 import org.balch.orpheus.features.visualizations.viz.shader.PlasmaSksl
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 
@@ -46,7 +48,7 @@ class OrphographViz(
     override val color = OrpheusColors.neonMagenta
     override val knob1Label = "DECAY"
     override val knob2Label = "TILT"
-    override val liquidEffects = PlasmaGlass
+    override val liquidEffects = Default
 
     private var _decay = 0.5f
     private var _tilt = 0.5f
@@ -144,5 +146,35 @@ class OrphographViz(
             drawRect(Color.hsv(hue, 0.35f, 1f), Offset(left, barTopY), Size(barW, 3f), blendMode = BlendMode.Plus)
             drawRect(barColor.copy(alpha = 0.9f), Offset(left, peakY), Size(barW, 2f), blendMode = BlendMode.Plus)
         }
+    }
+
+    companion object {
+        /**
+         * The phone's panel glass: light frost and tint, and the columns punched up in contrast behind
+         * the controls. The nav bars take [PlasmaBars] and the dock's panels [DockedPanels].
+         */
+        private val Default = VisualizationLiquidEffects(
+            frostSmall = 4f,
+            frostMedium = 6f,
+            frostLarge = 8f,
+            tintAlpha = 0.1f,
+            top = VisualizationLiquidScope(
+                saturation = .8f,
+                contrast = 2f,
+                dispersion = .1f,
+                refraction = 0.2f,
+                curve = .1f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 1f,
+                contrast = 2f,
+                dispersion = .1f,
+                refraction = 0.2f,
+                curve = .1f,
+            ),
+            title = PlasmaTitle,
+            bars = PlasmaBars,
+            docked = DockedPanels,
+        )
     }
 }

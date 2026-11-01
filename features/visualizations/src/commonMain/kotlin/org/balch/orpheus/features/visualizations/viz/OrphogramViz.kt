@@ -10,6 +10,8 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.visualizations.viz.spectrogram.OrphogramCanvas
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.viz.Visualization
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -20,8 +22,8 @@ import kotlin.math.roundToInt
  * dark nebula; RANGE dB under a slowly falling peak sets what counts as loud. The FFT runs in
  * C++; this writes one column a frame and the shader does the rest.
  */
-//@Inject  WIP
-//@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class OrphogramViz(
     private val engine: SynthEngine,
 ) : Visualization {
@@ -31,7 +33,7 @@ class OrphogramViz(
     override val color = Color(0xFF5A28C8)
     override val knob1Label = "SPEED"
     override val knob2Label = "RANGE"
-    override val liquidEffects = PlasmaGlass
+    override val liquidEffects = Default
     override val knob2ValueFormatter: (Float) -> String = { "${rangeDb(it).roundToInt()} dB" }
 
     private var _speed = 0.5f
@@ -57,4 +59,35 @@ class OrphogramViz(
             source = { engine.spectrogramFlow.value },
         )
     }
+
+    companion object {
+        /**
+         * The phone's panel glass: a little frost and tint with some bend, so the plasma shows through
+         * the controls. The nav bars take [PlasmaBars] and the dock's panels [DockedPanels].
+         */
+        private val Default = VisualizationLiquidEffects(
+            frostSmall = 6f,
+            frostMedium = 8f,
+            frostLarge = 9f,
+            tintAlpha = 0.15f,
+            top = VisualizationLiquidScope(
+                saturation = .8f,
+                contrast = .9f,
+                dispersion = .3f,
+                refraction = 0.2f,
+                curve = .1f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = .8f,
+                contrast = .9f,
+                dispersion = .3f,
+                refraction = 0.2f,
+                curve = .1f,
+            ),
+            title = PlasmaTitle,
+            bars = PlasmaBars,
+            docked = DockedPanels,
+        )
+    }
 }
+
