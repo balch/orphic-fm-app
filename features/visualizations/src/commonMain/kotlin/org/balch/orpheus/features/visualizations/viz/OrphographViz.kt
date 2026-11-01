@@ -150,8 +150,9 @@ class OrphographViz(
 
     companion object {
         /**
-         * The phone's panel glass: light frost and tint, and the columns punched up in contrast behind
-         * the controls. The nav bars take [PlasmaBars] and the dock's panels [DockedPanels].
+         * The phone's panel glass: light frost and tint, and the columns lifted in colour behind the
+         * controls; a high contrast crushed the dark blue columns to black. The nav bars take
+         * [PlasmaBars] and the dock's panels [DockedPanels].
          */
         private val Default = VisualizationLiquidEffects(
             frostSmall = 4f,
@@ -159,15 +160,15 @@ class OrphographViz(
             frostLarge = 8f,
             tintAlpha = 0.1f,
             top = VisualizationLiquidScope(
-                saturation = .8f,
-                contrast = 2f,
+                saturation = 1.3f,
+                contrast = 1.2f,
                 dispersion = .1f,
                 refraction = 0.2f,
                 curve = .1f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 1f,
-                contrast = 2f,
+                saturation = 1.3f,
+                contrast = 1.2f,
                 dispersion = .1f,
                 refraction = 0.2f,
                 curve = .1f,
