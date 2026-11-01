@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,8 +88,6 @@ private val DotSize = 18.dp
 private val DotCellSize = 34.dp
 // Where a caller caps the bar on a TV or large screen, instead of stretching it across the dock.
 internal val PresetBarMaxWidth = 520.dp
-// The bar's glass sits this far lower, over the transport's name pill, within its own padding.
-private val BarDrop = 2.dp
 // The panels' corner (CollapsibleColumnPanel).
 private val BarShape = RoundedCornerShape(8.dp)
 private val PillShape = RoundedCornerShape(6.dp)
@@ -143,9 +140,8 @@ internal fun VibePresetBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset(y = BarDrop)
-                // Vertical only: the panels above draw their glass to their slot's edges, so the bar does too.
-                .padding(vertical = 4.dp)
+                // No margin around the glass: the panels above and the transport below draw theirs to
+                // their slot's edges, so the bar's meets them with no gap.
                 // The same glass the docked panels wear, tinted teal; flat on TV hardware like they are.
                 .panelGlassChrome(
                     liquidState = LocalLiquidState.current,
