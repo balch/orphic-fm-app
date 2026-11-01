@@ -1,4 +1,4 @@
-package org.balch.orpheus.djapp.ai
+package org.balch.orpheus.djapp.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -11,7 +11,7 @@ import org.balch.orpheus.features.cowbell.CowbellFeature
 
 /**
  * Builds the cowbell at launch, so its saved knobs and engine restore before the tab opens and a
- * MIDI or AI strike sounds as the user left it. AI edition only: OG has no Cowbell tab and never builds it.
+ * MIDI or AI strike sounds as the user left it. Both editions show the Cowbell tab.
  */
 @SingleIn(AppScope::class)
 @Inject

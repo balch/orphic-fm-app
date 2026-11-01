@@ -20,13 +20,13 @@ internal const val TvBarMaxSlots = 8
 /** The panels [edition] can show in its nav, in default order. */
 fun navPanels(edition: DjEdition): List<DjRoute> = when (edition) {
     DjEdition.AI -> listOf(DjTab, MixTab, PulsarTab, AiTab, TimerTab, HornTab, CowbellTab)
-    DjEdition.OG -> listOf(DjTab, MixTab, PulsarTab, HornTab, TimerTab)
+    DjEdition.OG -> listOf(DjTab, MixTab, PulsarTab, HornTab, TimerTab, CowbellTab)
 }
 
 fun defaultNavOrder(panels: List<DjRoute>): List<NavEntry> =
     listOf(NavEntry.Open) + panels.map(NavEntry::Panel)
 
-/** The fixed OG order, which the scaffold and the TV chrome use until told otherwise. */
+/** The default OG order, which the scaffold and the TV chrome use until told otherwise. */
 internal val OgNavOrder: List<NavEntry> = defaultNavOrder(navPanels(DjEdition.OG))
 
 /** Repairs a saved order: unknown labels and repeats drop, one open slot, missing panels appended. */

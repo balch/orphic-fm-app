@@ -120,10 +120,9 @@ class NavBarLayoutTest {
     }
 
     @Test
-    fun `OG phone at 600dp shows today's four`() {
+    fun `OG phone at 600dp shows today's four plus Cowbell`() {
         val bar = render(600, 900, DjLayout.Portrait, DjEdition.OG)
-        assertEquals(listOf("DJ", "Mix", "Horn", "Timer"), bar.tabs())
-        assertNull(bar.openSlot, "OG has no open slot")
+        assertEquals(listOf("DJ", "Mix", "Horn", "Timer", "Cowbell"), bar.tabs())
     }
 
     @Test

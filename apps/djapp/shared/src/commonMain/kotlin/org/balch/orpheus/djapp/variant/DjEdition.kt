@@ -4,7 +4,7 @@ import org.balch.orpheus.djapp.AiTab
 
 /** The DJ app's editions; [customizableNav] gates the drag-to-reorder bottom nav. */
 enum class DjEdition(val customizableNav: Boolean) {
-    OG(false),
+    OG(true),
     AI(true),
 }
 

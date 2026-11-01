@@ -211,12 +211,11 @@ class DockNavCustomizeTest {
     }
 
     @Test
-    fun `OG dock matches today`() {
+    fun `OG dock keeps the dome between Mix and Pulsar`() {
         val dock = Dock(OgNavOrder)
         try {
-            val bounds = listOf("DJ", "Mix", "Pulsar", "Horn").map { dock.bounds(it) }
+            val bounds = listOf("DJ", "Mix", "Pulsar", "Horn", "Cowbell").map { dock.bounds(it) }
             assertNull(dock.toggle("AI"))
-            assertEquals(bounds[0].left, 1280f - bounds[3].right, 2f, "the bar is off centre")
             assertTrue(bounds[1].right < 640f && bounds[2].left > 640f, "the dome is not between Mix and Pulsar")
         } finally {
             dock.close()

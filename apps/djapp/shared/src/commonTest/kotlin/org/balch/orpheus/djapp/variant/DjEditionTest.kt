@@ -34,8 +34,8 @@ class DjEditionTest {
         assertEquals(DjEdition.OG, djEditionOf(setOf(StubContribution(TimerTab))))
     }
 
-    @Test fun onlyTheAiEditionHasACustomizableNav() {
+    @Test fun bothEditionsHaveACustomizableNav() {
         assertTrue(DjEdition.AI.customizableNav)
-        assertFalse(DjEdition.OG.customizableNav)
+        assertTrue(DjEdition.OG.customizableNav)
     }
 }

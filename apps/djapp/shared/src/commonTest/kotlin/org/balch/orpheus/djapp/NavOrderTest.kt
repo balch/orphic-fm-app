@@ -31,8 +31,8 @@ class NavOrderTest {
     }
 
     @Test
-    fun ogHasNoCowbell() {
-        assertTrue(CowbellTab !in navPanels(DjEdition.OG))
+    fun ogEndsWithCowbell() {
+        assertEquals(CowbellTab, navPanels(DjEdition.OG).last())
     }
 
     @Test
@@ -47,20 +47,20 @@ class NavOrderTest {
     }
 
     @Test
-    fun `default OG phone bar matches today`() {
+    fun `default OG phone bar keeps today's four and Cowbell off the bar`() {
         val order = defaultNavOrder(navPanels(DjEdition.OG))
         val bar = navBar(order, navDrops(DjLayout.Portrait), 4)
         assertEquals(listOf(p(DjTab), p(MixTab)), bar.left)
         assertEquals(listOf(p(HornTab), p(TimerTab)), bar.right)
-        assertEquals(emptyList(), bar.offBar)
+        assertEquals(listOf<DjRoute>(CowbellTab), bar.offBar)
     }
 
     @Test
-    fun `default OG TV bar matches today`() {
+    fun `default OG TV bar opens a slot left of the old four`() {
         val order = defaultNavOrder(navPanels(DjEdition.OG))
         val bar = navBar(order, navDrops(DjLayout.LargeScreen), 8)
-        assertEquals(listOf(p(DjTab), p(MixTab)), bar.left)
-        assertEquals(listOf(p(PulsarTab), p(HornTab)), bar.right)
+        assertEquals(listOf(NavEntry.Open, p(DjTab), p(MixTab)), bar.left)
+        assertEquals(listOf(p(PulsarTab), p(HornTab), p(CowbellTab)), bar.right)
     }
 
     @Test
