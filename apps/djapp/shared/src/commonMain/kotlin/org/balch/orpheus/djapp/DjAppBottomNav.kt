@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.ColorProducer
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
@@ -88,6 +91,9 @@ internal val NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicato
 private val NavBarHeight = 80.dp
 private val NavBarItemGap = 8.dp
 private val NavIconSize = 24.dp
+
+/** The test tag on the bar's empty slot. */
+internal const val NavOpenSlotTag = "navOpenSlot"
 
 /**
  * The phone bar's vibe name, a size up from the tabs' 11sp so it reads as the title. It keeps
@@ -177,11 +183,14 @@ fun DjAppNavScaffold(
     pulsarFeature: PulsarFeature,
     timerFeature: TimerFeature,
     onTogglePlayback: () -> Unit,
-    tabs: List<DjRoute> = djTabs,
+    navOrder: List<NavEntry> = OgNavOrder,
+    // Null is customization off (OG): no long press, drag or chip row.
+    navActions: NavActions? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val usesRail = layout.usesLandscapeChrome()
+    val drops = remember(layout) { navDrops(layout) }
     // Only play/pause, so knob turns, tempo ramps and section pushes never rerun the transport.
     val paused by remember(pulsarFeature) {
         pulsarFeature.stateFlow.map { it.globalPaused }.distinctUntilChanged()
@@ -191,8 +200,6 @@ fun DjAppNavScaffold(
     // Read by value only in the ring's frame loop: at the viz rate it must never recompose the scaffold.
     val pulse = rememberMusicPulse(pulsarFeature)
     val actions = pulsarFeature.actions
-    // The bar's transport sits between the two middle tabs.
-    val transportIndex = tabs.size / 2
     val pillPx = with(LocalDensity.current) { PhoneNamePillMaxWidth.roundToPx() }
     val barLane = remember(pillPx) { { _: Int -> pillPx } }
 
@@ -271,14 +278,24 @@ fun DjAppNavScaffold(
                 with(density) { (railInsets.getTop(density) + railInsets.getBottom(density)).toDp() }
             // The tab labels' and the title's line at the user's font scale (1.3 on the user's Fold 8).
             val labelLine = with(density) { MaterialTheme.typography.labelSmall.lineHeight.toDp() }
-            // Unmeasured on the first frame: the full ring, rather than a flash of the small one.
+            // Unmeasured on the first frame: every tab and the full ring, rather than a flash of fewer.
+            val allTabs = remember(navOrder, drops) { railTabs(navOrder, drops, Int.MAX_VALUE).first }
+            val (tabs, railOffBar) = if (railHeight > 0.dp) {
+                railTabs(navOrder, drops, railTabCapacity(railContentHeight, allTabs.size, labelLine))
+            } else {
+                allTabs to emptyList()
+            }
             val railTransport = if (railHeight > 0.dp) {
                 railTransportFor(railContentHeight, tabs.size, labelLine)
             } else {
                 RailTransport.Standard
             }
+            val gestures = rememberNavGestureHost(navActions, railOffBar, vertical = true)
             Row(modifier) {
-                GlassRail(Modifier.fillMaxHeight().onSizeChanged { railHeight = with(density) { it.height.toDp() } }) {
+                GlassRail(
+                    Modifier.fillMaxHeight().navAnchor(gestures)
+                        .onSizeChanged { railHeight = with(density) { it.height.toDp() } },
+                ) {
                     // Their own column, so a compact rail can set its tabs closer than M3's gap.
                     Column(verticalArrangement = Arrangement.spacedBy(railTransport.tabGap)) {
                         tabs.forEach { route ->
@@ -288,6 +305,7 @@ fun DjAppNavScaffold(
                                 onClick = { onItemClick(route) },
                                 icon = { tabIcon(route, selected) },
                                 label = { tabLabel(route, selected) },
+                                modifier = Modifier.navTabGestures(gestures, route),
                                 colors = NavigationRailItemDefaults.colors(indicatorColor = NavIndicatorColor),
                             )
                         }
@@ -303,8 +321,13 @@ fun DjAppNavScaffold(
                     Modifier.weight(1f).fillMaxHeight()
                         .consumeWindowInsets(NavigationRailDefaults.windowInsets.only(WindowInsetsSides.Start)),
                 ) { content() }
+                NavChipPopup(gestures)
             }
         } else {
+            // The bar's own width, not the screen's, sets how many tabs fit; four until it is measured.
+            var barWidth by remember { mutableStateOf(0.dp) }
+            val bar = navBar(navOrder, drops, if (barWidth > 0.dp) maxEvenSlots(barWidth) else 4)
+            val gestures = rememberNavGestureHost(navActions, bar.offBar, vertical = false)
             Column(modifier) {
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
@@ -316,35 +339,46 @@ fun DjAppNavScaffold(
                 // labels' line, its pill over the stage.
                 Box(Modifier.fillMaxWidth()) {
                     DockBarGlass()
+                    val density = LocalDensity.current
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                            .navAnchor(gestures)
+                            .onSizeChanged { barWidth = with(density) { it.width.toDp() } }
                             .defaultMinSize(minHeight = NavBarHeight)
                             .selectableGroup(),
                         horizontalArrangement = Arrangement.spacedBy(NavBarItemGap),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        tabs.forEachIndexed { index, route ->
-                            if (index == transportIndex) {
-                                transport(Modifier.weight(1f).alignBy(LastBaseline).hangFromLabelLine(PhoneBarDomeDrop), null)
+                        // Every slot weighs the same, and the transport sits between the halves.
+                        val slot: @Composable RowScope.(NavEntry) -> Unit = { entry ->
+                            when (entry) {
+                                is NavEntry.Panel -> {
+                                    val route = entry.route
+                                    val selected = isSelected(route)
+                                    NavigationBarItem(
+                                        selected = selected,
+                                        onClick = { onItemClick(route) },
+                                        // An icon tall at least, so a running Timer's countdown leaves its label on the line.
+                                        icon = {
+                                            Box(Modifier.heightIn(min = NavIconSize), contentAlignment = Alignment.Center) {
+                                                tabIcon(route, selected)
+                                            }
+                                        },
+                                        label = { tabLabel(route, selected) },
+                                        modifier = Modifier.alignBy(LastBaseline).navTabGestures(gestures, route),
+                                        colors = NavigationBarItemDefaults.colors(indicatorColor = NavIndicatorColor),
+                                    )
+                                }
+                                NavEntry.Open -> Box(Modifier.weight(1f).height(NavBarHeight).navOpenSlot(gestures).testTag(NavOpenSlotTag))
                             }
-                            val selected = isSelected(route)
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = { onItemClick(route) },
-                                // An icon tall at least, so a running Timer's countdown leaves its label on the line.
-                                icon = {
-                                    Box(Modifier.heightIn(min = NavIconSize), contentAlignment = Alignment.Center) {
-                                        tabIcon(route, selected)
-                                    }
-                                },
-                                label = { tabLabel(route, selected) },
-                                modifier = Modifier.alignBy(LastBaseline),
-                                colors = NavigationBarItemDefaults.colors(indicatorColor = NavIndicatorColor),
-                            )
                         }
+                        bar.left.forEach { slot(it) }
+                        transport(Modifier.weight(1f).alignBy(LastBaseline).hangFromLabelLine(PhoneBarDomeDrop), null)
+                        bar.right.forEach { slot(it) }
                     }
+                    NavChipPopup(gestures)
                 }
             }
         }

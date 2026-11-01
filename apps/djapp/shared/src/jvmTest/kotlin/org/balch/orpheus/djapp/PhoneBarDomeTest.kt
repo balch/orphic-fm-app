@@ -125,7 +125,7 @@ class PhoneBarDomeTest {
                         pulsarFeature = pulsar,
                         timerFeature = TimerViewModel.previewFeature(timer),
                         onTogglePlayback = { toggles++ },
-                        tabs = tabs,
+                        navOrder = tabs.map(NavEntry::Panel),
                         modifier = Modifier.fillMaxSize().background(background),
                     ) {
                         // Stands in for the panels: counts the taps that reach the stage.

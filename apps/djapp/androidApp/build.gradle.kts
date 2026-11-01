@@ -223,6 +223,7 @@ dependencies {
     implementation(project(":core:plugins:reverb"))
     implementation(project(":core:plugins:horn"))
     implementation(project(":core:plugins:distortion"))
+    implementation(project(":core:plugins:cowbell"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.media3.session)
     implementation(libs.kmlogging)

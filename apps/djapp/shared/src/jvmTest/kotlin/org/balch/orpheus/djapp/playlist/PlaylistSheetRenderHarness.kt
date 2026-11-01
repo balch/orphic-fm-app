@@ -199,7 +199,7 @@ class PlaylistSheetRenderHarness {
                 tvHardware = false, domeRingSize = BarRingSize, barGlass = false, vizHidesPanelsWhenIdle = false,
                 focusRegion = remember { TvFocusRegionHolder() }, vizFeature = VizViewModel.previewFeature(),
                 pulsarFeature = pulsar, timerFeature = TimerViewModel.previewFeature(), onTogglePlayback = {},
-                dockablePanels = largeScreenPanels(), dockedPanels = emptyList(), activeSheet = null, tabs = djTabs,
+                dockablePanels = largeScreenPanels(), dockedPanels = emptyList(), activeSheet = null,
                 onToggleDocked = {}, onActiveSheetChange = {}, stage = stage,
             )
         } else {

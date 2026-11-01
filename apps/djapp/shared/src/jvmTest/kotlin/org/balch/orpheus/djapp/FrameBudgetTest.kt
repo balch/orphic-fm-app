@@ -118,8 +118,6 @@ class FrameBudgetTest {
         }
     }
 
-    private val panels = bottomBarPanels(largeScreenPanels())
-
     private fun report(line: String) = println("[frame-budget] $line")
 
     private fun scene(
@@ -212,7 +210,7 @@ class FrameBudgetTest {
     private fun domeScene(pulsar: PulsarFeature, scopes: ScopeCounter, widthDp: Int = 1280, feed: ScopeFeed? = null) =
         scene(widthDp, 200, density = 1f, scopes = scopes, feed = feed) {
             DjTvBottomBar(
-                panels = panels, isDocked = { false }, onToggle = {},
+                nav = OgTvNavBar, isDocked = { false }, onToggle = {},
                 pulsarFeature = pulsar, onTogglePlayback = {},
                 domeRingSize = TvDockDomeRingSize,
             )
@@ -463,7 +461,7 @@ class FrameBudgetTest {
                     Column {
                         DockSongBand(pulsar)
                         DjTvBottomBar(
-                            panels = panels, isDocked = { it == DjTab }, onToggle = {},
+                            nav = OgTvNavBar, isDocked = { it == DjTab }, onToggle = {},
                             pulsarFeature = pulsar, onTogglePlayback = {},
                             glass = !tv,
                             domeRingSize = TvDockDomeRingSize,

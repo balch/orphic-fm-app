@@ -45,7 +45,7 @@ class VibeStepRenderHarness {
                         OrpheusTheme {
                             Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
                                 DjTvBottomBar(
-                                    panels = bottomBarPanels(largeScreenPanels()),
+                                    nav = OgTvNavBar,
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
                                     pulsarFeature = pulsar,
@@ -92,7 +92,7 @@ class VibeStepRenderHarness {
                     OrpheusTheme {
                         Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
                             DjTvBottomBar(
-                                panels = bottomBarPanels(largeScreenPanels()),
+                                nav = OgTvNavBar,
                                 isDocked = { it == PulsarTab || it == DjTab },
                                 onToggle = {},
                                 pulsarFeature = feature,
@@ -128,7 +128,7 @@ class VibeStepRenderHarness {
                 OrpheusTheme {
                     Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
                         DjTvBottomBar(
-                            panels = bottomBarPanels(largeScreenPanels()),
+                            nav = OgTvNavBar,
                             isDocked = { it == PulsarTab || it == DjTab },
                             onToggle = {},
                             pulsarFeature = pulsar,

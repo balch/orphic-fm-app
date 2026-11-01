@@ -13,14 +13,15 @@ import org.balch.orpheus.core.features.AgentGreetingMode
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
-import org.balch.orpheus.djapp.HornTab
 import org.balch.orpheus.features.horn.HornMixRestore
 import org.balch.orpheus.features.horn.HornPanelAvailability
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.OverlaySubtitleProducer
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
+import org.balch.orpheus.djapp.variant.DjEdition
 import org.balch.orpheus.djapp.variant.DjTabContribution
+import org.balch.orpheus.djapp.variant.djEditionOf
 import org.balch.orpheus.djapp.vibepresets.VibePresetsAvailability
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
@@ -64,23 +65,22 @@ interface DjAppModule {
         @Provides
         fun provideRestoreStrategy(): RestoreStrategy = RestoreStrategy.USER_PREFERENCES
 
-        /**
-         * The horn panel exists only while no contribution replaces its tab (the AI edition
-         * swaps in the AI tab). A horn the user cannot see must not run, so the horn feature
-         * reads this before restoring its persisted mix.
-         */
+        /** The edition, read once from what the graph contributes: AI when the AI tab is there. */
         @Provides
-        fun provideHornPanelAvailability(contributions: Set<DjTabContribution>): HornPanelAvailability =
-            HornPanelAvailability { contributions.none { it.replaces == HornTab } }
+        fun provideDjEdition(contributions: Set<DjTabContribution>): DjEdition = djEditionOf(contributions)
+
+        /** The horn panel is on both editions' bars, so the horn feature always restores its mix. */
+        @Provides
+        fun provideHornPanelAvailability(): HornPanelAvailability = HornPanelAvailability { true }
 
         /** The horn mix is per vibe here (off unless a preset sets it), so the saved one never comes back. */
         @Provides
         fun provideHornMixRestore(): HornMixRestore = HornMixRestore { false }
 
-        /** Vibe presets are an OG-edition feature: the same edition test as the horn panel. */
+        /** Vibe presets are an OG-edition feature. */
         @Provides
-        fun provideVibePresetsAvailability(contributions: Set<DjTabContribution>): VibePresetsAvailability =
-            VibePresetsAvailability { contributions.none { it.replaces == HornTab } }
+        fun provideVibePresetsAvailability(edition: DjEdition): VibePresetsAvailability =
+            VibePresetsAvailability { edition == DjEdition.OG }
 
         @Provides
         fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.EXPLICIT

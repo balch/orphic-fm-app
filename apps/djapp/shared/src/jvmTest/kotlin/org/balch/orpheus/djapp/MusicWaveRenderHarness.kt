@@ -155,7 +155,6 @@ class MusicWaveRenderHarness {
                                         dockablePanels = largeScreenPanels(),
                                         dockedPanels = docked,
                                         activeSheet = null,
-                                        tabs = djTabs,
                                         onToggleDocked = {},
                                         onActiveSheetChange = {},
                                         stage = {
@@ -218,7 +217,7 @@ class MusicWaveRenderHarness {
                                     if (tag == "bright") brightVizBackdrop() else busyVizBackdrop()
                                 }
                                 if (docked.value) DjTvBottomBar(
-                                    panels = bottomBarPanels(largeScreenPanels()),
+                                    nav = OgTvNavBar,
                                     isDocked = { it == DjTab },
                                     onToggle = {},
                                     pulsarFeature = pulsar,

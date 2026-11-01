@@ -77,7 +77,6 @@ class DockChromeRecompositionTest {
                             dockablePanels = dockable,
                             dockedPanels = docked,
                             activeSheet = null,
-                            tabs = djTabs,
                             onToggleDocked = {},
                             onActiveSheetChange = {},
                             stage = {},

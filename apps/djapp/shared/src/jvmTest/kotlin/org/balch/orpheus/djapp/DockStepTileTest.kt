@@ -45,7 +45,7 @@ class DockStepTileTest {
             OrpheusTheme {
                 CompositionLocalProvider(LocalTelevisionHardware provides tv) {
                     DjTvBottomBar(
-                        panels = bottomBarPanels(largeScreenPanels()),
+                        nav = OgTvNavBar,
                         isDocked = { false },
                         onToggle = {},
                         pulsarFeature = pulsar,

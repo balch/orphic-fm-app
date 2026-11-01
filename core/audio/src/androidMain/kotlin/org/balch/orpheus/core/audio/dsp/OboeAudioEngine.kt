@@ -100,6 +100,9 @@ class OboeAudioEngine(
         repairExecutor.execute { if (stillWanted()) bridge.nativePark() }
     }
 
+    // Unparks through ensureRunning(), on the same executor, so it orders against a queued park.
+    override fun resumeHostIfIdle() = ensureRunning()
+
     override val isRunning: Boolean
         get() = bridge.nativeIsRunning()
 

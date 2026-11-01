@@ -10,7 +10,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
+import org.balch.orpheus.core.audio.AudioHostHold
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.di.StartupRoot
@@ -37,13 +37,14 @@ class DjAppLifecycleManager(
     private val application: Application,
     synthEngine: SynthEngine,
     playbackController: PlaybackController,
+    hostHold: AudioHostHold,
     scope: AppCoroutineScope,
 ) {
     private val log = logging("DjAppLifecycleManager")
 
     init {
         registerActivityLifecycleCallbacks()
-        startHostParking(synthEngine, playbackController, scope)
+        startHostParking(synthEngine, playbackController, hostHold, scope)
         log.info { "DjAppLifecycleManager initialized" }
     }
 
@@ -55,13 +56,15 @@ class DjAppLifecycleManager(
     private fun startHostParking(
         synthEngine: SynthEngine,
         playbackController: PlaybackController,
+        hostHold: AudioHostHold,
         scope: CoroutineScope,
     ) {
         // Parks on screen too, unlike iOS: Android media apps stop their output on pause, and a
         // headset tap is how an on-screen pause gets resumed. Kept short because A2DP only
-        // suspends ~3s after the park, and the headset hears "paused" only then.
+        // suspends ~3s after the park, and the headset hears "paused" only then. A hold (the bell
+        // played over a paused vibe) stands in for foreground: it unparks and blocks the park.
         AudioHostSuspendPolicy(synthEngine, scope, grace = 500.milliseconds)
-            .start(playbackController.state, foreground = MutableStateFlow(false))
+            .start(playbackController.state, foreground = hostHold.held)
     }
 
     private fun registerActivityLifecycleCallbacks() {

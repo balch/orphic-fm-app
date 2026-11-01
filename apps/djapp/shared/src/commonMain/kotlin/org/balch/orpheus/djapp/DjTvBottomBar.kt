@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
@@ -26,11 +27,13 @@ import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -179,21 +182,28 @@ internal fun previousTileDescription(nav: VibeNavState): String {
 internal fun nextTileDescription(nav: VibeNavState): String =
     nav.nextName?.takeIf { it.isNotBlank() }?.let { "Next vibe, $it" } ?: "Next vibe"
 
+/** One tab's column on the bar: its width and the gap after it. */
+private val TvBottomBarColumn = TvBottomBarMinWidth + TvBottomBarItemGap
+
 /**
- * Fixed bottom bar display order: DJ, Mix, Pulsar, Horn. This is independent of [dockable]'s
- * toggle-order and of each panel's actual dock position (left/right column vs. centre stage —
- * see [assignDock]), which follows dock-toggle order, not this list. Info, Timer and Ends are
- * dock toggles too, in the top bar (see [topBarPanels]).
+ * The most tab slots (an even count either side of the dome) a bar [barWidth] wide holds. The room
+ * is what lies between the ◀/▶ tiles, counted in [maxEvenSlots]'s columns but at the dock's wider tabs.
+ * Counted at the screen's own size: a canvas widened by [canvasScale] (see [LocalCanvasScale]) draws
+ * every tab smaller, so a Fold held sideways holds four where a 1280dp TV holds six.
  */
-private val BottomBarOrder: List<DjRoute> = listOf(DjTab, MixTab, PulsarTab, HornTab)
+internal fun tvBarMaxSlots(barWidth: Dp, canvasScale: Float = 1f): Int {
+    val centre = barWidth * canvasScale - TvBottomBarSidePadding * 2 - TvBottomBarMinWidth * 2 - TvBottomBarItemGap * 2
+    return minOf(TvBarMaxSlots, maxEvenSlots(centre * (NavColumnWidth / TvBottomBarColumn)))
+}
 
-/** Filters [dockable] down to [BottomBarOrder], preserving that fixed display order. */
-internal fun bottomBarPanels(dockable: List<DjRoute>): List<DjRoute> =
-    BottomBarOrder.filter { it in dockable }
+/** The OG dock's bar: DJ, Mix, Pulsar, Horn, as it has always been. */
+internal val OgTvNavBar: NavBar = navBar(OgNavOrder, navDrops(DjLayout.LargeScreen), TvBarMaxSlots)
 
 /**
- * The dock's bottom bar: DJ, Mix, the play/pause dome, Pulsar and Horn in the centre, between ◀/▶
- * vibe navigator tiles at either end. Every toggle docks/undocks its own panel (see [DjPanelDock]).
+ * The dock's bottom bar: the [nav]'s tabs either side of the play/pause dome, between ◀/▶ vibe
+ * navigator tiles at either end. An open slot is an empty gap. Every toggle docks/undocks its own
+ * panel (see [DjPanelDock]). With [navActions], holding OK on a toggle opens a chip row to swap it
+ * or slide it along the bar (see [TvNavCustomize]); a short OK toggles as ever.
  *
  * Play/pause is the vibe transport's dome in the centre slot, between the two middle toggles as in
  * the phone bar, hung from the toggles' label line with its name in a pill above it (see [DockDome]).
@@ -206,12 +216,14 @@ internal fun bottomBarPanels(dockable: List<DjRoute>): List<DjRoute> =
  */
 @Composable
 fun DjTvBottomBar(
-    panels: List<DjRoute>,
+    nav: NavBar,
     isDocked: (DjRoute) -> Boolean,
     onToggle: (DjRoute) -> Unit,
     pulsarFeature: PulsarFeature,
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
+    // The remote's long-press and move gestures; null (OG) leaves the bar as a plain row of toggles.
+    navActions: NavActions? = null,
     // The centre dome's ring, from dockDomeRingSize. Defaults to the phone bar's own ring only as an
     // unsized fallback.
     domeRingSize: Dp = BarRingSize,
@@ -238,7 +250,9 @@ fun DjTvBottomBar(
     previewRegionFocusAlpha: Float = 1f,
 ) {
     val navState = pulsarFeature.vibeNavFlow.collectAsStateWithLifecycle()
-    val nav by navState
+    val vibeNav by navState
+    val customize = rememberTvNavCustomize(navActions)
+    TvNavFocusRestore(customize, nav)
 
     // Single accent for every viz-following color in this bar — region border, the docked items'
     // wash and content, the dome's focus mark — mirrors DjTvTopBar's own title.titleColor source
@@ -248,8 +262,6 @@ fun DjTvBottomBar(
     val dockAccent = rememberDockAccent()
     val accentNow = remember(dockAccent) { { dockAccent.color() } }
     val nameStyle = MaterialTheme.typography.labelMedium.let { remember(it) { it.copy(fontSize = DockNameSize) } }
-    // Between the two middle toggles, as the phone bar puts its transport.
-    val domeIndex = panels.size / 2
     val domeSideRoom = if (LocalTelevisionHardware.current) 0.dp else DockDomeSideRoom
 
     // Region-focus border — see tvFocusRegionBorder's doc for the single-holder exclusivity
@@ -305,59 +317,79 @@ fun DjTvBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 StepSlot(Alignment.CenterStart, Modifier.weight(1f)) { slotWidth ->
-                    val name = previousTileName(nav)
+                    val name = previousTileName(vibeNav)
                     StepTile(
                         // Past 5 s ◀ restarts the song, and says so.
-                        icon = if (nav.previousRestarts) Icons.Rounded.Replay else Icons.Rounded.SkipPrevious,
+                        icon = if (vibeNav.previousRestarts) Icons.Rounded.Replay else Icons.Rounded.SkipPrevious,
                         name = if (stepTileShowsName(slotWidth, name)) name.orEmpty() else "",
                         slotWidth = slotWidth,
                         onClick = pulsarFeature.actions.previousVibe,
-                        contentDescription = previousTileDescription(nav),
+                        contentDescription = previousTileDescription(vibeNav),
                         arrowFirst = true,
                         previewFocused = previewFocusPreviousTile,
                     )
                 }
                 // Aligned by the first baseline, so the dome hangs from the toggles' label line.
                 Row(horizontalArrangement = Arrangement.spacedBy(TvBottomBarItemGap)) {
-                    for (index in 0..panels.size) {
-                        if (index == domeIndex) {
-                            DockDome(
-                                pulsarFeature = pulsarFeature,
-                                onTogglePlayback = onTogglePlayback,
-                                ringSize = domeRingSize,
-                                nameStyle = nameStyle,
-                                accent = dockAccent,
-                                modifier = Modifier.alignBy(FirstBaseline).padding(horizontal = domeSideRoom),
-                                focusMark = focusHighlights,
-                                previewWavePhase = previewWavePhase,
-                                previewZipMs = previewZipMs,
-                            )
-                        }
-                        val route = panels.getOrNull(index) ?: continue
-                        TvBottomBarItem(
-                            icon = route.icon,
-                            label = route.label,
-                            docked = isDocked(route),
-                            onClick = { onToggle(route) },
-                            accent = dockAccent,
-                            modifier = Modifier.alignBy(FirstBaseline),
-                            previewFocused = route == previewFocusedRoute,
-                        )
-                    }
+                    for (entry in nav.left) key(entry) { NavSlot(entry, nav, customize, isDocked, onToggle, dockAccent, previewFocusedRoute) }
+                    DockDome(
+                        pulsarFeature = pulsarFeature,
+                        onTogglePlayback = onTogglePlayback,
+                        ringSize = domeRingSize,
+                        nameStyle = nameStyle,
+                        accent = dockAccent,
+                        modifier = Modifier.alignBy(FirstBaseline).padding(horizontal = domeSideRoom),
+                        focusMark = focusHighlights,
+                        previewWavePhase = previewWavePhase,
+                        previewZipMs = previewZipMs,
+                    )
+                    for (entry in nav.right) key(entry) { NavSlot(entry, nav, customize, isDocked, onToggle, dockAccent, previewFocusedRoute) }
                 }
                 StepSlot(Alignment.CenterEnd, Modifier.weight(1f)) { slotWidth ->
-                    val name = nextTileName(nav)
+                    val name = nextTileName(vibeNav)
                     StepTile(
                         icon = Icons.Rounded.SkipNext,
                         name = if (stepTileShowsName(slotWidth, name)) name.orEmpty() else "",
                         slotWidth = slotWidth,
                         onClick = pulsarFeature.actions.nextVibe,
-                        contentDescription = nextTileDescription(nav),
+                        contentDescription = nextTileDescription(vibeNav),
                         arrowFirst = false,
                         previewFocused = previewFocusNextTile,
                     )
                 }
             }
+        }
+        // Over the stage above the bar, taking no room of its own.
+        if (customize != null) TvNavChipRow(customize, Modifier.align(Alignment.TopCenter).floatAboveParent(TvChipRowGap))
+    }
+}
+
+/** One slot of the bar: a toggle for a panel, an empty gap for the open slot. */
+@Composable
+private fun RowScope.NavSlot(
+    entry: NavEntry,
+    nav: NavBar,
+    customize: TvNavCustomize?,
+    isDocked: (DjRoute) -> Boolean,
+    onToggle: (DjRoute) -> Unit,
+    accent: DockAccent,
+    previewFocusedRoute: DjRoute?,
+) {
+    when (entry) {
+        // A gap the width of a toggle, so the dome stays on the bar's centre; nothing in it takes focus.
+        NavEntry.Open -> Spacer(Modifier.size(TvBottomBarMinWidth, TvBottomBarMinHeight))
+        is NavEntry.Panel -> {
+            val route = entry.route
+            TvBottomBarItem(
+                icon = route.icon,
+                label = route.label,
+                docked = isDocked(route),
+                onClick = { onToggle(route) },
+                accent = accent,
+                modifier = Modifier.alignBy(FirstBaseline).tvNavTabKeys(customize, route, nav),
+                previewFocused = route == previewFocusedRoute,
+                moving = customize?.moving == route,
+            )
         }
     }
 }
@@ -485,6 +517,8 @@ private fun TvBottomBarItem(
     accent: DockAccent,
     modifier: Modifier = Modifier,
     previewFocused: Boolean = false,
+    // Move mode: the arrows slide this tab along the bar (see TvNavCustomize).
+    moving: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val liveFocused by interactionSource.collectIsFocusedAsState()
@@ -534,6 +568,7 @@ private fun TvBottomBarItem(
                         Modifier
                     }
                 )
+                .then(if (moving) Modifier.border(3.dp, LocalLiquidEffects.current.title.titleColor, shape) else Modifier)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
@@ -566,8 +601,16 @@ private fun TvBottomBarItem(
         // clickable underneath.
         if (isFocused) {
             Icon(
-                imageVector = if (docked) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                contentDescription = if (docked) "$label shown" else "$label hidden",
+                imageVector = when {
+                    moving -> Icons.Rounded.SwapHoriz
+                    docked -> Icons.Rounded.CheckCircle
+                    else -> Icons.Rounded.RadioButtonUnchecked
+                },
+                contentDescription = when {
+                    moving -> "Moving $label"
+                    docked -> "$label shown"
+                    else -> "$label hidden"
+                },
                 tint = focusAccent.lighten(TvBottomBarContentLighten),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -588,7 +631,7 @@ private fun DjTvBottomBarDefaultPreview() {
     OrpheusTheme {
         val docked = setOf<DjRoute>(DjTab, MixTab)
         DjTvBottomBar(
-            panels = bottomBarPanels(largeScreenPanels()),
+            nav = OgTvNavBar,
             isDocked = { it in docked },
             onToggle = {},
             pulsarFeature = PulsarViewModel.previewFeature(),
@@ -602,7 +645,7 @@ private fun DjTvBottomBarDefaultPreview() {
 private fun DjTvBottomBarEverythingDockedPreview() {
     OrpheusTheme {
         DjTvBottomBar(
-            panels = bottomBarPanels(largeScreenPanels()),
+            nav = OgTvNavBar,
             isDocked = { true },
             onToggle = {},
             pulsarFeature = PulsarViewModel.previewFeature(),
@@ -617,7 +660,7 @@ private fun DjTvBottomBarFocusedPreview() {
     OrpheusTheme {
         val docked = setOf<DjRoute>(DjTab, MixTab)
         DjTvBottomBar(
-            panels = bottomBarPanels(largeScreenPanels()),
+            nav = OgTvNavBar,
             isDocked = { it in docked },
             onToggle = {},
             pulsarFeature = PulsarViewModel.previewFeature(),
@@ -633,7 +676,7 @@ private fun DjTvBottomBarRegionFocusedPreview() {
     OrpheusTheme {
         val docked = setOf<DjRoute>(DjTab, MixTab)
         DjTvBottomBar(
-            panels = bottomBarPanels(largeScreenPanels()),
+            nav = OgTvNavBar,
             isDocked = { it in docked },
             onToggle = {},
             pulsarFeature = PulsarViewModel.previewFeature(),

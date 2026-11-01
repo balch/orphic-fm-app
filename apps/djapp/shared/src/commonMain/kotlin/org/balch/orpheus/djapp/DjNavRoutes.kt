@@ -5,6 +5,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SportsScore
 import androidx.compose.material.icons.rounded.SurroundSound
@@ -44,6 +45,12 @@ data object MixTab : DjRoute {
 data object HornTab : DjRoute {
     override val icon: ImageVector get() = Icons.Rounded.SurroundSound
     override val label: String = "Horn"
+}
+
+@Serializable
+data object CowbellTab : DjRoute {
+    override val icon: ImageVector get() = Icons.Rounded.Notifications
+    override val label: String = "Cowbell"
 }
 
 @Serializable

@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import org.balch.orpheus.djapp.AiTab
 import org.balch.orpheus.djapp.DjTab
+import org.balch.orpheus.djapp.HornTab
 import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.MixTab
 import org.balch.orpheus.djapp.TimerTab
@@ -423,6 +424,6 @@ class AiSheetLayoutTest {
 
     @Test
     fun theDockHasOneAiEntry() {
-        assertEquals(listOf(DjTab, MixTab, AiTab, TimerTab), mergeTabContributions(djTabs, listOf(AiTabContribution())))
+        assertEquals(listOf(DjTab, MixTab, HornTab, TimerTab, AiTab), mergeTabContributions(djTabs, listOf(AiTabContribution())))
     }
 }

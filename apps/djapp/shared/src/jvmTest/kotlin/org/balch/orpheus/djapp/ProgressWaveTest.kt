@@ -308,7 +308,7 @@ class ProgressWaveTest {
             CompositionLocalProvider(LocalTelevisionHardware provides tv) {
                 OrpheusTheme {
                     DjTvBottomBar(
-                        panels = bottomBarPanels(largeScreenPanels()),
+                        nav = OgTvNavBar,
                         isDocked = { compositions++; it == PulsarTab },
                         onToggle = {},
                         pulsarFeature = pulsar,

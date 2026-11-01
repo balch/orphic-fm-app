@@ -85,7 +85,6 @@ class DockTopBarTest {
                             dockablePanels = largeScreenPanels(),
                             dockedPanels = listOf(TimerTab, DjTab),
                             activeSheet = null,
-                            tabs = djTabs,
                             onToggleDocked = { toggled += it },
                             onActiveSheetChange = {},
                             stage = {},

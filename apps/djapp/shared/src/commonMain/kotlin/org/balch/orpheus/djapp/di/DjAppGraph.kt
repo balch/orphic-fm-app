@@ -11,6 +11,7 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.DomeWiggleLaunch
 import org.balch.orpheus.djapp.share.SharedTextInbox
+import org.balch.orpheus.djapp.variant.DjEdition
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
@@ -32,6 +33,9 @@ interface DjAppGraph : ViewModelGraph {
     val synthEngine: SynthEngine
     val globalTempo: GlobalTempo
     val djTabContributions: Set<DjTabContribution>
+
+    /** Which edition this graph is, derived from [djTabContributions]. */
+    val djEdition: DjEdition
 
     /** Drives PULSAR_PLAYING via PulsarPlaybackBridge (EXPLICIT playback mode). */
     val playbackController: PlaybackController

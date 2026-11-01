@@ -825,7 +825,7 @@ class VibeDomeCueTest {
                 OrpheusTheme {
                     Box(Modifier.fillMaxSize().background(background)) {
                         if (shown.value) DjTvBottomBar(
-                            panels = bottomBarPanels(largeScreenPanels()), isDocked = { false }, onToggle = {},
+                            nav = OgTvNavBar, isDocked = { false }, onToggle = {},
                             pulsarFeature = feature, onTogglePlayback = {},
                         )
                     }

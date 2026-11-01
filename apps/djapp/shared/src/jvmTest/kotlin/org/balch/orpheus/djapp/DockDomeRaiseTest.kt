@@ -152,7 +152,6 @@ class DockDomeRaiseTest {
                             dockablePanels = largeScreenPanels(),
                             dockedPanels = listOf(PulsarTab, DjTab, MixTab),
                             activeSheet = null,
-                            tabs = djTabs,
                             onToggleDocked = {},
                             onActiveSheetChange = {},
                             stage = {

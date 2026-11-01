@@ -69,6 +69,14 @@ val HornDisplayMinHeight: Dp = 88.dp
 fun hornDisplayHeightFor(slot: Dp, full: Dp): Dp =
     flexHeightFor(slot, HornFullDisplaySlotHeight, full, HornDisplayMinHeight)
 
+/**
+ * The docked cowbell's height: the dock wraps its content, so a weight-filled panel would collapse.
+ * Set by `renderCowbellSlotSweep` (the sweep prints the first height at which nothing squeezes,
+ * clips or truncates): 174dp at font scale 1, 181dp at 1.15 and 190dp at 1.3, the stack of three
+ * knobs with readouts. 200dp keeps 10dp spare at 1.3 and gives the bell the whole height.
+ */
+val CowbellDockedHeight: Dp = 200.dp
+
 /** [full] less whatever [slot] is short of [fullSlot], never under [min]. */
 private fun flexHeightFor(slot: Dp, fullSlot: Dp, full: Dp, min: Dp): Dp =
     (full - (fullSlot - slot).coerceAtLeast(0.dp)).coerceAtLeast(min)

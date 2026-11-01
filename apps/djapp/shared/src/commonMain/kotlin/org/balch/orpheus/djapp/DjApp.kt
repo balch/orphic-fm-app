@@ -181,6 +181,7 @@ fun DjApp(
                                 synthEngine = graph.synthEngine,
                                 vizFeature = vizFeature,
                                 appPreferencesRepository = graph.appPreferencesRepository,
+                                edition = graph.djEdition,
                                 onTogglePlayback = onTogglePlayback,
                                 modifier = Modifier.fillMaxSize(),
                                 tabContributions = tabContributions,

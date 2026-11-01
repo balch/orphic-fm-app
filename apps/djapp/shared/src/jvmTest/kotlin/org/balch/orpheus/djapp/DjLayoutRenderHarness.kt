@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +41,8 @@ import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjViewModel
 import org.balch.orpheus.features.horn.HornDisplayHeight
+import org.balch.orpheus.features.cowbell.CowbellViewModel
+import org.balch.orpheus.features.cowbell.dj.CowbellDjPanel
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
@@ -538,6 +541,81 @@ class DjLayoutRenderHarness {
     }
 
     /**
+     * The DJ cowbell panel alone in a nav slot at 412dp and 350dp wide (and 350dp at font scales
+     * 1.15 and 1.3) over a sweep of heights. Sets [CowbellDockedHeight] (and checks `DjKnobSize` and `DjControlsWidth`): each
+     * row prints the gap between the lowest control and the panel's foot (negative clips), the
+     * bell's height, and whether any label squeezes, clips or truncates.
+     */
+    @Test
+    fun renderCowbellSlotSweep() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        for ((width, fontScale) in listOf(412 to 1f, 412 to 1.3f, 350 to 1f, 350 to 1.15f, 350 to 1.3f)) {
+            val tag = if (fontScale == 1f) "$width" else "$width@$fontScale"
+            val tall = cowbellTallReading(width, fontScale)
+            fun readAt(height: Int, save: Boolean): CowbellFitReading {
+                val scene = ImageComposeScene(width, height, Density(1f, fontScale)) {
+                    OrpheusTheme {
+                        CompositionLocalProvider(LocalLiquidEffects provides VisualizationLiquidEffects.Default) {
+                            Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                                CowbellDjPanel(
+                                    feature = CowbellViewModel.previewFeature(),
+                                    modifier = Modifier.fillMaxSize().testTag("cowbellSlot"),
+                                )
+                            }
+                        }
+                    }
+                }
+                try {
+                    repeat(8) { scene.render() }
+                    val r = scene.readCowbellFit("cowbellSlot", lift = 0f)
+                    if (save) File(outDir, "cowbell-slot-$tag-$height.png").writeBytes(scene.render().encodeToData()!!.bytes)
+                    return r
+                } finally {
+                    scene.close()
+                }
+            }
+            fun fits(r: CowbellFitReading) =
+                r.squeezedAgainst(tall).isEmpty() && r.gap >= -0.5f && r.clipped.isEmpty() && r.overflowing.isEmpty()
+            for (height in 140..400 step 10) {
+                val r = readAt(height, save = true)
+                val squeezed = r.squeezedAgainst(tall)
+                println("[cowbell-sweep] ${tag}x$height ${if (fits(r)) "fits" else "CLIPS"} gap=${r.gap}dp bell=${r.bell?.height}dp squeezed=$squeezed clipped=${r.clipped} overflowing=${r.overflowing}")
+            }
+            // The exact smallest height whose controls all keep their full boxes.
+            val exact = (140..400).first { h -> fits(readAt(h, save = false)) }
+            println("[cowbell-sweep] ${tag}dp wide: first fits at ${exact}dp, bell ${readAt(exact, save = false).bell?.height}dp")
+        }
+        // The docked bell through the route, as the dock builds it: CowbellDockedHeight tall.
+        runCatching {
+            val scene = ImageComposeScene(420, 400, Density(1f)) {
+                OrpheusTheme {
+                    CompositionLocalProvider(LocalLiquidEffects provides VisualizationLiquidEffects.Default) {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            CowbellRoutePanel(
+                                synthEngine = RenderProbeSynthEngine(),
+                                modifier = Modifier.fillMaxWidth(),
+                                docked = true,
+                                lift = 0.dp,
+                                feature = CowbellViewModel.previewFeature(),
+                            )
+                        }
+                    }
+                }
+            }
+            try {
+                repeat(4) { scene.render() }
+                File(outDir, "cowbell-docked.png").writeBytes(scene.render().encodeToData()!!.bytes)
+            } finally {
+                scene.close()
+            }
+        }.onFailure {
+            if (it is IllegalStateException) throw it
+            println("[render-harness] cowbell docked skipped: $it")
+        }
+        println("[render-harness] wrote cowbell sweep PNGs to ${outDir.absolutePath}")
+    }
+
+    /**
      * The whole portrait screen at a closed iPhone Duo's size, once per lower panel. 466x644dp is
      * the 678pt display less the 34pt home-indicator inset the harness cannot supply.
      */
@@ -696,7 +774,7 @@ class DjLayoutRenderHarness {
                                     previewFocusedButton = TvTopBarButtonId.VIZ_PICKER,
                                 )
                                 DjTvBottomBar(
-                                    panels = bottomBarPanels(allPanels),
+                                    nav = OgTvNavBar,
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
                                     pulsarFeature = PulsarViewModel.previewFeature(),
@@ -814,7 +892,7 @@ class DjLayoutRenderHarness {
                                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
                                         DockSongBand(armedPulsar, previewWavePhase = 1f)
                                         DjTvBottomBar(
-                                            panels = bottomBarPanels(allPanels),
+                                            nav = OgTvNavBar,
                                             isDocked = { it == DjTab },
                                             onToggle = {},
                                             pulsarFeature = armedPulsar,
@@ -992,7 +1070,7 @@ class DjLayoutRenderHarness {
                                         modifier = Modifier.width(70.dp),
                                     )
                                     DjTvBottomBar(
-                                        panels = bottomBarPanels(allPanels),
+                                        nav = OgTvNavBar,
                                         isDocked = { it == PulsarTab || it == DjTab },
                                         onToggle = {},
                                         pulsarFeature = PulsarViewModel.previewFeature(),
@@ -1081,7 +1159,7 @@ class DjLayoutRenderHarness {
                                 }
                                 // Bottom bar "focused": only its border shows.
                                 DjTvBottomBar(
-                                    panels = bottomBarPanels(allPanels),
+                                    nav = OgTvNavBar,
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
                                     pulsarFeature = PulsarViewModel.previewFeature(),
@@ -1655,7 +1733,6 @@ private fun DockChrome(docked: List<DjRoute>, tvHardware: Boolean) {
         dockablePanels = largeScreenPanels(),
         dockedPanels = docked,
         activeSheet = null,
-        tabs = djTabs,
         onToggleDocked = {},
         onActiveSheetChange = {},
         stage = {
@@ -1713,6 +1790,10 @@ internal fun PreviewRoutePanel(route: DjRoute, modifier: Modifier, docked: Boole
             showCollapsedHeader = false,
             showExpandedTitle = false,
             fillHeight = false,
+        )
+        CowbellTab -> CowbellDjPanel(
+            feature = CowbellViewModel.previewFeature(),
+            modifier = if (docked) modifier.height(CowbellDockedHeight) else modifier,
         )
         VibeInfoTab -> VibeInfoPanel(
             pulsar = PulsarViewModel.previewFeature(),
@@ -1793,6 +1874,10 @@ private fun NavDestinationPanel(route: DjRoute, modifier: Modifier) {
                 },
             )
         }
+        CowbellTab -> CowbellDjPanel(
+            feature = CowbellViewModel.previewFeature(),
+            modifier = modifier.padding(bottom = HornPillClearance),
+        )
         TimerTab -> TimerPanel(
             feature = TimerViewModel.previewFeature(),
             modifier = modifier,

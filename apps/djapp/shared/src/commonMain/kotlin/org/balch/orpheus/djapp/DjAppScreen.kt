@@ -77,9 +77,9 @@ import org.balch.orpheus.djapp.playlist.PlaylistSheet
 import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.djapp.share.shareMarker
 import org.balch.orpheus.djapp.share.shouldOpenForShare
+import org.balch.orpheus.djapp.variant.DjEdition
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
-import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.djapp.variant.stageChromeOverhang
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
@@ -141,6 +141,7 @@ fun DjAppScreen(
     synthEngine: SynthEngine,
     vizFeature: VizFeature,
     appPreferencesRepository: AppPreferencesRepository,
+    edition: DjEdition,
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
     tabContributions: List<DjTabContribution> = emptyList(),
@@ -169,14 +170,15 @@ fun DjAppScreen(
     // activity, and a plain remember snapped the bottom panel back to DJ.
     val backStack = rememberSaveable(saver = BottomTabBackStackSaver) { NavBackStack<DjRoute>(DjTab) }
     val currentRoute = backStack.lastOrNull() ?: DjTab
-    val tabs = remember(tabContributions) { mergeTabContributions(djTabs, tabContributions) }
+    // The panels a tab can open here; Pulsar is the stage's, never a tab of the single-panel layouts.
+    val tabPanels = remember(edition) { navPanels(edition) - PulsarTab }
 
     // Single state for "which sheet is open" (a tab-sheet contribution's route, VibeInfoTab, or
     // null): one value replacing itself needs no separate "close the other sheet" bookkeeping.
     // rememberSaveable: survives Android rotation so an in-flight AI generation stays visible
     // instead of the sheet closing mid-run while the agent keeps working unseen.
-    val sheetRouteSaver = remember(tabs) {
-        val byKey = (tabs + VibeInfoTab + PlaylistRoute).associateBy { it.label }
+    val sheetRouteSaver = remember(tabPanels) {
+        val byKey = (tabPanels + VibeInfoTab + PlaylistRoute).associateBy { it.label }
         Saver<DjRoute?, String>(
             save = { route -> route?.label ?: "" },
             restore = { key -> byKey[key] },
@@ -189,10 +191,10 @@ fun DjAppScreen(
     // A shared tab opens the AI sheet; the marker is saved so rotation doesn't reopen it, and
     // carries the inbox session so a count from before process death is ignored.
     var handledShares by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(sharedTextInbox, tabs) {
+    LaunchedEffect(sharedTextInbox, edition) {
         val inbox = sharedTextInbox ?: return@LaunchedEffect
         inbox.openRequests.collect { count ->
-            if (shouldOpenForShare(handledShares, inbox.session, count) && AiTab in tabs) {
+            if (shouldOpenForShare(handledShares, inbox.session, count) && edition == DjEdition.AI) {
                 if (activeSheet != AiTab) activeSheet = AiTab
                 handledShares = shareMarker(inbox.session, count)
             }
@@ -215,7 +217,7 @@ fun DjAppScreen(
     // slot-fill order (see assignDock). Null until prefs load so the first frame doesn't flash
     // the default set before the restored one replaces it.
     var dockedPanels by remember { mutableStateOf<List<DjRoute>?>(null) }
-    val dockablePanels = remember(tabs) { largeScreenPanels(tabs) }
+    val dockablePanels = remember(tabPanels) { largeScreenPanels(tabPanels) }
 
     val toggleDocked: (DjRoute) -> Unit = { route ->
         // Unbounded: the dock never evicts. togglePanel's append is what makes toggle order the
@@ -244,7 +246,7 @@ fun DjAppScreen(
     // The wide-portrait bottom pair. Its own list rather than dockedPanels: the pair holds two
     // and evicts the oldest, and a shared list would let that eviction undock a landscape panel.
     var pairPanels by remember { mutableStateOf<List<DjRoute>?>(null) }
-    val pairablePanels = remember(tabs) { portraitPairPanels(tabs) }
+    val pairablePanels = remember(tabPanels) { portraitPairPanels(tabPanels) }
 
     val togglePair: (DjRoute) -> Unit = { route ->
         val next = togglePanel(pairPanels.orEmpty(), route, capacity = PortraitPairCapacity)
@@ -264,6 +266,25 @@ fun DjAppScreen(
             pairPanels = saved?.mapNotNull { byLabel[it] }?.take(PortraitPairCapacity)
                 ?: DefaultPortraitPair.filter { it in pairablePanels }
         }
+    }
+
+    // The nav order, shared by every layout. Null until prefs load, so a gesture before then
+    // swaps the default order, which is what the bar shows meanwhile.
+    var navOrder by remember { mutableStateOf<List<NavEntry>?>(null) }
+    val navPanelList = remember(edition) { navPanels(edition) }
+    val defaultOrder = remember(navPanelList) { defaultNavOrder(navPanelList) }
+    val currentNavOrder = navOrder ?: defaultOrder
+
+    // Only an edition with customization loads a saved order: the other's bar is fixed.
+    LaunchedEffect(navPanelList) {
+        val saved = if (edition.customizableNav) appPreferencesRepository.load().navOrder else null
+        // Same guard as the pair: a swap during this suspend already claimed the value.
+        if (navOrder == null) navOrder = restoreNavOrder(saved, navPanelList)
+    }
+
+    val saveNavOrder: (List<NavEntry>) -> Unit = { next ->
+        navOrder = next
+        scope.launch { appPreferencesRepository.update { it.copy(navOrder = next.toSaved()) } }
     }
 
     CompositionLocalProvider(LocalEightBall provides eightBall) {
@@ -348,6 +369,12 @@ fun DjAppScreen(
                                 fill = fill,
                                 lift = hornPillLift(layout, docked, barShown = presetChrome.available && presetChrome.barShown),
                             )
+                            CowbellTab -> CowbellRoutePanel(
+                                synthEngine = synthEngine,
+                                modifier = panelModifier,
+                                docked = docked,
+                                lift = hornPillLift(layout, docked, barShown = presetChrome.available && presetChrome.barShown),
+                            )
                             VibeInfoTab -> VibeInfoPanel(
                                 pulsar = pulsarFeature,
                                 vizFlow = synthEngine.pulsarVizFlow,
@@ -389,6 +416,7 @@ fun DjAppScreen(
                                 entry<TimerTab> { routePanel(TimerTab, Modifier.fillMaxSize(), false) }
                                 entry<MixTab> { routePanel(MixTab, Modifier.fillMaxSize(), false) }
                                 entry<HornTab> { routePanel(HornTab, Modifier.fillMaxSize(), false) }
+                                entry<CowbellTab> { routePanel(CowbellTab, Modifier.fillMaxSize(), false) }
                             },
                         )
                     }
@@ -439,6 +467,44 @@ fun DjAppScreen(
                 }
             }
 
+            // A tab's tap in the single-panel and pair layouts; a chip's double-tap opens through it too.
+            val onItemClick: (DjRoute) -> Unit = { route ->
+                activeSheet = sheetAfterBarTab(activeSheet, route)
+                when {
+                    route.opensAsSheet -> Unit
+                    // Pair layouts: the nav is a toggle bar, not single-select navigation.
+                    layout.showsPair() -> togglePair(route)
+                    route != currentRoute -> {
+                        backStack.clear()
+                        backStack.add(route)
+                    }
+                }
+            }
+            // On the dock a panel opens by docking, a sheet by showing; the other layouts use the tap.
+            val openOffBar: (DjRoute) -> Unit = { route ->
+                when {
+                    layout != DjLayout.LargeScreen -> onItemClick(route)
+                    route in dockablePanels -> if (route !in dockedPanels.orEmpty()) toggleDocked(route)
+                    else -> activeSheet = route
+                }
+            }
+            val navActions = remember(edition, defaultOrder, openOffBar, togglePair, toggleDocked, saveNavOrder) {
+                if (edition.customizableNav) {
+                    NavActions(
+                        onChipSwap = { slot, chip ->
+                            saveNavOrder(swapEntries(navOrder ?: defaultOrder, NavEntry.Panel(slot), NavEntry.Panel(chip)))
+                            // Nothing stays lit without a tab to turn it off. Portrait's shown panel stays.
+                            if (slot in pairPanels.orEmpty()) togglePair(slot)
+                            if (slot in dockedPanels.orEmpty()) toggleDocked(slot)
+                        },
+                        onExchange = { a, b -> saveNavOrder(swapEntries(navOrder ?: defaultOrder, a, b)) },
+                        onOpenOffBar = openOffBar,
+                    )
+                } else {
+                    null
+                }
+            }
+
             when (layout) {
                 DjLayout.LargeScreen -> {
                     // remember: the holder must survive recomposition or focus resets.
@@ -460,7 +526,8 @@ fun DjAppScreen(
                         dockablePanels = dockablePanels,
                         dockedPanels = dockedPanels.orEmpty(),
                         activeSheet = activeSheet,
-                        tabs = tabs,
+                        navOrder = currentNavOrder,
+                        navActions = navActions,
                         onToggleDocked = toggleDocked,
                         onActiveSheetChange = { activeSheet = it },
                         stage = stage,
@@ -476,23 +543,13 @@ fun DjAppScreen(
                                 else -> route == currentRoute
                             }
                         },
-                        onItemClick = { route ->
-                            activeSheet = sheetAfterBarTab(activeSheet, route)
-                            when {
-                                route.opensAsSheet -> Unit
-                                // Pair layouts: the nav is a toggle bar, not single-select navigation.
-                                layout.showsPair() -> togglePair(route)
-                                route != currentRoute -> {
-                                    backStack.clear()
-                                    backStack.add(route)
-                                }
-                            }
-                        },
+                        onItemClick = onItemClick,
                         layout = layout,
                         pulsarFeature = pulsarFeature,
                         timerFeature = timerFeature,
                         onTogglePlayback = onTogglePlayback,
-                        tabs = tabs,
+                        navOrder = currentNavOrder,
+                        navActions = navActions,
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         stage()
@@ -547,7 +604,7 @@ internal fun sheetAfterBarTab(activeSheet: DjRoute?, tapped: DjRoute): DjRoute? 
  * destinations NavDisplay has entries for can be restored.
  */
 internal val BottomTabBackStackSaver: Saver<NavBackStack<DjRoute>, String> = run {
-    val byLabel = listOf(DjTab, TimerTab, MixTab, HornTab).associateBy { it.label }
+    val byLabel = listOf(DjTab, TimerTab, MixTab, HornTab, CowbellTab).associateBy { it.label }
     Saver(
         save = { stack -> stack.lastOrNull()?.label ?: DjTab.label },
         restore = { label -> NavBackStack<DjRoute>(byLabel[label] ?: DjTab) },
@@ -883,7 +940,9 @@ internal fun DjAppTvChrome(
     dockablePanels: List<DjRoute>,
     dockedPanels: List<DjRoute>,
     activeSheet: DjRoute?,
-    tabs: List<DjRoute>,
+    navOrder: List<NavEntry> = OgNavOrder,
+    // The remote's long-press and move gestures; null (OG) leaves the bar as plain toggles.
+    navActions: NavActions? = null,
     onToggleDocked: (DjRoute) -> Unit,
     onActiveSheetChange: (DjRoute?) -> Unit,
     stage: @Composable () -> Unit,
@@ -905,12 +964,13 @@ internal fun DjAppTvChrome(
         TvFocusIdleWatcher(focusRegion)
 
         val panelFade = LocalPanelIdleFade.current
-        // Sheet-only tab contributions (e.g. AI) have no dock slot of their own; appending them
-        // here is their only entry point on this layout. Remembered, so a chrome recomposition
-        // that is not the bottom bar's business (a window resize) leaves it free to skip.
-        val bottomPanels = remember(dockablePanels, tabs) {
-            bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet }
-        }
+        // The saved order, as far as the bar's centre between the ◀/▶ tiles holds. A sheet-only panel
+        // (AI) has no dock slot, so its tab here is its only entry point. The slot count is state that
+        // changes only when the cap does, so a window resize that keeps it leaves the bar free to skip.
+        var maxSlots by remember { mutableIntStateOf(TvBarMaxSlots) }
+        val density = LocalDensity.current
+        val canvasScale = LocalCanvasScale.current
+        val bottomNav = remember(navOrder, maxSlots) { navBar(navOrder, navDrops(DjLayout.LargeScreen), maxSlots) }
         val topPanels = remember(dockablePanels) { topBarPanels(dockablePanels) }
         // Both bars' toggles. Branch on dockablePanels membership, NOT route.opensAsSheet:
         // VibeInfoTab also has opensAsSheet=true (it governs only the phone/tablet path per its own
@@ -928,6 +988,7 @@ internal fun DjAppTvChrome(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .onSizeChanged { maxSlots = tvBarMaxSlots(with(density) { it.width.toDp() }, canvasScale) }
                 // Tunnels through here before reaching whatever's focused. This ONLY
                 // timestamps activity and always returns false, so it never consumes the
                 // event or otherwise changes behavior. The dome's own preview watchers (the
@@ -965,7 +1026,8 @@ internal fun DjAppTvChrome(
             // After the stage, so the dome rising out of the bar draws over it and takes its taps
             // first; nothing else in the bar reaches past its top edge.
             DjTvBottomBar(
-                panels = bottomPanels,
+                nav = bottomNav,
+                navActions = navActions,
                 isDocked = isDocked,
                 onToggle = onToggle,
                 pulsarFeature = pulsarFeature,

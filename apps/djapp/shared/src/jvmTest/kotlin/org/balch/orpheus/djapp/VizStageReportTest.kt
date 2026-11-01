@@ -115,7 +115,7 @@ class VizStageReportTest {
                         ) { _, mod -> filler(mod) }
                     }
                     DjTvBottomBar(
-                        panels = bottomBarPanels(largeScreenPanels()),
+                        nav = OgTvNavBar,
                         isDocked = { false },
                         onToggle = {},
                         pulsarFeature = PulsarViewModel.previewFeature(),
@@ -145,7 +145,6 @@ class VizStageReportTest {
                 dockablePanels = largeScreenPanels(),
                 dockedPanels = listOf(PulsarTab, DjTab),
                 activeSheet = null,
-                tabs = djTabs,
                 onToggleDocked = {},
                 onActiveSheetChange = {},
                 stage = {

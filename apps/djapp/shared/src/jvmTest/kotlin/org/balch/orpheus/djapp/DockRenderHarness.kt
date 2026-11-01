@@ -215,7 +215,6 @@ class DockRenderHarness {
                             dockablePanels = largeScreenPanels(),
                             dockedPanels = docked,
                             activeSheet = null,
-                            tabs = djTabs,
                             onToggleDocked = {},
                             onActiveSheetChange = {},
                             stage = {

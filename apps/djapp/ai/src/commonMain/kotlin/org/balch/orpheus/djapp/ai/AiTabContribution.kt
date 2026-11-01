@@ -37,7 +37,6 @@ import kotlinx.coroutines.flow.map
 import org.balch.orpheus.djapp.AdaptiveSheet
 import org.balch.orpheus.djapp.AiTab
 import org.balch.orpheus.djapp.DjRoute
-import org.balch.orpheus.djapp.HornTab
 import org.balch.orpheus.djapp.ai.chat.ChatColumn
 import org.balch.orpheus.djapp.ai.chat.ChatInk
 import org.balch.orpheus.djapp.ai.chat.ChatInputFocus
@@ -72,7 +71,7 @@ private const val StackedMixerWeight = 0.45f
 @ContributesIntoSet(AppScope::class, binding = binding<DjTabContribution>())
 class AiTabContribution : DjTabContribution {
     override val route: DjRoute = AiTab
-    override val replaces: DjRoute? = HornTab
+    override val replaces: DjRoute? = null
 
     @Composable
     override fun Content(

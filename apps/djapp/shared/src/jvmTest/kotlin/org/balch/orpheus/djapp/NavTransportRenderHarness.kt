@@ -64,7 +64,7 @@ class NavTransportRenderHarness {
                     pulsarFeature = feature,
                     timerFeature = TimerViewModel.previewFeature(),
                     onTogglePlayback = {},
-                    tabs = tabs,
+                    navOrder = tabs.map(NavEntry::Panel),
                     modifier = Modifier.fillMaxSize().background(Color(0xFF14141F)),
                 ) { Box(Modifier.fillMaxSize()) }
             }
@@ -137,7 +137,6 @@ class NavTransportRenderHarness {
                             pulsarFeature = feature,
                             timerFeature = TimerViewModel.previewFeature(),
                             onTogglePlayback = {},
-                            tabs = djTabs,
                             modifier = Modifier.fillMaxSize().background(Color(0xFF14141F)),
                         ) { Box(Modifier.fillMaxSize()) }
                     }
@@ -175,7 +174,7 @@ class NavTransportRenderHarness {
                         OrpheusTheme {
                             DjAppNavScaffold(
                                 isSelected = { it == DjTab }, onItemClick = {}, layout = layout, pulsarFeature = pulsar,
-                                timerFeature = TimerViewModel.previewFeature(), onTogglePlayback = {}, tabs = djTabs,
+                                timerFeature = TimerViewModel.previewFeature(), onTogglePlayback = {},
                                 modifier = Modifier.fillMaxSize().background(Color(0xFF14141F)),
                             ) { Box(Modifier.fillMaxSize()) }
                         }

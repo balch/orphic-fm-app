@@ -30,6 +30,14 @@ import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.features.cowbell.CowbellFeature
+import org.balch.orpheus.features.cowbell.CowbellPanelActions
+import org.balch.orpheus.features.cowbell.CowbellUiState
+import org.balch.orpheus.features.cowbell.CowbellViewModel
+import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
@@ -203,6 +211,105 @@ class DjAppMainContentWiringTest {
         d.run(10_000)
         assertTrue(d.panelIsPainted(), "the panel went away on its own after being docked")
         d.close()
+    }
+
+    // ==================== the cowbell tab ====================
+
+    /**
+     * A bell held in SYNTH keeps sounding until something lets go. This proves the route panel
+     * lets go when it leaves composition: `releaseAll` on a recording [CowbellFeature] and the viz
+     * poll's on/off. The tab switch here is the test's own `when`, not `NavDisplay`: that the nav
+     * disposes the old entry on `backStack.clear(); add(route)` is read from DjAppScreen, not run.
+     */
+    @Test
+    fun leavingCowbellTabReleasesHold() {
+        var held = false
+        var releases = 0
+        val feature = object : CowbellFeature {
+            override val stateFlow: StateFlow<CowbellUiState> =
+                MutableStateFlow(CowbellUiState(mode = CowbellMode.SYNTH))
+            override val actions = CowbellPanelActions.EMPTY.copy(
+                onHold = { _, _ -> held = true },
+                releaseAll = { held = false; releases++ },
+            )
+        }
+        val vizCalls = mutableListOf<Boolean>()
+        val probe = RenderProbeSynthEngine()
+        val engine = object : SynthEngine by probe {
+            override fun setCowbellVizEnabled(enabled: Boolean) { vizCalls += enabled }
+        }
+        val selected = mutableStateOf<DjRoute>(CowbellTab)
+        val scene = ImageComposeScene(360, 780, Density(1f)) {
+            OrpheusTheme {
+                Box(Modifier.fillMaxSize().background(VoidColour)) {
+                    when (selected.value) {
+                        CowbellTab -> CowbellRoutePanel(
+                            synthEngine = engine,
+                            modifier = Modifier.fillMaxSize(),
+                            docked = false,
+                            lift = 0.dp,
+                            feature = feature,
+                        )
+                        else -> Box(Modifier.fillMaxSize())
+                    }
+                }
+            }
+        }
+        try {
+            repeat(2) { scene.render() }
+            assertEquals(listOf(true), vizCalls, "the viz poll did not turn on with the tab")
+            feature.actions.onHold(0.5f, 0.5f)
+            assertTrue(held, "sanity: the hold took")
+
+            selected.value = DjTab
+            repeat(2) { scene.render() }
+            assertEquals(1, releases, "leaving the tab did not let go exactly once")
+            assertTrue(!held, "the bell is still held after leaving the tab")
+            assertEquals(listOf(true, false), vizCalls, "the viz poll kept running after the tab left")
+        } finally {
+            scene.close()
+        }
+    }
+
+    /**
+     * The Cowbell tab arms the cowbell's LIVE gate through its feature while shown, and lets go
+     * when it leaves, so a strike sounds through a pause. The view model's own port write is
+     * covered in :features:cowbell.
+     */
+    @Test
+    fun cowbellTabArmsLiveWhileShown() {
+        val arms = mutableListOf<Boolean>()
+        val feature = object : CowbellFeature by CowbellViewModel.previewFeature() {
+            override fun armLive() { arms += true }
+            override fun disarmLive() { arms += false }
+        }
+        val engine = RenderProbeSynthEngine()
+        val selected = mutableStateOf<DjRoute>(CowbellTab)
+        val scene = ImageComposeScene(360, 780, Density(1f)) {
+            OrpheusTheme {
+                Box(Modifier.fillMaxSize().background(VoidColour)) {
+                    when (selected.value) {
+                        CowbellTab -> CowbellRoutePanel(
+                            synthEngine = engine,
+                            modifier = Modifier.fillMaxSize(),
+                            docked = false,
+                            lift = 0.dp,
+                            feature = feature,
+                        )
+                        else -> Box(Modifier.fillMaxSize())
+                    }
+                }
+            }
+        }
+        try {
+            repeat(2) { scene.render() }
+            assertEquals(listOf(true), arms, "the tab did not arm LIVE when shown")
+            selected.value = DjTab
+            repeat(2) { scene.render() }
+            assertEquals(listOf(true, false), arms, "LIVE stayed armed after the tab left")
+        } finally {
+            scene.close()
+        }
     }
 
     /**
@@ -475,7 +582,6 @@ class DjAppMainContentWiringTest {
                 dockablePanels = largeScreenPanels(),
                 dockedPanels = emptyList(),
                 activeSheet = null,
-                tabs = djTabs,
                 onToggleDocked = {},
                 onActiveSheetChange = {},
                 stage = content,

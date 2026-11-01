@@ -54,9 +54,12 @@ import org.balch.orpheus.djapp.DjAppNavScaffold
 import org.balch.orpheus.djapp.DjLayout
 import org.balch.orpheus.djapp.DjTab
 import org.balch.orpheus.djapp.DjTvBottomBar
+import org.balch.orpheus.djapp.defaultNavOrder
+import org.balch.orpheus.djapp.navBar
 import org.balch.orpheus.djapp.HornTab
 import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.MixTab
+import org.balch.orpheus.djapp.NavEntry
 import org.balch.orpheus.djapp.PulsarTab
 import org.balch.orpheus.djapp.djTabs
 import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
@@ -274,7 +277,7 @@ class AiMixerRenderHarness {
             Spacer(Modifier.height(108.dp))
             Box(Modifier.weight(1f).fillMaxWidth()) { Stage(feature, DjLayout.LargeScreen) }
             DjTvBottomBar(
-                panels = listOf(DjTab, MixTab, PulsarTab, AiTab),
+                nav = navBar(defaultNavOrder(listOf(DjTab, MixTab, PulsarTab, AiTab)), emptySet(), 8),
                 isDocked = { it == AiTab },
                 onToggle = {},
                 pulsarFeature = pulsar,
@@ -294,7 +297,7 @@ class AiMixerRenderHarness {
             pulsarFeature = pulsar,
             timerFeature = TimerViewModel.previewFeature(),
             onTogglePlayback = {},
-            tabs = djTabs.map { if (it == HornTab) AiTab else it },
+            navOrder = djTabs.map { if (it == HornTab) AiTab else it }.map(NavEntry::Panel),
             modifier = Modifier.fillMaxSize().background(MixerInk.sourceCard),
         ) { Stage(feature, DjLayout.Portrait) }
     }

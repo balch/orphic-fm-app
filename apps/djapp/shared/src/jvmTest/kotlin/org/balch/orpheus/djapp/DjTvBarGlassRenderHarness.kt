@@ -148,7 +148,7 @@ class DjTvBarGlassRenderHarness {
                                 ) { route, mod -> BarGlassProbePanel(route, mod) }
                             }
                             DjTvBottomBar(
-                                panels = bottomBarPanels(allPanels),
+                                nav = OgTvNavBar,
                                 isDocked = { it in docked.toSet() },
                                 onToggle = {},
                                 pulsarFeature = PulsarViewModel.previewFeature(),

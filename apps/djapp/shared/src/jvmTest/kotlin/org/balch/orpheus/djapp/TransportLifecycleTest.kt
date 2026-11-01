@@ -114,7 +114,7 @@ class TransportLifecycleTest {
     @Test
     fun theDockDomeLetsGoWhileStopped() = assertLetsGoWhileStopped("dock dome", 1280, 200) { pulsar ->
         DjTvBottomBar(
-            panels = bottomBarPanels(largeScreenPanels()), isDocked = { false }, onToggle = {},
+            nav = OgTvNavBar, isDocked = { false }, onToggle = {},
             pulsarFeature = pulsar, onTogglePlayback = {},
         )
     }
