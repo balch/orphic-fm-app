@@ -186,6 +186,8 @@ private fun ChatMessage.markdownColors(): DefaultMarkdownColors {
             inlineCodeBackground = containerColor.copy(alpha = 0.5f),
             dividerColor = textColor.copy(alpha = 0.2f),
             tableBackground = containerColor,
+            highlightText = textColor,
+            highlightBackground = textColor.copy(alpha = 0.2f),
         )
     }
 }
