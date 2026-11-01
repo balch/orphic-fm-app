@@ -57,14 +57,15 @@ static constexpr float kVibratoOnsetSeconds = 0.3f;
 static constexpr float kRiseReturnSeconds = 0.08f;
 
 // One block of a per-note rise: a 0..1 ramp over `time` seconds that restarts on a note-on,
-// reached by gliding from the last note's offset for kRiseReturnSeconds. Returns the offset.
+// reached by gliding from the last note's offset for kRiseReturnSeconds, or at once when
+// `snap` is set. Returns the offset.
 static float advance_note_rise(float rise, float time, bool retrig, float& progress, float& offset,
                                float& return_from, float& return_progress, int num_frames,
-                               float sample_rate) {
+                               float sample_rate, bool snap = false) {
     if (retrig) {
         progress = 0.0f;
         return_from = offset;
-        return_progress = 0.0f;
+        return_progress = snap ? 1.0f : 0.0f;
     }
     float out = rise * progress;
     if (return_progress < 1.0f) {
@@ -6087,11 +6088,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Morph rise ──
         // The same per-note ramp on morph: on SPK morph picks the vowel, so a rise sweeps it
         // within each note (VOWEL_FOF's vowel is harmonics). Added after every morph modulation.
+        // On OSC morph is the FM index, and a falling rise is a pluck's FM decay: the note-on
+        // snaps back so every attack gets its full index rather than swelling into it.
         if (ts.morph_rise != 0.0f) {
             mod_morph += advance_note_rise(ts.morph_rise, ts.morph_rise_time, ts.pending_retrig,
                                            ts.morph_rise_progress, ts.morph_rise_offset,
                                            ts.morph_rise_return_from, ts.morph_rise_return_progress,
-                                           num_frames, sample_rate);
+                                           num_frames, sample_rate, ts.engine_index < 0);
         }
 
         // ── Render voice ──
