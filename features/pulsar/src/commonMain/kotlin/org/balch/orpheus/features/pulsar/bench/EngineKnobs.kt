@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.bench
 
 import kotlin.math.floor
+import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.OrpheusEngineId.ADD
 import org.balch.orpheus.core.audio.OrpheusEngineId.BD
@@ -43,7 +44,6 @@ import org.balch.orpheus.core.audio.OrpheusEngineId.VCF
 import org.balch.orpheus.core.audio.OrpheusEngineId.VOWEL_FOF
 import org.balch.orpheus.core.audio.OrpheusEngineId.WSH
 import org.balch.orpheus.core.audio.OrpheusEngineId.WTB
-import org.balch.orpheus.features.pulsar.FmPatchNames
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe

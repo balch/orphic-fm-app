@@ -1,6 +1,5 @@
-package org.balch.orpheus.features.pulsar
+package org.balch.orpheus.core.audio
 
-import org.balch.orpheus.core.audio.OrpheusEngineId
 import kotlin.math.floor
 
 /**
@@ -74,10 +73,15 @@ object FmPatchNames {
      * not a DX-family engine (caller should fall back to `engineId.displayName`).
      */
     fun patchNameFor(engineId: OrpheusEngineId, harmonics: Float): String? {
+        val idx = patchIndexFor(engineId, harmonics) ?: return null
+        return BANKS[engineId.id - 2][idx]
+    }
+
+    /** The patch index (0..31) that [harmonics] selects on [engineId], or `null` off the DX family. */
+    fun patchIndexFor(engineId: OrpheusEngineId, harmonics: Float): Int? {
         val bank = engineId.id - 2
         if (bank !in BANKS.indices) return null
         // Mirrors the engine's own multiply order; the -0.005f is the from-below hysteresis.
-        val idx = floor(harmonics * 1.02f * 32f - 0.005f).toInt().coerceIn(0, 31)
-        return BANKS[bank][idx]
+        return floor(harmonics * 1.02f * 32f - 0.005f).toInt().coerceIn(0, 31)
     }
 }
