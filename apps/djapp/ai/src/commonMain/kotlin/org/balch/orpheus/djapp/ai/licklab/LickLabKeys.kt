@@ -79,6 +79,9 @@ private val KEY_LABELS = mapOf(
     Key.Z to "Z", Key.X to "X", Key.C to "C", Key.V to "V", Key.B to "B", Key.N to "N", Key.M to "M",
 )
 
+/** The key's note name over its degree and Mac key. */
+private const val NOTE_SCALE = 1.4f
+
 /** A full key's height of vertical drag bends this far; the engine caps it at ±2 semitones. */
 private const val BEND_PER_KEY = 2f
 
@@ -473,12 +476,17 @@ private fun StripKeyCell(key: StripKey, lit: Boolean, chordTone: Boolean, modifi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(key.macKeys, style = mixText(legible(LegibleText.MIXER_MIN), ink, FontWeight.Bold), maxLines = 1)
-        Text(LickPitch.noteName(key.midi), style = mixText(legible(LegibleText.MIXER_MIN), ink), maxLines = 1)
+        // The note leads, large: it is what the constellation shows. The degree and the Mac key sit under it.
+        Text(
+            LickPitch.noteName(key.midi),
+            style = mixText(legible(LegibleText.MIXER_MIN) * NOTE_SCALE, ink, FontWeight.Bold),
+            maxLines = 1,
+        )
         Text(
             key.degree?.toString() ?: "·",
             style = mixText(legible(LegibleText.MIXER_MIN), if (lit) ink else MixerInk.dim),
             maxLines = 1,
         )
+        Text(key.macKeys, style = mixText(legible(LegibleText.MIXER_MIN), ink), maxLines = 1)
     }
 }

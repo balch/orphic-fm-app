@@ -475,6 +475,15 @@ class LickLabViewModelTest {
     }
 
     @Test
+    fun `a chip names one engine for both slots, both when they differ, then the track's name`() {
+        val va = track(TrackRole.Melodic())
+        assertEquals("VA", LickLabViewModel.chipDetail(va))
+        assertEquals("VA · timpani", LickLabViewModel.chipDetail(va.copy(name = "timpani")))
+        val split = va.copy(engineSpace = OrpheusEngine(engineId = OrpheusEngineId.DX2), name = "pad")
+        assertEquals("VA/DX2 · pad", LickLabViewModel.chipDetail(split))
+    }
+
+    @Test
     fun `boost writes the gain and 1 and needs an armed track`() = labTest {
         val r = rig()
         r.vm.actions.toggleShown()

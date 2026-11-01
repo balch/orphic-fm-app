@@ -269,6 +269,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdProbability = 0.4f, holdLengthMin = 2, holdLengthMax = 6,
                 ).let { timpani ->
                     TrackVoice(
+                        name = "timpani",
                         engineEdm = timpani,
                         engineSpace = timpani,
                         density = 0.28f,
@@ -291,6 +292,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdProbability = 0.35f, holdLengthMin = 2, holdLengthMax = 5,
                 ).let { bloom ->
                     TrackVoice(
+                        name = "mallets",
                         engineEdm = bloom,
                         engineSpace = bloom,
                         density = 0.20f,
@@ -326,6 +328,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdLengthMax = 12,
                 ).let { swell ->
                     TrackVoice(
+                        name = "cymbal swell",
                         engineEdm = swell,
                         engineSpace = swell,
                         density = 0.35f,
@@ -347,6 +350,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdProbability = 0.95f, holdLengthMin = 12, holdLengthMax = 28,
                 ).let { bass ->
                     TrackVoice(
+                        name = "pedal bass",
                         engineEdm = bass,
                         engineSpace = bass,
                         density = 0.10f,
@@ -378,6 +382,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdLengthMax = 32,
                 ).let { organ ->
                     TrackVoice(
+                        name = "organ drone",
                         engineEdm = organ,
                         engineSpace = organ,
                         density = 0.12f,
@@ -412,6 +417,7 @@ class SpaceDroneVibe : VibeProvider {
                     modLfoCoupling = 0.65f,
                 ).let { vibraphone ->
                     TrackVoice(
+                        name = "vibraphone",
                         engineEdm = vibraphone,
                         engineSpace = vibraphone,
                         density = 0.22f,
@@ -447,6 +453,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdLengthMax = 28,
                 ).let { mellotron ->
                     TrackVoice(
+                        name = "mellotron",
                         engineEdm = mellotron,
                         engineSpace = mellotron,
                         density = 0.10f,
@@ -482,6 +489,7 @@ class SpaceDroneVibe : VibeProvider {
                     holdLengthMax = 9,
                 ).let { whisper ->
                     TrackVoice(
+                        name = "whispers",
                         engineEdm = whisper,
                         engineSpace = whisper,
                         density = 0.08f,

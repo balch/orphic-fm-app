@@ -29,6 +29,7 @@ import kotlinx.serialization.Serializable
  * @param evolution Per-track evolution config for rhythmic and pitch evolution.
  * @param slotLock Holds the track on one engine slot whatever the energy, loop roll or soloist rule would pick.
  * @param chromaticStyle How the tension's chromatic passing tones play on this track.
+ * @param name What the track plays, in a word or two ("timpani"), where its slot name would mislead. Display only.
  */
 @Serializable
 data class TrackVoice(
@@ -46,6 +47,7 @@ data class TrackVoice(
     val evolution: Evolution = Evolution(),
     val slotLock: SlotLock = SlotLock.AUTO,
     val chromaticStyle: ChromaticStyle = ChromaticStyle.AUTO,
+    val name: String? = null,
 )
 
 /** Which engine slot a track plays. The ordinal is the C++ `track_N_slot_lock` value: 0 Auto, 1 EDM, 2 SPACE. */

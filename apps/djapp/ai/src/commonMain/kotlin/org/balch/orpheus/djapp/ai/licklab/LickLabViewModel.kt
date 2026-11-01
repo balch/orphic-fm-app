@@ -36,6 +36,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import kotlin.math.abs
 import kotlin.math.floor
@@ -547,7 +548,7 @@ class LickLabViewModel internal constructor(
             soloTracks = v.tracks.indices.filterTo(HashSet()) { v.tracks[it].soloBehavior?.melodicOverride != null },
             tracks = v.tracks.mapIndexedNotNull { i, t ->
                 if (t.role is TrackRole.Percussive) null
-                else TrackChip(i, BenchMeters.CHANNEL_NAMES.getOrElse(i) { "T$i" }, "${t.engineEdm.engineId.name}/${t.engineSpace.engineId.name}")
+                else TrackChip(i, BenchMeters.CHANNEL_NAMES.getOrElse(i) { "T$i" }, chipDetail(t))
             },
         )
     }
@@ -567,6 +568,14 @@ class LickLabViewModel internal constructor(
         // A change estimate further than this from the held one is a real move (a cut, the clock re-snapping).
         private const val REANCHOR_BEATS = 0.25
         private const val MAX_WINDOW_BEATS = 2.0
+
+        /** "BD · timpani": the engine (both slots when they differ) and the track's own name, if it has one. */
+        internal fun chipDetail(t: TrackVoice): String {
+            val edm = t.engineEdm.engineId.name
+            val space = t.engineSpace.engineId.name
+            val engines = if (edm == space) edm else "$edm/$space"
+            return t.name?.let { "$engines · $it" } ?: engines
+        }
 
         private fun monotonicMs(): () -> Long {
             val start = TimeSource.Monotonic.markNow()

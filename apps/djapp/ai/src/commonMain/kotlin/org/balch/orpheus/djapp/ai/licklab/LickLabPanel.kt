@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp.ai.licklab
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -46,6 +47,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -102,6 +104,13 @@ private val GRID_LABEL_WIDTH = 40.dp
 private val GRID_LAST_WIDTH = 84.dp
 private val GRID_GAP = 6.dp
 private val WAVE_HEIGHT = 28.dp
+
+/** Constellation stars and their note names, sized to read at a glance while playing. */
+private val STAR_RADIUS = 5.5.dp
+private const val NOTE_TEXT_SCALE = 1.35f
+
+/** A track chip's detail line rests this long before and between scrolls. */
+private const val MARQUEE_HOLD_MS = 1500
 
 private val BOOST_INK = OrpheusColors.evoGold
 private val CALL_INK = OrpheusColors.galaxyStarBlue
@@ -187,7 +196,7 @@ fun LickLabPanel(
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LickHeader(ui, actions, meters)
+        LickHeader(ui, actions, meters, animate)
         Row(Modifier.weight(1f).fillMaxWidth().minIntrinsicHeight(BODY_MIN_HEIGHT), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Constellation(live, beatNow, frame, Modifier.weight(1f).fillMaxHeight())
             Takes(ui, feature, copiedNote, Modifier.width(TAKES_WIDTH).fillMaxHeight())
@@ -236,10 +245,10 @@ private fun GridRow(
 }
 
 @Composable
-private fun LickHeader(ui: LickLabUiState, actions: LickLabActions, meters: State<MeterSnapshot>?) {
+private fun LickHeader(ui: LickLabUiState, actions: LickLabActions, meters: State<MeterSnapshot>?, animate: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         GridRow("PLAY", ui.tracks, last = { BoostButton(ui.boost, enabled = ui.armedTrack != null, actions::toggleBoost) }) { t, m ->
-            TrackChipView(t, selected = t.index == ui.armedTrack, selectedFill = MixerInk.accent, m.testTag(playChipTag(t.index))) {
+            TrackChipView(t, selected = t.index == ui.armedTrack, selectedFill = MixerInk.accent, m.testTag(playChipTag(t.index)), animate = animate) {
                 actions.arm(t.index)
             }
         }
@@ -254,6 +263,7 @@ private fun LickHeader(ui: LickLabUiState, actions: LickLabActions, meters: Stat
                 m.testTag(callChipTag(t.index)),
                 // A track cannot both play and call.
                 enabled = t.index != ui.armedTrack,
+                animate = animate,
             ) {
                 actions.setCaller(if (t.index == ui.callerTrack) null else t.index)
             }
@@ -301,6 +311,7 @@ private fun TrackChipView(
     selectedFill: Color,
     modifier: Modifier,
     enabled: Boolean = true,
+    animate: Boolean = true,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(6.dp)
@@ -315,7 +326,20 @@ private fun TrackChipView(
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(track.name, style = mixText(legible(LegibleText.MIXER_MIN), color, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(track.engine, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Holds, then scrolls a detail too long for the chip, and holds again at the start. Tests turn it
+        // off with [animate], since an endless marquee never lets them go idle.
+        Text(
+            track.engine,
+            style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+            maxLines = 1,
+            overflow = if (animate) TextOverflow.Clip else TextOverflow.Ellipsis,
+            modifier = if (!animate) Modifier else Modifier.basicMarquee(
+                iterations = Int.MAX_VALUE,
+                repeatDelayMillis = MARQUEE_HOLD_MS,
+                initialDelayMillis = MARQUEE_HOLD_MS,
+                velocity = 30.dp,
+            ),
+        )
     }
 }
 
@@ -518,12 +542,13 @@ private fun Constellation(live: State<LickLabUiState>, beatNow: () -> Double, fr
     val size = legible(LegibleText.MIXER_MIN)
     val small = remember(size) { mixText(size * 0.9f, MixerInk.dim) }
     val labelStyle = remember(size) { mixText(size, MixerInk.dim, FontWeight.SemiBold) }
+    val noteStyle = remember(size) { mixText(size * NOTE_TEXT_SCALE, MixerInk.text, FontWeight.Bold) }
     val density = LocalDensity.current
     val dash = remember(density) { with(density) { PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())) } }
     Canvas(modifier.clip(RoundedCornerShape(8.dp)).background(MixerInk.well)) {
         val ms = frame.value
         val s = live.value
-        drawConstellation(s, beatNow(), ms, measurer, small, labelStyle, dash)
+        drawConstellation(s, beatNow(), ms, measurer, small, labelStyle, noteStyle, dash)
     }
 }
 
@@ -560,6 +585,7 @@ private fun DrawScope.drawConstellation(
     measurer: TextMeasurer,
     small: TextStyle,
     labelStyle: TextStyle,
+    noteStyle: TextStyle,
     dash: PathEffect,
 ) {
     val w = size.width
@@ -585,8 +611,10 @@ private fun DrawScope.drawConstellation(
 
     val n = s.scale.size
     val root = s.chordRootDegree
-    val call = lane(s.callNotes, null, s.baseMidi, labelRoom + 4f, mid - 8.dp.toPx())
-    val answer = lane(s.answerNotes, s.heldMidi, s.baseMidi, mid + 8.dp.toPx(), h - labelRoom - 4f)
+    // Each lane's top leaves a note name's height, so the highest star's label stays inside it.
+    val noteRoom = measurer.measure("G#", noteStyle).size.height + STAR_RADIUS.toPx() * 2.4f
+    val call = lane(s.callNotes, null, s.baseMidi, labelRoom + noteRoom, mid - 8.dp.toPx())
+    val answer = lane(s.answerNotes, s.heldMidi, s.baseMidi, mid + noteRoom, h - labelRoom - 4f)
 
     drawText(measurer, "CALL", Offset(pad, 2f), labelStyle.copy(color = CALL_INK))
     drawText(measurer, "YOUR ANSWER", Offset(pad, h - labelRoom), labelStyle.copy(color = ANSWER_INK))
@@ -617,9 +645,9 @@ private fun DrawScope.drawConstellation(
         )
     }
 
-    drawLane(s.callNotes, call, now, v, CALL_INK, flash = null, ms, measurer, small)
+    drawLane(s.callNotes, call, now, v, CALL_INK, flash = null, ms, measurer, noteStyle)
     val newest = s.answerNotes.lastOrNull()?.takeIf { v.isRoot(it) }
-    drawLane(s.answerNotes, answer, now, v, ANSWER_INK, flash = newest, ms, measurer, small)
+    drawLane(s.answerNotes, answer, now, v, ANSWER_INK, flash = newest, ms, measurer, noteStyle)
 }
 
 /** One frame's beat-to-x mapping and chord: [root] is the chord's degree (-1 none) in a scale of [n] steps. */
@@ -647,9 +675,9 @@ private fun DrawScope.drawLane(
     flash: LiveNote?,
     ms: Long,
     measurer: TextMeasurer,
-    small: TextStyle,
+    noteStyle: TextStyle,
 ) {
-    val r = 4.dp.toPx()
+    val r = STAR_RADIUS.toPx()
     // The constellation: each star joined to the next, each note's tail as long as it sounded.
     for (i in 1 until notes.size) {
         val a = notes[i - 1]
@@ -670,8 +698,9 @@ private fun DrawScope.drawLane(
         } else {
             drawCircle(if (tone || sounding) ink else ink.copy(alpha = 0.6f), if (tone) r * 1.2f else r * 0.85f, Offset(cx, cy))
         }
-        val label = note.name + " " + (note.degree?.toString() ?: "·")
-        drawText(measurer, label, Offset(cx + r * 1.5f, cy - r * 3.2f), small)
+        // Above the star and clear of its glow, tinted toward the lane's ink.
+        val label = measurer.measure(note.name, noteStyle.copy(color = lerp(MixerInk.text, ink, 0.35f)))
+        drawText(label, topLeft = Offset(cx - label.size.width / 2f, cy - r * 2.4f - label.size.height))
     }
 }
 
