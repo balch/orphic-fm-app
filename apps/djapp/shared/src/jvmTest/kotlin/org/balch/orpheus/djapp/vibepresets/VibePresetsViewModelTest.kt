@@ -210,7 +210,8 @@ class VibePresetsViewModelTest {
         val claimed = pulsar.fireApply(vibe("A"))
 
         assertFalse(claimed)
-        assertEquals(pulsar.portsBeforeListeners, portValues)
+        // Only the horn moves: it starts off on a new vibe.
+        assertEquals(pulsar.portsBeforeListeners + (HornSymbol.MIX.controlId.key to FloatValue(0f)), portValues)
         assertEquals(120f, pulsar.bpm)
     }
 
@@ -349,6 +350,53 @@ class VibePresetsViewModelTest {
 
         val draft = vm.stateFlow.value.draft!!
         assertTrue("HORN: SPEED 30%→60%" in draft.chips, draft.chips.toString())
+    }
+
+    @Test
+    fun hornMixStartsOffOnEachNewVibe() = runTest(dispatcher) {
+        val vm = vm(prefsWith())
+        watch(vm)
+        setPort(HornSymbol.MIX.controlId, 0.6f)
+        pulsar.fireApply(vibe("A"))
+        assertEquals(0f, port(HornSymbol.MIX.controlId))
+
+        // The original is horn off too, and a horn turned up on this vibe shows as a change.
+        setPort(HornSymbol.MIX.controlId, 0.4f)
+        assertTrue(vm.stateFlow.value.changed)
+        vm.actions.loadOriginal()
+        assertEquals(0f, port(HornSymbol.MIX.controlId))
+
+        setPort(HornSymbol.MIX.controlId, 0.4f)
+        pulsar.fireApply(vibe("B"))
+        assertEquals(0f, port(HornSymbol.MIX.controlId))
+    }
+
+    @Test
+    fun selectedPresetHornMixWinsOverTheReset() = runTest(dispatcher) {
+        val hornOn = VibePresetSlot(
+            presets = listOf(VibePreset(1, "Slow Horn", 10L, mapOf(PresetField.HORN_MIX.key to 0.7f))),
+            selectedId = 1,
+            nextId = 2,
+        )
+        vm(prefsWith("A" to hornOn))
+        setPort(HornSymbol.MIX.controlId, 0.2f)
+
+        pulsar.fireApply(vibe("A"))
+
+        assertEquals(0.7f, port(HornSymbol.MIX.controlId))
+    }
+
+    @Test
+    fun sameVibeReapplyKeepsALiveHorn() = runTest(dispatcher) {
+        val vm = vm(prefsWith())
+        watch(vm)
+        pulsar.fireApply(vibe("A"))
+        setPort(HornSymbol.MIX.controlId, 0.5f)
+
+        // An engine rebuild or the launch graph-ready re-apply is not a new vibe.
+        pulsar.fireApply(vibe("A"))
+
+        assertEquals(0.5f, port(HornSymbol.MIX.controlId))
     }
 
     @Test
