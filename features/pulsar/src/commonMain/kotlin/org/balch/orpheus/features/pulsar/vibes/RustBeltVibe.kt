@@ -13,6 +13,7 @@ import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
+import org.balch.orpheus.features.pulsar.models.ChromaticStyle
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
@@ -88,7 +89,7 @@ class RustBeltVibe : VibeProvider {
     private val verseProgression = chords(0)
 
     // The chorus lift, IV -> bVII -> i -> i; in dorian the major IV is the money chord.
-    // ROOT_ONLY tracks transpose the hook up the lift and back.
+    // The ROOT_ONLY bass rides the lift's roots up and back.
     private val chorusProgression = chords(3, 6, 0, 0)
 
     // Jam seesaw — mostly home with a bVII lean every 4th bar to give soloists a shape.
@@ -560,8 +561,8 @@ class RustBeltVibe : VibeProvider {
                     )
                 },
                 // Track 3 — BASS (PD warm-round): THE HOOK. LickMode.Fill owns the whole
-                // 2-bar phrase; PLUCK gives the fingered attack; ROOT_ONLY so the chorus
-                // lift transposes the hook with the chord roots (the payoff moment).
+                // 2-bar phrase; PLUCK gives the fingered attack. ROOT_ONLY plays the hook's
+                // rhythm on the chord root, so the bass rides the chorus lift's roots.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
                     volume = 0.62f,
@@ -594,12 +595,13 @@ class RustBeltVibe : VibeProvider {
                         // EAR-TUNE(user owns after ear test)
                         macroMap = TrackMacroMap.MELODIC.copy(
                             moodHarmonics = MacroTarget(0.5f, 0.5f),
-                            moodTimbre = MacroTarget(0.12f, 0.50f),
+                            moodTimbre = MacroTarget(0.20f, 0.60f),
                         ),
-                        // A light blend of the vibe's evolution sweep: some movement without
-                        // the per-step flicker or losing the mood knob.
-                        evolutionWeight = .3f,
+                        // Over half of the vibe's evolution sweep: the wah moves note to note
+                        // again, and the mood knob still steers it.
+                        evolutionWeight = .6f,
                         barStrategy = BarStrategy.REPEAT,  // locked; variation = lickMutation only
+                        chromaticStyle = ChromaticStyle.SLIDE,  // approach notes slide onto the root
                     )
                 },
                 // Track 4 — Jangle chank (CHD native chords): dry rhythm bed on the off-hand.
@@ -749,9 +751,9 @@ class RustBeltVibe : VibeProvider {
                 volume = 0.28f,
                 tonal = TonalTension(
                     octaveShift = true,        // hook jumps the octave at the peak
-                    // Off: it nudges a random note a semitone, and on the ROOT_ONLY bass
-                    // pedal that lands a held C# or D# against the D vamp.
-                    chromaticPassing = 0f,
+                    // Chromatic approach notes, walking-bass DNA. The bass slides them in
+                    // (ChromaticStyle.SLIDE), so it never holds a C# or D# on the D vamp.
+                    chromaticPassing = 0.12f,
                 ),
                 timing = 0.18f,
                 evolution = EvolutionTension(
