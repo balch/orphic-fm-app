@@ -54,7 +54,7 @@ import org.balch.orpheus.features.pulsar.models.chords
 
 // Base 2-bar hook used for
 // reference and Fire Sky .5f's rare anomaly flash.
-private val ogLick by lazy {
+internal val ogLick by lazy {
     Lick(
         steps = listOf(
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
@@ -74,7 +74,7 @@ private val ogLick by lazy {
     )
 }
 
-private val aiLick by lazy {
+internal val aiLick by lazy {
     Lick(
         steps = listOf(
             // bar 1 — the climb, stated once: G D F, the b7 rings out the bar
@@ -92,7 +92,7 @@ private val aiLick by lazy {
     )
 }
 
-private val tweakLick by lazy {
+internal val tweakLick by lazy {
     Lick(
         steps = listOf(
             LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
@@ -112,44 +112,6 @@ private val tweakLick by lazy {
         ),
         loopLength = 8,
     )
-}
-
-/**
- * Fire Sky (OG) — FROZEN A/B reference: the founding hook stated exactly, kept so riff
- * variants can be compared against the original statement. Catalog status WIP: dev-only,
- * visible on debuggable / `-Pcatalog=wip` builds; not for LIVE promotion — the shipping
- * vibes are the variants, this file is the reference. Reuses the live [FireSkyVibe]
- * wholesale and swaps ONLY the lick + mutation, so an A/B isolates the riff. Do not
- * edit; git commit ee8677e0 is the hard, fully-frozen snapshot.
- */
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSkyOgVibe : VibeProvider {
-    override val name: VibeName = VibeNames.FIRE_SKY_OG
-
-    override val vibe: Vibe by lazy {
-        FireSkyVibeBase().vibe.copy(
-            name = name.value,
-            lick = ogLick,
-            lickMutation = 0.10f,
-            stepCount = 32
-        )
-    }
-}
-
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSkyCxVibe : VibeProvider {
-    override val name: VibeName = VibeNames.FIRE_SKY_CX
-
-    override val vibe: Vibe by lazy {
-        FireSkyVibeBase().vibe.copy(
-            name = name.value,
-            lick = tweakLick,
-            lickMutation = 0.60f,
-            stepCount = 32
-        )
-    }
 }
 
 @Inject
@@ -172,34 +134,6 @@ class FireSkyVibe : VibeProvider {
             // load-order bug had it inherit the previously-loaded vibe's floor. Kept as an
             // authored opening gesture; it decays after bar 1 as the vibe mutates.
             openingNoteFloor = 33,
-        )
-    }
-}
-
-/**
- * Fire Sky .5f — a flat 60 BPM Fire Sky (no half-time — every section, including
- * intro/build, runs at the same tempo, and the build's exit scratch is off) that
- * ROTATES between [aiLick] and [tweakLick] per section, with the rare [ogLick]
- * anomaly: a flash of the founding hook stated exactly, also fired by the
- * manual anomaly trigger.
- */
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSky05Vibe : VibeProvider {
-    override val name: VibeName = VibeNames.FIRE_SKY_05F
-
-    override val vibe: Vibe by lazy {
-        FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildScratchMs = 0).vibe.copy(
-            name = name.value,
-            lick = tweakLick,  // fallback seed; the pool overrides it at load
-            lickRotation = LickRotation(pool = listOf(tweakLick, aiLick)),
-            anomalies = listOf(
-                // A rare flash of the founding hook, stated exactly; also fired by
-                // the manual anomaly trigger.
-                LickAnomaly(lick = ogLick, chance = 0.005f),
-            ),
-            lickMutation = 0.20f,
-            stepCount = 32,
         )
     }
 }
@@ -250,7 +184,7 @@ class FireSky05Vibe : VibeProvider {
  * literal 0.5x, which would clamp 42->60 and then over-restore the drop to 120).
  * A/B against DogHouseVibe.
  */
-private class FireSkyVibeBase(
+internal class FireSkyVibeBase(
     private val baseBpm: Float = 84f,
     private val halfTimeMult: Float = 0.72f,
     private val buildScratchMs: Int = 500,
