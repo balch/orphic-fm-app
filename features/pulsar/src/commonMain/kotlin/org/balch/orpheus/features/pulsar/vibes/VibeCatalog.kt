@@ -135,6 +135,7 @@ object VibeCatalog {
         // ── Club / ambient / time ──
         VibeNames.COSMIC_TECHNO to CatalogEntry(VibeStatus.WIP, tags = listOf("club")),
         VibeNames.DEEP_SPACE to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient")),
+        VibeNames.RUNNING_OUT to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
         VibeNames.TIME_ZONE to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
         VibeNames.UTC to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
         // ── Comp Lab: comping-style demos ──
