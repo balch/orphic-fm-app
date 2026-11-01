@@ -6170,6 +6170,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->pulsar_track_mod_morph_debug[t].store(clamp01(mod_morph), std::memory_order_relaxed);
         engine->pulsar_track_note_debug[t].store(note_for_render, std::memory_order_relaxed);
 #endif
+        // Mirrors FmPatchNames: floor(h * 32.64) clamped to 0..31, the DX patch picker.
+        engine->pulsar_track_active_patch[t].store(
+            is_dx_engine(ts.engine_index)
+                ? std::clamp(static_cast<int>(std::floor(clamp01(mod_harmonics) * 32.64f)), 0, 31)
+                : -1,
+            std::memory_order_relaxed);
 
         // Renders the engine (every family but Mist) at `note` into `out` on one voice set:
         // the track's own, or the detuned double's second set in state->dbl. Scalars are

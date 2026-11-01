@@ -104,6 +104,7 @@ class OboeAudioBridge : NativeDspBridge {
         stepCountsOut: IntArray,
     )
     external override fun nativeGetPulsarActiveEngines(out: IntArray)
+    external override fun nativeGetPulsarActivePatches(out: IntArray)
     external override fun nativeGetPulsarArrangement(out: IntArray)
 
     /**

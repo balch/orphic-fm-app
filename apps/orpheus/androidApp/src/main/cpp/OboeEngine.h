@@ -62,6 +62,7 @@ public:
     int  getScope(float* out, int numPoints, float windowMs);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getPulsarActiveEngines(int* out);
+    void getPulsarActivePatches(int* out);
     void getPulsarArrangement(int* out);
     void getTurntableViz(int deck, float* outBuf);
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);

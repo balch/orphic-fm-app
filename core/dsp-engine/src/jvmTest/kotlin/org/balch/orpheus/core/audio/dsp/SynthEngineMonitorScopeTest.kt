@@ -225,6 +225,7 @@ class SynthEngineMonitorScopeTest {
             stepCountsOut: IntArray,
         ) {}
         override fun nativeGetPulsarActiveEngines(out: IntArray) { out.fill(-1) }
+        override fun nativeGetPulsarActivePatches(out: IntArray) { out.fill(-1) }
         override fun nativeGetPulsarArrangement(out: IntArray) { out[0] = -1 }
 
         // Unused control surface.

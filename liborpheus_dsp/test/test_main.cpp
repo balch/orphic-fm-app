@@ -149,6 +149,7 @@ static TestSuite suites[] = {
     {"mix_bench",       run_mix_bench_tests,       true},
     {"stem_capture",    run_stem_capture_tests,    true},
     {"pulsar_mist",     run_pulsar_mist_tests,     true},
+    {"pulsar_active_patch", run_pulsar_active_patch_tests, true},
     {"pulsar_vibrato",  run_pulsar_vibrato_tests,  true},
     {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},
     {"pulsar_mood_pitch", run_pulsar_mood_pitch_tests, true},

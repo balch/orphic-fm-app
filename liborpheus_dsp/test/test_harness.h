@@ -604,6 +604,7 @@ bool run_pulsar_morph_rise_tests();
 bool run_pulsar_double_tests();
 bool run_pulsar_double_bench();
 bool run_pulsar_mist_tests();
+bool run_pulsar_active_patch_tests();
 bool run_pulsar_vibrato_tests();
 bool run_pulsar_pitch_rise_tests();
 bool run_pulsar_mood_pitch_tests();

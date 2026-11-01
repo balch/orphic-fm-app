@@ -1491,6 +1491,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         for (i in out.indices) out[i] = -1
     }
 
+    override fun nativeGetPulsarActivePatches(out: IntArray) {
+        for (i in out.indices) out[i] = -1
+    }
+
     companion object {
         private val log = logging("IosAudioEngine")
 

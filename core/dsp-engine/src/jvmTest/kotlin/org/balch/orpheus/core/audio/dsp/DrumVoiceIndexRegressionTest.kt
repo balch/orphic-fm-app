@@ -188,6 +188,7 @@ class DrumVoiceIndexRegressionTest {
             stepCountsOut: IntArray,
         ) {}
         override fun nativeGetPulsarActiveEngines(out: IntArray) {}
+        override fun nativeGetPulsarActivePatches(out: IntArray) {}
         override fun nativeGetPulsarArrangement(out: IntArray) {}
     }
 }
