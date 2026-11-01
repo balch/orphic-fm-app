@@ -18,6 +18,7 @@ import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
 import org.balch.orpheus.djapp.startDjAudio
 import org.balch.orpheus.djapp.largeScreenCanvasScale
+import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.LocalHinge
 import org.balch.orpheus.djapp.rememberTabletopHinge
 
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalDensity provides
                     Density(baseDensity.density * canvasScale, baseDensity.fontScale),
+                LocalCanvasScale provides canvasScale,
                 LocalHinge provides hinge,
             ) {
                 DjApp(

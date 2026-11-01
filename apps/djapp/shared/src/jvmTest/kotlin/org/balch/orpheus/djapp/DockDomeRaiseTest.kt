@@ -133,6 +133,7 @@ class DockDomeRaiseTest {
             OrpheusTheme {
                 CompositionLocalProvider(
                     LocalDensity provides Density(totalScale),
+                    LocalCanvasScale provides scale,
                     LocalLiquidState provides rememberLiquidState(),
                     LocalVizStage provides vizStage,
                 ) {

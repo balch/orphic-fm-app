@@ -38,7 +38,10 @@ fun DesktopCanvasScale(content: @Composable () -> Unit) {
                 minScale = DesktopMinimumDensityScale,
             )
         }
-        CompositionLocalProvider(LocalDensity provides Density(native.density * scale, native.fontScale)) {
+        CompositionLocalProvider(
+            LocalDensity provides Density(native.density * scale, native.fontScale),
+            LocalCanvasScale provides scale,
+        ) {
             content()
         }
     }
