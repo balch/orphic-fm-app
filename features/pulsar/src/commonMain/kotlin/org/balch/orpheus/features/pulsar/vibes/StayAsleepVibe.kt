@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -157,7 +158,7 @@ class StayAsleepVibe : VibeProvider {
 
     private val replyLick = Lick(
         steps = listOf(
-            LickStep(scaleDegree = -1, duration = 3.0f),   // rest: the call is still speaking
+            Rest(3.0f),   // rest: the call is still speaking
             // Maybes, so the reply changes shape; tension lifts both toward certain.
             LickStep(scaleDegree = 5, duration = .25f, velocity = 0.40f, hitProbability = 0.70f),
             LickStep(scaleDegree = 4, duration = 1.0f, velocity = 0.60f, glideRate = .15f, hitProbability = 0.85f),

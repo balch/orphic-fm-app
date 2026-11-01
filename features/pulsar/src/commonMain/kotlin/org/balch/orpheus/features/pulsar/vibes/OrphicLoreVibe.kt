@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -89,16 +90,16 @@ class OrphicLoreVibe : VibeProvider {
     private val descent = Lick(
         steps = listOf(
             LickStep(7, 3.5f, 0.95f, glideRate = 0.5f),   // D
-            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            Rest(0.25f, 0.45f),                     //   breath
             LickStep(7, 0.25f, 0.45f),                      //   pickup, lifts into C
             LickStep(6, 3.5f, 0.90f, glideRate = 0.5f),   // C
-            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            Rest(0.25f, 0.45f),                     //   breath
             LickStep(6, 0.25f, 0.45f),                      //   pickup, into Bb
             LickStep(5, 3.5f, 0.90f, glideRate = 0.5f),   // Bb
-            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            Rest(0.25f, 0.45f),                     //   breath
             LickStep(5, 0.25f, 0.45f),                      //   pickup, into A
             LickStep(4, 3.5f, 0.95f, glideRate = 0.5f),   // A, holds the bar
-            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            Rest(0.25f, 0.45f),                     //   breath
             LickStep(4, 0.25f, 0.45f),                      //   pickup, back to D
         ),
         loopLength = 16,  // 16 beats = the full 64-step pattern, no padding
@@ -135,12 +136,12 @@ class OrphicLoreVibe : VibeProvider {
                 scaleDegree = 10, duration = 1.0f, velocity = 0.9f,
                 glideRate = override1.glideRate, hitProbability = override1.hitProbability
             ),
-            LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0f),
+            Rest(0.5f, 0f),
             LickStep(
                 scaleDegree = 9, duration = 0.25f, velocity = 0.75f,
                 glideRate = override2.glideRate, hitProbability = override2.hitProbability
             ),
-            LickStep(scaleDegree = -1, duration = .5f, velocity = 0f),
+            Rest(.5f, 0f),
             LickStep(
                 scaleDegree = 7, duration = 0.25f, velocity = 0.7f,
                 glideRate = override3.glideRate, hitProbability = override3.hitProbability
@@ -150,7 +151,7 @@ class OrphicLoreVibe : VibeProvider {
                 scaleDegree = 4, duration = 1.5f, velocity = 0.82f,
                 glideRate = override4.glideRate, hitProbability = override4.hitProbability
             ),
-            LickStep(scaleDegree = -1, duration = 3.0f, velocity = 0f),
+            Rest(3.0f, 0f),
         ),
         loopLength = 8,
     )
@@ -185,27 +186,27 @@ class OrphicLoreVibe : VibeProvider {
         steps = listOf(
             // bar 1: the one, an octave pop, then off-beat 16ths
             LickStep(7, 0.25f, 0.95f),                    // D  on 1
-            LickStep(-1, 0.25f),
+            Rest(0.25f),
             LickStep(14, 0.25f, 0.75f),                   // D' octave pop on &
             LickStep(7, 0.25f, 0.30f),                    // ghost
-            LickStep(-1, 0.5f),
+            Rest(0.5f),
             LickStep(9, 0.25f, 0.85f),                    // F  on & of 2
             LickStep(10, 0.5f, 0.90f, glideRate = 0.12f), // G  on a of 2, pushed into 3
-            LickStep(-1, 0.25f),
+            Rest(0.25f),
             LickStep(9, 0.25f, 0.35f),                    // ghost
             LickStep(7, 0.25f, 0.85f),                    // D  on a of 3
-            LickStep(-1, 0.5f),
+            Rest(0.5f),
             LickStep(4, 0.5f, 0.90f, glideRate = 0.12f),  // A  on & of 4, leaning into bar 2
             // bar 2: the answer
-            LickStep(-1, 0.5f),
+            Rest(0.5f),
             LickStep(6, 0.25f, 0.80f),                    // C  pickup
             LickStep(7, 0.75f, 0.90f, glideRate = 0.12f), // D  slid into
-            LickStep(-1, 0.5f),
+            Rest(0.5f),
             LickStep(9, 0.25f, 0.85f),                    // F
             LickStep(10, 0.25f, 0.35f),                   // ghost
             LickStep(9, 0.25f, 0.80f),                    // F
             LickStep(7, 0.25f, 0.80f),                    // D
-            LickStep(-1, 1.0f),
+            Rest(1.0f),
         ),
         loopLength = 8,
     )

@@ -28,6 +28,7 @@ import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RhythmicEvolution
 import org.balch.orpheus.features.pulsar.models.RootNote
@@ -303,11 +304,11 @@ class TremoloTideVibe : VibeProvider {
                     LickStep(scaleDegree = 0, duration = 2f, velocity = 1f, glideRate = .5f),
                     LickStep(scaleDegree = 7, duration = 1.0f, velocity = 0.7f, glideRate = .35f),
                     LickStep(scaleDegree = 5, duration = .25f, velocity = 0.7f),
-                    LickStep(scaleDegree = -2, duration = .25f, velocity = 0.8f),
+                    Rest(.25f),  // silent since authoring; was degree -2
                     LickStep(scaleDegree = 3, duration = .25f, velocity = 0.8f),
                     LickStep(scaleDegree = 2, duration = .25f, velocity = 0.4f),
                     LickStep(scaleDegree = 0, duration = .5f, velocity = 0.7f),
-                    LickStep(scaleDegree = -2, duration = .25f, velocity = 0.7f),
+                    Rest(.25f, 0.7f),  // silent since authoring; was degree -2
                     LickStep(scaleDegree = 0, duration = .125f, velocity = 0.45f),
                     LickStep(scaleDegree = 0, duration = .125f, velocity = 0.9f),
                 ),

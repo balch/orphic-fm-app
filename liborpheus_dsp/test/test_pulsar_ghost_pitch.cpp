@@ -122,7 +122,7 @@ static bool test_fill_lick_ghost_borrows_preceding_pitch() {
     printf("\n=== Test: Fill lick ghosts sound the nearest preceding written pitch ===\n");
 
     OrpheusEngine* engine = make_ghost_engine();
-    const int8_t degrees[] = {0, -1, 2, -1, 4, -1, 5, -1};
+    const int8_t degrees[] = {0, kLickRestDegree, 2, kLickRestDegree, 4, kLickRestDegree, 5, kLickRestDegree};
     for (int i = 0; i < 8; i++) {
         engine->pulsar_lick[i].scale_degree = degrees[i];
         engine->pulsar_lick[i].duration = 1.0f;  // 4 sequencer slots

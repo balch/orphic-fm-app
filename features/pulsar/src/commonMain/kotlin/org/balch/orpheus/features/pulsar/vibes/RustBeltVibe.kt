@@ -32,6 +32,7 @@ import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -483,22 +484,22 @@ class RustBeltVibe : VibeProvider {
             lick = Lick(
                 steps = listOf(
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.98f),   // D  root — single anchor
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    Rest(0.25f, 0f),  // (rest)
                     LickStep(scaleDegree = 6, duration = 0.75f, velocity = 0.90f),  // C  b7 — dotted downward lean
                     LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.86f),   // A  5
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    Rest(0.25f, 0f),  // (rest)
                     LickStep(scaleDegree = 0, duration = 1.0f, velocity = 1.00f),   // D  root — home by leap DOWN, held
                     LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.80f),   // B  6 — bright lift
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    Rest(0.25f, 0f),  // (rest)
                     LickStep(scaleDegree = 7, duration = 0.5f, velocity = 0.92f),   // D  octave POP
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    Rest(0.25f, 0f),  // (rest)
                     LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.84f),   // C  b7
                     LickStep(scaleDegree = 4, duration = 0.75f, velocity = 0.88f),  // A  5 — dotted
-                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (pocket breath)
+                    Rest(0.5f, 0f),   // (pocket breath)
                     LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.78f),   // G  4  ┐
                     LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.74f),   // F  b3 │ DESCENDING turn into the loop
                     LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.70f),  // E  2  ┘
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    Rest(0.25f, 0f),  // (rest)
                 ),
                 loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
             ),

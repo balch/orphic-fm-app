@@ -237,7 +237,7 @@ The sealed interface is the extension point: future dramatic events (Scratch / T
 ### Limits and checks in code
 
 - **Sections:** up to `Arrangement.MAX_SECTIONS` (12) sections and `MAX_SECTION_TRANSITIONS` (8) outgoing edges each. Both mirror C++ constants in `liborpheus_dsp/src/pulsar_limits.h` and are enforced by `PulsarSectionLimitsTest`. Exceeding sections throws at `Arrangement.<init>`; exceeding edges is clamped silently.
-- **Licks:** up to `Lick.MAX_LICK_STEPS` (64, mirroring C++ `kMaxLickSteps`) steps. A negative `scaleDegree` is a rest (`if (degree < 0)` in `pulsar_pattern_gen.h`).
+- **Licks:** up to `Lick.MAX_LICK_STEPS` (64, mirroring C++ `kMaxLickSteps`) steps. A rest is `Rest(beats)` in Kotlin (`{ "scaleDegree": 0, "duration": N, "rest": true }` in JSON, `kLickRestDegree` in `pulsar_pattern_gen.h`); a negative `scaleDegree` is a real note below the lick base. A rest's velocity is optional (default 0.8, `Rest(beats, velocity)`) and drum leads read it as a hit, so keep a converted rest's old velocity.
 - **Solos:** a section with a `soloMode` needs `Vibe.band`; `Vibe.init` rejects the combination.
 - **Copyright:** if a lick (or a pooled one) is a recognizable copyrighted riff, keep the vibe dev-only `WIP`, never `LIVE`.
 - **MST morph:** `DeadStaticToneAudit` fails a clean vibe whose MST track writes `morph` without `pinMorph = true`.

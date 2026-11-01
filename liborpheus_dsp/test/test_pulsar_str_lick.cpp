@@ -87,7 +87,7 @@ std::vector<float> run_lick(int engine_id, EnvCase env) {
     engine->pulsar_track_morph[t].store(0.6f, std::memory_order_relaxed);
     engine->pulsar_track_morph_space[t].store(0.6f, std::memory_order_relaxed);
 
-    const struct { int8_t degree; float beats; } figure[] = {{-1, 3.0f}, {5, 1.0f}, {4, 1.5f}};
+    const struct { int8_t degree; float beats; } figure[] = {{kLickRestDegree, 3.0f}, {5, 1.0f}, {4, 1.5f}};
     for (int i = 0; i < 3; i++) {
         engine->pulsar_bass_line[i].scale_degree = figure[i].degree;
         engine->pulsar_bass_line[i].duration = figure[i].beats;

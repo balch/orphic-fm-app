@@ -198,7 +198,7 @@ class TabParserTest {
         assertEquals(listOf(0.5f) + List(7) { 1f } + 0.5f, notes.map { it.beats })
         val key = SongKey(RootNote.G, ScaleType.MAJOR, "G major", 1f, "notes")
         val lick = toMelodies(notes, RhythmSource.BARS, key, "Riff", 0, null, 0).single().lick
-        assertEquals(-1, lick.steps.first().scaleDegree); assertEquals(8, lick.loopLength)
+        assertTrue(lick.steps.first().rest); assertEquals(8, lick.loopLength)
     }
 
     @Test fun crowdedBarTimesEighthsAndThePickupLeadsTheLoopBackIn() {

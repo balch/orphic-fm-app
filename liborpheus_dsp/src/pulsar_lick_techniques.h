@@ -50,12 +50,16 @@ inline void mutate_live_lick(
     if (length <= 0) return;
 
     for (int i = 0; i < length; i++) {
+        // A rest marker mutates exactly as the legacy rest (-1) did: same draws and
+        // arithmetic, then it stays a rest while the result is negative.
+        const bool was_rest = is_lick_rest(degrees[i]);
+        int d = was_rest ? -1 : degrees[i];
         float roll = pattern_rand01(seed);
 
         // Note substitution: probability scales with creativity
         if (roll < creativity * 0.3f) {
             int shift = static_cast<int>(pattern_rand01(seed) * 5.0f) - 2;
-            degrees[i] = static_cast<int8_t>(degrees[i] + shift);
+            d += shift;
         }
 
         // Duration variation
@@ -76,21 +80,23 @@ inline void mutate_live_lick(
         roll = pattern_rand01(seed);
         if (allow_octave_jump && roll < creativity * 0.1f) {
             int octave = (pattern_rand01(seed) > 0.5f) ? octave_degrees : -octave_degrees;
-            degrees[i] = static_cast<int8_t>(degrees[i] + octave);
+            d += octave;
         }
 
         // MUT-4: clamp drift against the section-entry snapshot.
         if (base_degrees) {
-            int lo = base_degrees[i] - max_degree_drift;
-            int hi = base_degrees[i] + max_degree_drift;
-            int d = degrees[i];
+            int base = is_lick_rest(base_degrees[i]) ? -1 : base_degrees[i];
+            int lo = base - max_degree_drift;
+            int hi = base + max_degree_drift;
             if (d < lo) d = lo;
             if (d > hi) d = hi;
-            // Bound to int8_t range so the cast can't wrap past the drift clamp:
-            // base ± max_degree_drift can exceed [-128,127] for extreme bases.
-            if (d < -128) d = -128;
-            if (d > 127) d = 127;
-            degrees[i] = static_cast<int8_t>(d);
+        }
+
+        if (was_rest && d < 0) {
+            degrees[i] = kLickRestDegree;
+        } else {
+            // Clamp in int before the cast so base +/- drift can't wrap the int8.
+            degrees[i] = static_cast<int8_t>(std::max(kLickMinDegree, std::min(kLickMaxDegree, d)));
         }
     }
 }
@@ -265,7 +271,10 @@ inline void generate_lick_melody_variation(
         if (pos >= step_count) pos = step_count - 1;
         if (pos < 0) pos = 0;
 
-        int degree = lick[li].scale_degree;
+        // A rest marker runs the legacy rest (-1) arithmetic and draws; it stays silent
+        // only while the degree is still negative.
+        const bool was_rest = is_lick_rest(lick[li].scale_degree);
+        int degree = was_rest ? -1 : lick[li].scale_degree;
         float vel = lick[li].velocity;
 
         // 3a. Octave shift mutation
@@ -288,6 +297,8 @@ inline void generate_lick_melody_variation(
             vel *= 0.8f;
         }
 
+        const bool silent = was_rest && degree < 0;
+
         // 4. Convert degree to MIDI note via root + scale
         int octave = 0;
         int d = degree;
@@ -299,15 +310,15 @@ inline void generate_lick_melody_variation(
         midi_note = std::max(24, std::min(96, midi_note));
 
         float dur = 0.4f + vel * 0.3f;
-        if (pos < step_count && !steps[pos].gate) {
+        if (!silent && pos < step_count && !steps[pos].gate) {
             steps[pos] = make_step(static_cast<uint8_t>(midi_note), vel, true, dur);
         }
 
         // 3c. Passing tone between this note and next
         if (li + 1 < lick_length && pattern_rand01(seed) < complexity * 0.3f) {
-            int next_degree = lick[li + 1].scale_degree;
+            int next_degree = is_lick_rest(lick[li + 1].scale_degree) ? -1 : lick[li + 1].scale_degree;
             int mid_pos = pos + static_cast<int>(((lick[li].duration / total_dur) * step_count) / 2.0f);
-            if (mid_pos > pos && mid_pos < step_count && !steps[mid_pos].gate) {
+            if (!silent && mid_pos > pos && mid_pos < step_count && !steps[mid_pos].gate) {
                 int pass_degree = degree + ((next_degree > degree) ? 1 : -1);
                 int pd = pass_degree;
                 int p_oct = 0;
@@ -374,7 +385,10 @@ inline void generate_lick_contour_sweep(
         // 2. Compute direction from current to next degree
         float direction = 0.0f;
         if (seg_idx < lick_length - 1) {
-            direction = static_cast<float>(lick[seg_idx + 1].scale_degree - lick[seg_idx].scale_degree) / 7.0f;
+            // A rest marker counts as the legacy rest degree (-1), not -128.
+            const int from = is_lick_rest(lick[seg_idx].scale_degree) ? -1 : lick[seg_idx].scale_degree;
+            const int to = is_lick_rest(lick[seg_idx + 1].scale_degree) ? -1 : lick[seg_idx + 1].scale_degree;
+            direction = static_cast<float>(to - from) / 7.0f;
             direction = std::max(-1.0f, std::min(1.0f, direction));
         }
 

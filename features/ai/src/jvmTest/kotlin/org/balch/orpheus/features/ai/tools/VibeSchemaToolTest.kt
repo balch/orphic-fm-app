@@ -50,6 +50,17 @@ class VibeSchemaToolTest {
     }
 
     @Test
+    fun `schema lists every LickStep field including rest`() {
+        val schema = generateVibeSchemaJson()
+        val start = schema.indexOf("\"org.balch.orpheus.features.pulsar.models.LickStep\"")
+        assertTrue(start >= 0, "schema has no LickStep definition")
+        val body = schema.substring(start, minOf(schema.length, start + 3000))
+        listOf("scaleDegree", "duration", "velocity", "glideRate", "hitProbability", "rest").forEach {
+            assertTrue(body.contains("\"$it\""), "LickStep schema missing $it")
+        }
+    }
+
+    @Test
     fun `reference documents trackOverrides even though the schema omits it`() {
         // trackOverrides is excluded from the generated schema (Int map keys), so the agent must
         // still learn about it from the addendum.

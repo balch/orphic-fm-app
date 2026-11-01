@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
+import org.balch.orpheus.features.pulsar.models.Rest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -30,5 +31,22 @@ class PulsarLickTest {
         assertFailsWith<IllegalArgumentException> {
             Lick(steps = List(Lick.MAX_LICK_STEPS + 1) { LickStep(0, 0.25f, 0.8f) })
         }
+    }
+
+    @Test
+    fun `Rest builds a silent step of the given length`() {
+        val r = Rest(0.5f)
+        assertEquals(true, r.rest)
+        assertEquals(0.5f, r.duration)
+        assertEquals(LickStep(0, 0.5f).velocity, r.velocity)
+        assertEquals(LickStep(0, 0.5f).glideRate, r.glideRate)
+    }
+
+    @Test
+    fun `Lick validates note degrees but not rests`() {
+        Lick(listOf(Rest(1f)))
+        Lick(listOf(LickStep(-32, 1f), LickStep(63, 1f)))
+        assertFailsWith<IllegalArgumentException> { Lick(listOf(LickStep(64, 1f))) }
+        assertFailsWith<IllegalArgumentException> { Lick(listOf(LickStep(-33, 1f))) }
     }
 }

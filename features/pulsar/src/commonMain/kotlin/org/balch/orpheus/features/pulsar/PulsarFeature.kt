@@ -2101,7 +2101,7 @@ class PulsarViewModel(
         if (lick != null) {
             lick.steps.forEachIndexed { i, step ->
                 val base = i * Lick.LICK_FIELDS_PER_STEP
-                lickDataIds[base].value = FloatValue(step.scaleDegree.toFloat())
+                lickDataIds[base].value = FloatValue(step.wireDegree)
                 lickDataIds[base + 1].value = FloatValue(step.duration)
                 lickDataIds[base + 2].value = FloatValue(step.velocity)
                 // -1 = "use the track's TrackVoice.glideRate"; explicit value overrides.
@@ -2125,7 +2125,7 @@ class PulsarViewModel(
                 val base = i * Lick.LICK_FIELDS_PER_STEP
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "bass_line_data_$base"),
-                    FloatValue(step.scaleDegree.toFloat()))
+                    FloatValue(step.wireDegree))
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "bass_line_data_${base + 1}"),
                     FloatValue(step.duration))
@@ -2178,7 +2178,7 @@ class PulsarViewModel(
                         step * Lick.LICK_FIELDS_PER_STEP
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "lick_pool_data_$base"),
-                        FloatValue(s.scaleDegree.toFloat()))
+                        FloatValue(s.wireDegree))
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "lick_pool_data_${base + 1}"),
                         FloatValue(s.duration))

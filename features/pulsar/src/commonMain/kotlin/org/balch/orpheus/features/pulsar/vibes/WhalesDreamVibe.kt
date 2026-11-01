@@ -34,6 +34,7 @@ import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
@@ -268,11 +269,11 @@ class WhalesDreamVibe : VibeProvider {
         ),
         lick = Lick(
           steps = listOf(
-            LickStep(-1, 5.0f),
+            Rest(5.0f),
             LickStep(4, 3.0f, 0.7f),
             LickStep(7, 3.5f, 0.85f, glideRate = 0.5f),
             LickStep(4, 2.5f, 0.6f, glideRate = 0.5f),
-            LickStep(-1, 2.0f),
+            Rest(2.0f),
           ),
           loopLength = 16,
         ),
@@ -282,13 +283,13 @@ class WhalesDreamVibe : VibeProvider {
           pool = listOf(
             Lick(
               steps = listOf(
-                LickStep(-1, 3.0f, glideRate = 0.0f),
+                Rest(3.0f, glideRate = 0f),
                 LickStep(11, 0.5f, 0.6f, glideRate = 0.0f),
                 LickStep(14, 1.0f, 0.75f, glideRate = 0.45f),
                 LickStep(13, 0.5f, 0.65f, glideRate = 0.2f),
                 LickStep(16, 1.25f, glideRate = 0.5f),
                 LickStep(11, 1.75f, 0.6f, glideRate = 0.6f),
-                LickStep(-1, 8.0f, glideRate = 0.0f),
+                Rest(8.0f, glideRate = 0f),
               ),
               loopLength = 16,
             ),
@@ -297,7 +298,7 @@ class WhalesDreamVibe : VibeProvider {
                 LickStep(7, 3.0f, 0.85f, glideRate = 0.0f),
                 LickStep(9, 2.0f, glideRate = 0.5f),
                 LickStep(7, 4.0f, glideRate = 0.5f),
-                LickStep(-1, 7.0f, glideRate = 0.0f),
+                Rest(7.0f, glideRate = 0f),
               ),
               loopLength = 16,
             ),
@@ -330,13 +331,13 @@ class WhalesDreamVibe : VibeProvider {
             ),
             Lick(
               steps = listOf(
-                LickStep(-1, 3.0f, glideRate = 0.0f),
+                Rest(3.0f, glideRate = 0f),
                 LickStep(8, 0.5f, 0.6f, glideRate = 0.0f),
                 LickStep(11, 1.0f, 0.75f, glideRate = 0.45f),
                 LickStep(10, 0.5f, 0.65f, glideRate = 0.2f),
                 LickStep(13, 1.25f, glideRate = 0.5f),
                 LickStep(8, 1.75f, 0.6f, glideRate = 0.6f),
-                LickStep(-1, 8.0f, glideRate = 0.0f),
+                Rest(8.0f, glideRate = 0f),
               ),
               loopLength = 16,
             ),
@@ -345,11 +346,11 @@ class WhalesDreamVibe : VibeProvider {
                 LickStep(7, 2.0f, 0.85f, glideRate = 0.0f),
                 LickStep(10, 1.5f, glideRate = 0.5f),
                 LickStep(7, 2.5f, glideRate = 0.5f),
-                LickStep(-1, 0.5f, glideRate = 0.0f),
+                Rest(0.5f, glideRate = 0f),
                 LickStep(7, 2.0f, 0.85f, glideRate = 0.0f),
                 LickStep(11, 2.0f, 0.85f, glideRate = 0.5f),
                 LickStep(7, 3.0f, glideRate = 0.5f),
-                LickStep(-1, 2.5f, glideRate = 0.0f),
+                Rest(2.5f, glideRate = 0f),
               ),
               loopLength = 16,
             ),
@@ -359,17 +360,17 @@ class WhalesDreamVibe : VibeProvider {
                 LickStep(11, 1.0f, 0.9f, glideRate = 0.45f),
                 LickStep(13, 0.5f, 0.75f, glideRate = 0.0f),
                 LickStep(11, 0.5f, 0.7f, glideRate = 0.0f),
-                LickStep(-1, 1.0f, glideRate = 0.0f),
+                Rest(1.0f, glideRate = 0f),
                 LickStep(7, 1.0f, 0.85f, glideRate = 0.0f),
                 LickStep(11, 1.0f, 0.9f, glideRate = 0.45f),
                 LickStep(13, 0.5f, 0.75f, glideRate = 0.0f),
                 LickStep(11, 0.5f, 0.7f, glideRate = 0.0f),
-                LickStep(-1, 1.0f, glideRate = 0.0f),
+                Rest(1.0f, glideRate = 0f),
                 LickStep(7, 1.0f, 0.85f, glideRate = 0.0f),
                 LickStep(11, 1.0f, 0.9f, glideRate = 0.45f),
                 LickStep(13, 0.5f, 0.75f, glideRate = 0.0f),
                 LickStep(11, 0.5f, 0.7f, glideRate = 0.0f),
-                LickStep(-1, 1.0f, glideRate = 0.0f),
+                Rest(1.0f, glideRate = 0f),
                 LickStep(7, 1.0f, 0.85f, glideRate = 0.0f),
                 LickStep(11, 1.0f, 0.9f, glideRate = 0.45f),
                 LickStep(13, 1.0f, 0.9f, glideRate = 0.45f),
@@ -412,14 +413,14 @@ class WhalesDreamVibe : VibeProvider {
             ),
             Lick(
               steps = listOf(
-                LickStep(-1, 2.0f, glideRate = 0.0f),
+                Rest(2.0f, glideRate = 0f),
                 LickStep(13, 1.5f, 0.7f, glideRate = 0.0f),
                 LickStep(10, 2.0f, 0.65f, glideRate = 0.6f),
-                LickStep(-1, 1.5f, glideRate = 0.0f),
+                Rest(1.5f, glideRate = 0f),
                 LickStep(12, 1.0f, 0.7f, glideRate = 0.3f),
                 LickStep(14, 1.0f, 0.75f, glideRate = 0.5f),
                 LickStep(9, 3.0f, 0.6f, glideRate = 0.7f),
-                LickStep(-1, 4.0f, glideRate = 0.0f),
+                Rest(4.0f, glideRate = 0f),
               ),
               loopLength = 16,
             ),
@@ -434,7 +435,7 @@ class WhalesDreamVibe : VibeProvider {
             LickStep(2, 3.0f, glideRate = 0.75f),
             LickStep(1, 1.0f, 0.65f, glideRate = 0.6f),
             LickStep(0, 2.0f, 0.85f, glideRate = 0.7f),
-            LickStep(-1, 2.0f),
+            Rest(2.0f),
           ),
           loopLength = 16,
         ),

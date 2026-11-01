@@ -30,6 +30,7 @@ import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -112,7 +113,7 @@ class TechnoWobbleVibe : VibeProvider {
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),   // G# — hammer
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),   // G# — pulse
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),   // G# — pulse
-                    LickStep(scaleDegree = -2, duration = 0.5f, velocity = 0.70f),  // F — dip below
+                    Rest(0.5f, 0.70f),  // F: dip below; silent since authoring; was degree -2
                     LickStep(
                         scaleDegree = 0,
                         duration = 0.5f,

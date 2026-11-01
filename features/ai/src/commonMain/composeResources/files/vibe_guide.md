@@ -284,7 +284,12 @@ consecutive sections: the verse's first half on slot 1, its second half on slot 
   1 a quarter), a velocity (0..1; about 0.3 is a ghost), a glideRate (0..1, a slide into this
   note; leave it out to use the voice's own glideRate) and a hitProbability (the chance the note
   plays; tension lifts it toward certain, and a lost roll leaves the next note struck clean).
-- A negative scaleDegree is a rest for its duration, the only way to put silence inside a line.
+- A rest is silence for its duration, the only way to put silence inside a line. Write every rest
+  as `{ "scaleDegree": 0, "duration": N, "rest": true }`. Always write "rest" explicitly, true on a
+  rest and false on a note below the root. velocity is optional on a rest (default 0.8): a drum
+  lead reads it, loud as a kick, mid as a snare, quiet as a hat.
+- A negative scaleDegree is a real note below the lick's base (-1 is one scale step under the
+  root) and must say "rest": false; a negative degree with no rest key still reads as a rest.
 - loopLength (beats): make it the steps' total, rests included, and the line repeats back to back
   across the window. A larger value fills only steps' total / loopLength of the window, the line
   still back to back (cut mid-line if it does not fit), and leaves the end silent: a breath only
@@ -454,26 +459,26 @@ Orphic Lore, val funkSketch:
 {
   "steps": [
     { "scaleDegree": 7, "duration": 0.25, "velocity": 0.95 },
-    { "scaleDegree": -1, "duration": 0.25 },
+    { "scaleDegree": 0, "duration": 0.25, "rest": true },
     { "scaleDegree": 14, "duration": 0.25, "velocity": 0.75 },
     { "scaleDegree": 7, "duration": 0.25, "velocity": 0.3 },
-    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 0, "duration": 0.5, "rest": true },
     { "scaleDegree": 9, "duration": 0.25, "velocity": 0.85 },
     { "scaleDegree": 10, "duration": 0.5, "velocity": 0.9, "glideRate": 0.12 },
-    { "scaleDegree": -1, "duration": 0.25 },
+    { "scaleDegree": 0, "duration": 0.25, "rest": true },
     { "scaleDegree": 9, "duration": 0.25, "velocity": 0.35 },
     { "scaleDegree": 7, "duration": 0.25, "velocity": 0.85 },
-    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 0, "duration": 0.5, "rest": true },
     { "scaleDegree": 4, "duration": 0.5, "velocity": 0.9, "glideRate": 0.12 },
-    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 0, "duration": 0.5, "rest": true },
     { "scaleDegree": 6, "duration": 0.25, "velocity": 0.8 },
     { "scaleDegree": 7, "duration": 0.75, "velocity": 0.9, "glideRate": 0.12 },
-    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 0, "duration": 0.5, "rest": true },
     { "scaleDegree": 9, "duration": 0.25, "velocity": 0.85 },
     { "scaleDegree": 10, "duration": 0.25, "velocity": 0.35 },
     { "scaleDegree": 9, "duration": 0.25, "velocity": 0.8 },
     { "scaleDegree": 7, "duration": 0.25, "velocity": 0.8 },
-    { "scaleDegree": -1, "duration": 1 }
+    { "scaleDegree": 0, "duration": 1, "rest": true }
   ],
   "loopLength": 8
 }
@@ -484,7 +489,7 @@ Stay Asleep, val replyLick:
 ```json
 {
   "steps": [
-    { "scaleDegree": -1, "duration": 3 },
+    { "scaleDegree": 0, "duration": 3, "rest": true },
     { "scaleDegree": 5, "duration": 0.25, "velocity": 0.4, "hitProbability": 0.7 },
     { "scaleDegree": 4, "duration": 1, "velocity": 0.6, "glideRate": 0.15, "hitProbability": 0.85 },
     { "scaleDegree": 5, "duration": 0.25, "velocity": 0.8, "hitProbability": 0.7 },
@@ -877,7 +882,7 @@ The highest-value part: translate a described feel into concrete parameter choic
   moderate lickMutation (0.3–0.5) for a living feel.
 - Static drone with embellishment: single-note lick with long duration, low-velocity accents, and
   chordFollow = FIXED so the pitch does not chase chord changes.
-- Negative scaleDegree = rest in that step's slot — use this for stop-time: hit, hit, rest, walk-up.
+- A "rest": true step is silence in that step's slot; use this for stop-time: hit, hit, rest, walk-up.
 - Rotating riff (per-section variety, avoids monotony): set `lickRotation.pool` to 2–4 licks and the engine
   swaps between them at section boundaries (needs an arrangement). For a rare surprise, add a
   `{"type":"lick", "lick": {…}, "chance": 0.02}` entry to `anomalies` (≈ 1-in-50 per ~2-bar statement) —
@@ -1102,9 +1107,13 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
 
 ### Lick steps
 - A lick is a list of steps, each a scaleDegree (0 is the root), a duration in beats and a velocity
-  (0..1), up to 64 steps. A negative degree is a rest; under lickMutationMode RANDOM, at high
-  lickMutation a rest has about a mutation × 0.3 chance of filling with a note.
+  (0..1), up to 64 steps. A rest is `{ "scaleDegree": 0, "duration": N, "rest": true }`
+  (velocity optional, default 0.8, read by drum leads). A negative degree is a note below the
+  base and needs "rest": false. Under lickMutationMode RANDOM, at high lickMutation a rest has
+  about a mutation × 0.3 chance of filling with a note.
 - lickMode Fill spreads the lick across its bars; Squash compresses it into one bar.
+- To repeat a line, make loopLength the steps' total, rests included: it plays back to back
+  across the window.
 - loopLength (beats) longer than the steps' total fills only steps' total / loopLength of the
   window, the line back to back, and leaves the end silent; for a breath after each phrase, end it
   with a rest step.

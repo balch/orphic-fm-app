@@ -4,6 +4,7 @@ import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.LickRotation
+import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.NotatedScore
 import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.TensionArc
@@ -36,10 +37,10 @@ class PulsarSectionLimitsTest {
     private val scoreClockHeader = File("../../liborpheus_dsp/src/pulsar_score_clock.h")
     private val speechHeader = File("../../liborpheus_dsp/src/pulsar_speech.h")
 
-    private fun constant(source: File, name: String): Int {
+    private fun constant(source: File, name: String, type: String = "int"): Int {
         assertTrue(source.exists(), "missing C++ source ${source.absolutePath}")
         // Signed: the trans-fx edge sentinels are negative.
-        val re = Regex("""constexpr\s+int\s+$name\s*=\s*(-?\d+)""")
+        val re = Regex("""constexpr\s+$type\s+(?:\w+\s*=\s*-?\d+\s*,\s*)*$name\s*=\s*(-?\d+)""")
         val m = re.find(source.readText())
         requireNotNull(m) { "could not find `constexpr int $name` in ${source.name}" }
         return m.groupValues[1].toInt()
@@ -284,5 +285,12 @@ class PulsarSectionLimitsTest {
                 "when the next cycle plans its own full section of cues, so a queue sized " +
                 "to the per-section cap exactly can drop a cue and its forced kick.",
         )
+    }
+
+    @Test
+    fun `lick degree constants match C++`() {
+        assertEquals(LickStep.REST_DEGREE_WIRE, constant(pulsarHeader, "kLickRestDegree", "int8_t"))
+        assertEquals(LickStep.MIN_DEGREE, constant(pulsarHeader, "kLickMinDegree"))
+        assertEquals(LickStep.MAX_DEGREE, constant(pulsarHeader, "kLickMaxDegree"))
     }
 }

@@ -977,8 +977,8 @@ static constexpr RepickNote kHeadsOnTheE[] = {{4, 0.25f, 0.9f}, {2, 2.0f, 0.95f}
 static constexpr int kHeadsOnTheECount = static_cast<int>(sizeof(kHeadsOnTheE) / sizeof(kHeadsOnTheE[0]));
 // Four 1.5-beat notes, each starting on the "&" after an 8th rest.
 static constexpr RepickNote kHeadsOnTheAnd[] = {
-    {-1, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {-1, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
-    {-1, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {-1, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
+    {kLickRestDegree, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {kLickRestDegree, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
+    {kLickRestDegree, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {kLickRestDegree, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
 };
 static constexpr int kHeadsOnTheAndCount = static_cast<int>(sizeof(kHeadsOnTheAnd) / sizeof(kHeadsOnTheAnd[0]));
 

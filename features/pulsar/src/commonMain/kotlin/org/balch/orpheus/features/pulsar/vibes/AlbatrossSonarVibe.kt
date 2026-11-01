@@ -44,6 +44,7 @@ import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
@@ -1436,13 +1437,7 @@ public class AlbatrossSonarVibe : VibeProvider {
               glideRate = 0.3f,
               hitProbability = 1.0f,
             ),
-            LickStep(
-              scaleDegree = -1,
-              duration = 2.0f,
-              velocity = 0.8f,
-              glideRate = -1.0f,
-              hitProbability = 1.0f,
-            ),
+            Rest(2.0f),
             LickStep(
               scaleDegree = 3,
               duration = 0.5f,
@@ -1471,13 +1466,7 @@ public class AlbatrossSonarVibe : VibeProvider {
               glideRate = 0.45f,
               hitProbability = 1.0f,
             ),
-            LickStep(
-              scaleDegree = -1,
-              duration = 3.0f,
-              velocity = 0.8f,
-              glideRate = -1.0f,
-              hitProbability = 1.0f,
-            ),
+            Rest(3.0f),
           ),
           loopLength = 16,
         ),
@@ -1530,13 +1519,7 @@ public class AlbatrossSonarVibe : VibeProvider {
                   glideRate = 0.3f,
                   hitProbability = 1.0f,
                 ),
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 2.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(2.0f),
                 LickStep(
                   scaleDegree = 3,
                   duration = 0.5f,
@@ -1565,25 +1548,13 @@ public class AlbatrossSonarVibe : VibeProvider {
                   glideRate = 0.45f,
                   hitProbability = 1.0f,
                 ),
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 3.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(3.0f),
               ),
               loopLength = 16,
             ),
             Lick(
               steps = listOf(
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 1.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(1.0f),
                 LickStep(
                   scaleDegree = 7,
                   duration = 1.5f,
@@ -1633,13 +1604,7 @@ public class AlbatrossSonarVibe : VibeProvider {
                   glideRate = 0.45f,
                   hitProbability = 1.0f,
                 ),
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 4.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(4.0f),
               ),
               loopLength = 16,
             ),

@@ -922,7 +922,7 @@ bool run_pulsar_tests() {
             {0, 0.5f, 0.8f},   // root
             {2, 0.5f, 0.8f},   // 3rd
             {4, 1.0f, 0.9f},   // 5th
-            {-1, 0.5f, 0.0f},  // rest
+            {kLickRestDegree, 0.5f, 0.0f},  // rest
         };
         // D minor scale: 0=D, 1=E, 2=F, 3=G, 4=A, 5=Bb, 6=C
         const PulsarScale& d_minor = kPulsarScales[0]; // minor

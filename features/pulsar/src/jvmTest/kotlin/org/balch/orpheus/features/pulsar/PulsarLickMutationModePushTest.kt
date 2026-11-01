@@ -30,6 +30,7 @@ import org.balch.orpheus.features.pulsar.models.LickMutationMode
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -139,7 +140,7 @@ private fun modeTestVibe(mode: LickMutationMode = LickMutationMode.RANDOM): Vibe
         rhythmDensity = RhythmPattern.SPARSE.density,
     ),
     lickRotation = LickRotation(
-        pool = listOf(Lick(steps = listOf(LickStep(0, 1f, 0.8f), LickStep(-1, 1f, 0f), LickStep(2, 2f, 0.8f)))),
+        pool = listOf(Lick(steps = listOf(LickStep(0, 1f, 0.8f), Rest(1f), LickStep(2, 2f, 0.8f)))),
     ),
     lickMutationMode = mode,
     tracks = List(8) {

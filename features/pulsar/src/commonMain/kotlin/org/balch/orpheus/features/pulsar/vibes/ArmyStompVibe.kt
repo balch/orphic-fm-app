@@ -28,6 +28,7 @@ import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -290,21 +291,9 @@ class ArmyStompVibe : VibeProvider {
                         duration = 1.5f,
                         velocity = 0.90f
                     ),    // E — back, held
-                    LickStep(
-                        scaleDegree = -1,
-                        duration = 1.0f,
-                        velocity = 0.80f
-                    ),   // D — descent starts
-                    LickStep(
-                        scaleDegree = -2,
-                        duration = 1.0f,
-                        velocity = 0.75f
-                    ),   // C — deliberate
-                    LickStep(
-                        scaleDegree = -3,
-                        duration = 1.5f,
-                        velocity = 0.85f
-                    ),   // B low — resolve, ring out
+                    Rest(1.0f),   // D: descent starts; silent since authoring; was degree -1
+                    Rest(1.0f, 0.75f),   // C: deliberate; silent since authoring; was degree -2
+                    Rest(1.5f, 0.85f),   // B low: resolve, ring out; silent since authoring; was degree -3
                 ),
             ),
             // 24-bar lick evolution arc — mutations stick within ±4 scale degrees of original.

@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -69,10 +70,10 @@ class VoltageStrutVibe : VibeProvider {
                 steps = listOf(
                     LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
                     LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.65f),
-                    LickStep(scaleDegree = -3, duration = 0.5f, velocity = 0.85f),
+                    Rest(0.5f, 0.85f),  // silent since authoring; was degree -3
                     LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.80f),
                     LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.90f),
-                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.75f),
+                    Rest(0.5f, 0.75f),  // silent since authoring; was degree -1
                     LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.85f),
                     LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.80f),
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),

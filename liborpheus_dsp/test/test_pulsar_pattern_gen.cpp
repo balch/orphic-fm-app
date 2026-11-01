@@ -286,8 +286,8 @@ static bool test_dust_groove_scenario() {
     lick[3] = {0, 0.5f, 0.80f};
     lick[4] = {2, 0.5f, 0.85f};
     lick[5] = {0, 0.5f, 0.90f};
-    lick[6] = {-1, 0.5f, 0.75f};  // rest
-    lick[7] = {-2, 1.0f, 0.80f};  // rest
+    lick[6] = {kLickRestDegree, 0.5f, 0.75f};  // rest
+    lick[7] = {kLickRestDegree, 1.0f, 0.80f};  // rest
 
     PulsarScale scale = test_minor_scale();
     uint32_t seed = 42;
@@ -433,6 +433,65 @@ static bool test_effect_wide_window_unchanged() {
     return ok;
 }
 
+// Negative degrees are notes below the lick base now; only kLickRestDegree is silent.
+static bool test_lick_negative_degree_is_note_below_root() {
+    printf("\n  Test: a negative lick degree plays below the root\n");
+    const PulsarScale& minor = kPulsarScales[0];  // natural minor; root 11 makes it B minor
+    bool ok = true;
+    const struct { int8_t degree; int midi; } cases[] = {{-1, 69}, {-7, 59}};
+    for (const auto& c : cases) {
+        PulsarStep steps[16] = {};
+        PulsarLickStep lick[1] = {{c.degree, 1.0f, 0.8f, -1.0f}};
+        generate_lick_pattern(steps, 4, lick, 1, 0.0f, 11, minor, 7u, 0, 5, 0, 127);
+        bool pass = steps[0].gate && steps[0].note == c.midi;
+        printf("    degree %d -> gate=%d note=%d (want %d) -- %s\n", c.degree,
+               steps[0].gate, steps[0].note, c.midi, pass ? "PASS" : "FAIL");
+        ok = ok && pass;
+    }
+    return ok;
+}
+
+static bool test_lick_rest_marker_is_silent() {
+    printf("\n  Test: kLickRestDegree renders silence\n");
+    PulsarStep steps[16] = {};
+    PulsarLickStep lick[2] = {{kLickRestDegree, 1.0f, 0.8f, -1.0f}, {0, 1.0f, 0.8f, -1.0f}};
+    generate_lick_pattern(steps, 8, lick, 2, 0.0f, 11, kPulsarScales[0], 7u, 0, 5, 0, 127);
+    bool ok = count_gates(steps, 4) == 0 && steps[4].gate && steps[4].note == 71;
+    printf("    head gates=%d step4 gate=%d note=%d (want 71) -- %s\n",
+           count_gates(steps, 4), steps[4].gate, steps[4].note, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_rest_marker_survives_chord_tones_mutation() {
+    printf("\n  Test: CHORD_TONES mutation never fills a rest marker\n");
+    PulsarLickStep lick[2] = {{kLickRestDegree, 1.0f, 0.8f, -1.0f}, {0, 1.0f, 0.8f, -1.0f}};
+    int filled = 0;
+    for (uint32_t seed = 1; seed <= 64; seed++) {
+        PulsarStep steps[16] = {};
+        generate_lick_pattern(steps, 8, lick, 2, 1.0f, 11, kPulsarScales[0], seed * 2654435761u,
+                              0, 5, 0, 127, 0, 0, LickMutationMode::CHORD_TONES);
+        filled += count_gates(steps, 4);
+    }
+    bool ok = filled == 0;
+    printf("    rest steps gated over 64 seeds: %d -- %s\n", filled, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_random_mutation_can_still_fill_rest_marker() {
+    printf("\n  Test: RANDOM mutation can still fill a rest marker\n");
+    PulsarLickStep lick[2] = {{kLickRestDegree, 1.0f, 0.8f, -1.0f}, {0, 1.0f, 0.8f, -1.0f}};
+    int seeds_filled = 0;
+    for (uint32_t seed = 1; seed <= 64; seed++) {
+        PulsarStep steps[16] = {};
+        generate_lick_pattern(steps, 8, lick, 2, 1.0f, 11, kPulsarScales[0], seed * 2654435761u,
+                              0, 5, 0, 127, 0, 0, LickMutationMode::RANDOM);
+        if (count_gates(steps, 4) > 0) seeds_filled++;
+    }
+    bool ok = seeds_filled > 0;
+    printf("    seeds that filled the rest: %d of 64 -- %s\n", seeds_filled, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_pattern_gen_tests() {
     printf("\n=== Pulsar Pattern Gen Tests ===\n");
     int pass = 0, fail = 0;
@@ -449,6 +508,10 @@ bool run_pulsar_pattern_gen_tests() {
     test_blues_scale_renders_flat_five()    ? pass++ : fail++;
     test_effect_narrow_window_stays_in_range() ? pass++ : fail++;
     test_effect_wide_window_unchanged()     ? pass++ : fail++;
+    test_lick_negative_degree_is_note_below_root() ? pass++ : fail++;
+    test_lick_rest_marker_is_silent()       ? pass++ : fail++;
+    test_rest_marker_survives_chord_tones_mutation() ? pass++ : fail++;
+    test_random_mutation_can_still_fill_rest_marker() ? pass++ : fail++;
 
     printf("\n  Results: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);

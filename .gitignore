@@ -54,6 +54,7 @@ liborpheus_dsp/.cache/
 
 # C++ DSP test output (WAV/CSV files)
 liborpheus_dsp/test/output/
+**/test/output/
 
 # Root-level test output (symlinked from C++ build)
 /test/output

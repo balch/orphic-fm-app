@@ -1379,7 +1379,7 @@ static bool test_jam_builds_over_its_section() {
 // {0,1,4,5,8,9,12,13} and leaving {2,3,6,7,10,11,14,15} empty — the gaps a jam
 // is supposed to ornament rather than paint over. Shape mirrors an authored
 // LickMode.Fill + BarStrategy.REPEAT riff (the RustBelt bass case).
-static const int8_t kHookDegrees[8]   = {0, -1, 3, -1, 5, -1, 4, -1};
+static const int8_t kHookDegrees[8]   = {0, kLickRestDegree, 3, kLickRestDegree, 5, kLickRestDegree, 4, kLickRestDegree};
 static const int    kHookGatedSteps[8] = {0, 1, 4, 5, 8, 9, 12, 13};
 
 static bool is_hook_step(int s) {

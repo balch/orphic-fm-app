@@ -31,6 +31,7 @@ import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
@@ -103,11 +104,11 @@ class RunningOutVibe : VibeProvider {
             LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.75f),
             LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.8f),
             LickStep(scaleDegree = 4, duration = 2f, velocity = 0.9f, glideRate = 0.28f),
-            LickStep(scaleDegree = -1, duration = 4f),
+            Rest(4f),
             LickStep(scaleDegree = 7, duration = 1f, velocity = 0.9f),
             LickStep(scaleDegree = 6, duration = 1f, velocity = 0.8f),
             LickStep(scaleDegree = 4, duration = 2f, velocity = 0.85f, glideRate = 0.28f),
-            LickStep(scaleDegree = -1, duration = 4f),
+            Rest(4f),
         ),
         loopLength = 16,
     )
@@ -116,11 +117,11 @@ class RunningOutVibe : VibeProvider {
     private val loneWhaleCall = Lick(
         steps = listOf(
             LickStep(scaleDegree = 4, duration = 3f, velocity = 0.8f, glideRate = 0.6f),
-            LickStep(scaleDegree = -1, duration = 1f),
+            Rest(1f),
             LickStep(scaleDegree = 7, duration = 4f, velocity = 0.85f, glideRate = 0.7f),
-            LickStep(scaleDegree = -1, duration = 2f),
+            Rest(2f),
             LickStep(scaleDegree = 5, duration = 3f, velocity = 0.75f, glideRate = 0.6f),
-            LickStep(scaleDegree = -1, duration = 3f),
+            Rest(3f),
         ),
         loopLength = 16,
     )
@@ -130,10 +131,10 @@ class RunningOutVibe : VibeProvider {
     private val podCall = Lick(
         steps = listOf(
             LickStep(scaleDegree = 4, duration = 3f, velocity = 0.85f, glideRate = 0.6f),
-            LickStep(scaleDegree = -1, duration = 5f),
+            Rest(5f),
             LickStep(scaleDegree = 7, duration = 2.5f, velocity = 0.85f, glideRate = 0.7f),
             LickStep(scaleDegree = 5, duration = 1.5f, velocity = 0.75f, glideRate = 0.6f),
-            LickStep(scaleDegree = -1, duration = 4f),
+            Rest(4f),
         ),
         loopLength = 16,
     )
@@ -141,15 +142,15 @@ class RunningOutVibe : VibeProvider {
     // TODO(lick): slot 3, the pound's return. Develops slot 0's motif (higher, or shifted an 8th).
     private val returnLick = Lick(
         steps = listOf(
-            LickStep(scaleDegree = -1, duration = 2f),
+            Rest(2f),
             LickStep(scaleDegree = 9, duration = 1.5f, velocity = 0.9f, glideRate = 0.28f),
             LickStep(scaleDegree = 7, duration = 0.5f, velocity = 0.75f),
             LickStep(scaleDegree = 6, duration = 2f, velocity = 0.85f),
-            LickStep(scaleDegree = -1, duration = 2f),
+            Rest(2f),
             LickStep(scaleDegree = 4, duration = 1f, velocity = 0.8f),
             LickStep(scaleDegree = 6, duration = 1f, velocity = 0.8f),
             LickStep(scaleDegree = 7, duration = 2f, velocity = 0.9f, glideRate = 0.28f),
-            LickStep(scaleDegree = -1, duration = 4f),
+            Rest(4f),
         ),
         loopLength = 16,
     )
@@ -199,21 +200,21 @@ class RunningOutVibe : VibeProvider {
     private val jamSkeleton = Lick(
         steps = listOf(
             LickStep(scaleDegree = 7, duration = 1f, velocity = 0.9f),
-            LickStep(scaleDegree = -1, duration = 1f),
+            Rest(1f),
             LickStep(scaleDegree = 11, duration = 0.5f, velocity = 0.8f),
-            LickStep(scaleDegree = -1, duration = 1.5f),
+            Rest(1.5f),
             LickStep(scaleDegree = 10, duration = 1f, velocity = 0.9f),
-            LickStep(scaleDegree = -1, duration = 1f),
+            Rest(1f),
             LickStep(scaleDegree = 13, duration = 0.5f, velocity = 0.85f),
-            LickStep(scaleDegree = -1, duration = 1.5f),
+            Rest(1.5f),
             LickStep(scaleDegree = 11, duration = 1f, velocity = 0.85f),
-            LickStep(scaleDegree = -1, duration = 1f),
+            Rest(1f),
             LickStep(scaleDegree = 8, duration = 0.5f, velocity = 0.75f),
-            LickStep(scaleDegree = -1, duration = 1.5f),
+            Rest(1.5f),
             LickStep(scaleDegree = 6, duration = 1f, velocity = 0.9f),
-            LickStep(scaleDegree = -1, duration = 1f),
+            Rest(1f),
             LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.75f),
-            LickStep(scaleDegree = -1, duration = 1.5f),
+            Rest(1.5f),
         ),
         loopLength = 16,
     )
@@ -222,9 +223,9 @@ class RunningOutVibe : VibeProvider {
     // call sings, answers, rests again, answers lower. The bass doubles it at C#2 / E2, a deep whale.
     private val whaleAnswer = Lick(
         steps = listOf(
-            LickStep(scaleDegree = -1, duration = 4f),
+            Rest(4f),
             LickStep(scaleDegree = 7, duration = 3f, velocity = 0.8f, glideRate = 0.6f),
-            LickStep(scaleDegree = -1, duration = 5f),
+            Rest(5f),
             LickStep(scaleDegree = 9, duration = 2f, velocity = 0.75f, glideRate = 0.65f),
             LickStep(scaleDegree = 7, duration = 2f, velocity = 0.7f, glideRate = 0.6f),
         ),

@@ -43,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
@@ -1345,13 +1346,7 @@ public class SimianSwaggerVibe : VibeProvider {
         ),
         lick = Lick(
           steps = listOf(
-            LickStep(
-              scaleDegree = -1,
-              duration = 0.25f,
-              velocity = 0.8f,
-              glideRate = -1.0f,
-              hitProbability = 1.0f,
-            ),
+            Rest(0.25f),
             LickStep(
               scaleDegree = 6,
               duration = 0.25f,
@@ -1607,13 +1602,7 @@ public class SimianSwaggerVibe : VibeProvider {
           pool = listOf(
             Lick(
               steps = listOf(
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 1.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(1.0f),
                 LickStep(
                   scaleDegree = 6,
                   duration = 0.5f,
@@ -1663,13 +1652,7 @@ public class SimianSwaggerVibe : VibeProvider {
                   glideRate = -1.0f,
                   hitProbability = 1.0f,
                 ),
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 1.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(1.0f),
               ),
               loopLength = 16,
             ),
@@ -1703,25 +1686,13 @@ public class SimianSwaggerVibe : VibeProvider {
                   glideRate = -1.0f,
                   hitProbability = 1.0f,
                 ),
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 3.0f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(3.0f),
               ),
               loopLength = 16,
             ),
             Lick(
               steps = listOf(
-                LickStep(
-                  scaleDegree = -1,
-                  duration = 0.25f,
-                  velocity = 0.8f,
-                  glideRate = -1.0f,
-                  hitProbability = 1.0f,
-                ),
+                Rest(0.25f),
                 LickStep(
                   scaleDegree = 6,
                   duration = 0.25f,

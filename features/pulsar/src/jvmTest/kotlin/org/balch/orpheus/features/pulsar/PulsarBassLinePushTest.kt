@@ -28,6 +28,8 @@ import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickSource
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.LickRotation
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -95,7 +97,7 @@ class PulsarBassLinePushTest {
     @Test
     fun `bass line and track sources reach the controller`() = runTest(testDispatcher) {
         val bassLine = Lick(
-            steps = listOf(LickStep(7, 1.5f, 0.9f), LickStep(-1, 0.5f, 0f), LickStep(4, 2.0f, 0.8f)),
+            steps = listOf(LickStep(7, 1.5f, 0.9f), Rest(0.5f), LickStep(4, 2.0f, 0.8f)),
             loopLength = 16,
         )
         val vibe = bassPushTestVibe(
@@ -114,8 +116,8 @@ class PulsarBassLinePushTest {
         assertEquals(1.5f, floatPort("bass_line_data_1"))
         assertEquals(0.9f, floatPort("bass_line_data_2"))
         assertEquals(-1f, floatPort("bass_line_data_3"), "default glide sentinel must pass through")
-        // Rest step marshals its negative degree
-        assertEquals(-1f, floatPort("bass_line_data_4"))
+        // Rest step marshals the rest sentinel
+        assertEquals(-128f, floatPort("bass_line_data_4"))
         // Scalars + fence
         assertEquals(0.25f, floatPort("bass_line_mutation"))
         assertEquals(2f, floatPort("bass_line_octave"))
@@ -125,6 +127,45 @@ class PulsarBassLinePushTest {
         assertEquals(1f, floatPort("track_lick_source_3"), "bass track pushes 1")
         assertEquals(0f, floatPort("track_lick_source_4"), "lead track pushes 0")
         assertEquals(0f, floatPort("track_lick_source_0"), "percussive track pushes 0")
+    }
+
+    @Test
+    fun `rests marshal as the rest degree and below-root notes keep theirs on all three channels`() =
+        runTest(testDispatcher) {
+            val figure = Lick(listOf(LickStep(-1, 1f), Rest(0.5f)))
+            val vibe = bassPushTestVibe(
+                track3 = TrackRole.Melodic(lickMode = LickMode.Fill, lickSource = LickSource.BASS),
+                track4 = TrackRole.Melodic(lickMode = LickMode.Fill),
+                bassLine = figure,
+            ).copy(
+                lick = figure,
+                lickRotation = LickRotation(pool = listOf(figure)),
+            )
+
+            makeViewModel(vibe).actions.setVibe(vibe)
+            advanceUntilIdle()
+
+            assertEquals(-1f, floatPort("lick_data_0"))
+            assertEquals(-128f, floatPort("lick_data_4"))
+            assertEquals(-1f, floatPort("bass_line_data_0"))
+            assertEquals(-128f, floatPort("bass_line_data_4"))
+            assertEquals(-1f, floatPort("lick_pool_data_0"))
+            assertEquals(-128f, floatPort("lick_pool_data_4"))
+        }
+
+    @Test
+    fun `a rest marshals the velocity a legacy degree -1 rest did`() = runTest(testDispatcher) {
+        // Drum leads map a rest's velocity to a hit, so it must match the legacy LickStep(-1, x).
+        val legacy = LickStep(-1, 0.5f)
+        assertEquals(legacy.velocity, Rest(0.5f).velocity)
+        val vibe = bassPushTestVibe(track4 = TrackRole.Melodic(lickMode = LickMode.Fill))
+            .copy(lick = Lick(listOf(Rest(0.5f), Rest(0.5f, 0.45f))))
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(legacy.velocity, floatPort("lick_data_2"))
+        assertEquals(0.45f, floatPort("lick_data_6"))
     }
 
     @Test

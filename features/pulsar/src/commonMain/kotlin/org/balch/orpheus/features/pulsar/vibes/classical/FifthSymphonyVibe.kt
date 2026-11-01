@@ -27,6 +27,7 @@ import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -235,14 +236,14 @@ class FifthSymphonyVibe : VibeProvider {
     // tail. FOLLOW on the bass track carries it through every section's progression.
     private val lowStrings = Lick(
         steps = listOf(
-            LickStep(scaleDegree = -1, duration = 0.5f),
+            Rest(0.5f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
             LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.95f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.7f, hitProbability = 0.6f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.7f, hitProbability = 0.6f),
-            LickStep(scaleDegree = -1, duration = 0.5f),
+            Rest(0.5f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),

@@ -338,7 +338,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 int max_drift = std::max(1, static_cast<int>(state->lick_mutation * 4.0f + 0.5f));
                 for (int i = 0; i < state->lick_length; i++) {
                     int drift = state->lick[i].scale_degree - state->original_lick[i].scale_degree;
-                    if (std::abs(drift) > max_drift) {
+                    if (is_lick_rest(state->lick[i].scale_degree) || is_lick_rest(state->original_lick[i].scale_degree)) {
+                        state->lick[i].scale_degree = state->original_lick[i].scale_degree;
+                    } else if (std::abs(drift) > max_drift) {
                         state->lick[i].scale_degree = state->original_lick[i].scale_degree
                             + std::max(-max_drift, std::min(drift, max_drift));
                     }
@@ -356,7 +358,10 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                     for (int i = 0; i < state->bass_line_length; i++) {
                         int drift = state->bass_line[i].scale_degree
                                   - state->original_bass_line[i].scale_degree;
-                        if (std::abs(drift) > bass_drift_max) {
+                        if (is_lick_rest(state->bass_line[i].scale_degree) ||
+                            is_lick_rest(state->original_bass_line[i].scale_degree)) {
+                            state->bass_line[i].scale_degree = state->original_bass_line[i].scale_degree;
+                        } else if (std::abs(drift) > bass_drift_max) {
                             state->bass_line[i].scale_degree =
                                 state->original_bass_line[i].scale_degree
                                 + std::max(-bass_drift_max, std::min(drift, bass_drift_max));
@@ -4969,7 +4974,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             if (state->band_solo_state.just_handed_off ||
                                 state->band_solo_state.solo_lick_octave < 0) {
                                 int chosen = choose_lick_octave(
-                                    nlive > 0 ? state->live_lick_degrees[0] : 0,
+                                    nlive > 0 ? lick_handoff_degree(state->live_lick_degrees[0]) : 0,
                                     state->band_solo_state.outgoing_last_note,
                                     static_cast<int>(rroot), rscale,
                                     reg_lo, reg_hi);
@@ -5017,7 +5022,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             if (nlive > 0) {
                                 state->band_solo_state.outgoing_last_note =
                                     fit_jam_note_to_range(lick_degree_to_midi(
-                                        state->live_lick_degrees[nlive - 1],
+                                        lick_handoff_degree(state->live_lick_degrees[nlive - 1]),
                                         static_cast<int>(rroot), rscale, oct,
                                         static_cast<int>(nr_low),
                                         static_cast<int>(nr_high)),

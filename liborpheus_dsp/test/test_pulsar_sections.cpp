@@ -1970,14 +1970,11 @@ static bool test_midi_lick_degree_roundtrip_and_synth() {
     return ok;
 }
 
-// Fix #1: a source note BELOW the root maps to a negative scale degree, and the
-// lick renderer (bar_strategy / generate_lick_pattern) treats scale_degree<0 as a
-// REST. So synthesize_lick_from_steps must octave-shift the contour non-negative,
-// or the DogHouse lick-less LickBuilder fallback renders those notes as silence.
+// A source note below the root maps to a negative degree. The fallback contour is lifted
+// by whole scale octaves to non-negative so the lick-less solo keeps its register.
 static bool test_synthesize_lick_below_root_renders_notes_not_rests() {
     const PulsarScale& scale = kPulsarScales[0];  // major
-    int root = 60;  // C4 — a source note below this maps to a negative degree
-    // Ascending line that STARTS below the root: G3, C4, E4.
+    int root = 60;  // C4
     PulsarStep steps[8];
     for (int i = 0; i < 8; i++) steps[i] = make_step(0, 0.0f, false, 0.0f);
     steps[0] = make_step((uint8_t)(root - 5), 0.7f, true, 0.5f);  // G3, below root
@@ -1985,14 +1982,30 @@ static bool test_synthesize_lick_below_root_renders_notes_not_rests() {
     steps[2] = make_step((uint8_t)(root + 4), 0.9f, true, 0.5f);  // E4
     int8_t dg[32]; float du[32], ve[32];
     int n = synthesize_lick_from_steps(steps, 8, root, scale, dg, du, ve, 32);
-    // 1. All synthesized degrees must be NON-NEGATIVE (else they render as rests).
-    bool no_negatives = (n == 3);
-    for (int i = 0; i < n; i++) if (dg[i] < 0) no_negatives = false;
-    // 2. Contour preserved: ascending source -> non-descending degrees.
+    bool non_negative = (n == 3);
+    for (int i = 0; i < n; i++) if (dg[i] < 0) non_negative = false;
     bool ascending = (n == 3) && dg[0] <= dg[1] && dg[1] <= dg[2];
-    bool ok = no_negatives && ascending;
-    printf("  synth below-root: n=%d no_neg=%d ascending=%d (dg=[%d,%d,%d]) -- %s\n",
-           n, no_negatives, ascending, dg[0], dg[1], dg[2], ok ? "PASS":"FAIL");
+    // Lifted by whole octaves: pitch classes survive.
+    bool pcs = n == 3 && (lick_degree_to_midi(dg[0], root, scale, 0) - (root - 5)) % 12 == 0;
+    bool ok = non_negative && ascending && pcs;
+    printf("  synth below-root: n=%d non_negative=%d ascending=%d pcs=%d (dg=[%d,%d,%d]) -- %s\n",
+           n, non_negative, ascending, pcs, dg[0], dg[1], dg[2], ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// A rest marker at the lick's edge must pick the same handoff octave and last note as the
+// legacy -1 rest did, so migrated vibes keep their register.
+static bool test_handoff_degree_reads_rest_marker_as_legacy_minus_one() {
+    const PulsarScale& scale = kPulsarScales[0];
+    bool ok = lick_handoff_degree(kLickRestDegree) == -1 && lick_handoff_degree(5) == 5
+           && lick_handoff_degree(-3) == -3;
+    for (int outgoing : {48, 60, 72}) {
+        ok = ok && choose_lick_octave(lick_handoff_degree(kLickRestDegree), outgoing, 2, scale, 36, 84)
+                   == choose_lick_octave(-1, outgoing, 2, scale, 36, 84);
+    }
+    ok = ok && lick_degree_to_midi(lick_handoff_degree(kLickRestDegree), 2, scale, 5, 36, 84)
+               == lick_degree_to_midi(-1, 2, scale, 5, 36, 84);
+    printf("  handoff degree of a rest marker == legacy -1 -- %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -3113,6 +3126,77 @@ static bool test_live_lick_octave_jump_is_one_scale() {
     return pass;
 }
 
+static bool test_mutate_live_lick_never_makes_rest_marker() {
+    printf("\n=== Test: mutate_live_lick keeps notes inside the lick range, one lick mutated cumulatively ===\n");
+    int8_t deg[3] = {-32, 0, 63};
+    float dur[3] = {1.0f, 1.0f, 1.0f}; float vel[3] = {0.8f, 0.8f, 0.8f};
+    uint32_t seed = 1;
+    int bad = 0;
+    for (int n = 0; n < 1000; n++) {
+        mutate_live_lick(deg, dur, vel, 3, 1.0f, seed, nullptr, 14, true, 7);
+        for (int i = 0; i < 3; i++)
+            if (is_lick_rest(deg[i]) || deg[i] < kLickMinDegree || deg[i] > kLickMaxDegree) bad++;
+    }
+    bool ok = bad == 0;
+    printf("  violations over 1000 cumulative mutations: %d -- %s\n", bad, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// A rest marker must mutate exactly as the legacy rest (-1) did, then stay a rest only
+// while the result is negative. Reference: the same call with -1 (a plain note degree).
+static bool test_mutate_live_lick_rest_marker_matches_legacy_minus_one() {
+    printf("\n=== Test: mutate_live_lick treats a rest marker like legacy -1 ===\n");
+    int bad = 0, became_note = 0, stayed_rest = 0;
+    for (uint32_t s = 1; s <= 500; s++) {
+        int8_t ref[4] = {-1, 3, -1, 5}, got[4] = {kLickRestDegree, 3, kLickRestDegree, 5};
+        int8_t base_ref[4] = {-1, 3, -1, 5}, base_got[4] = {kLickRestDegree, 3, kLickRestDegree, 5};
+        float dr[4] = {1, 1, 1, 1}, dg[4] = {1, 1, 1, 1};
+        float vr[4] = {.8f, .8f, .8f, .8f}, vg[4] = {.8f, .8f, .8f, .8f};
+        uint32_t sr = s, sg = s;
+        mutate_live_lick(ref, dr, vr, 4, 1.0f, sr, base_ref, 5, true, 7);
+        mutate_live_lick(got, dg, vg, 4, 1.0f, sg, base_got, 5, true, 7);
+        for (int i = 0; i < 4; i++) {
+            bool rest_slot = (i == 0 || i == 2);
+            int want = (rest_slot && ref[i] < 0) ? kLickRestDegree : ref[i];
+            if (got[i] != want) bad++;
+            if (rest_slot) { if (got[i] == kLickRestDegree) stayed_rest++; else became_note++; }
+            if (dg[i] != dr[i] || vg[i] != vr[i]) bad++;
+        }
+        if (sr != sg) bad++;
+    }
+    bool ok = bad == 0 && became_note > 0 && stayed_rest > 0;
+    printf("  mismatches=%d rests->notes=%d stayed=%d -- %s\n", bad, became_note, stayed_rest, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// Same for generate_lick_melody_variation: identical RNG stream and positions as the
+// legacy -1 lick, with the rest's note present only where the legacy result was non-negative.
+static bool test_melody_variation_rest_marker_matches_legacy_minus_one() {
+    printf("\n=== Test: melody variation treats a rest marker like legacy -1 ===\n");
+    const PulsarScale& scale = kPulsarScales[0];
+    int bad = 0, rest_sounded = 0, rest_silent = 0;
+    for (uint32_t s = 1; s <= 300; s++) {
+        PulsarLickStep ref[4] = {{-1, 1.0f, 0.8f, -1.0f}, {0, 1.0f, 0.8f, -1.0f},
+                                 {2, 1.0f, 0.8f, -1.0f}, {-1, 1.0f, 0.8f, -1.0f}};
+        PulsarLickStep got[4] = {ref[0], ref[1], ref[2], ref[3]};
+        got[0].scale_degree = kLickRestDegree; got[3].scale_degree = kLickRestDegree;
+        PulsarStep a[16], b[16];
+        uint32_t sa = s, sb = s;
+        generate_lick_melody_variation(a, 16, ref, 4, 1.0f, MemberSoloRole::ACTIVE, 2, scale, sa);
+        generate_lick_melody_variation(b, 16, got, 4, 1.0f, MemberSoloRole::ACTIVE, 2, scale, sb);
+        if (sa != sb) bad++;
+        for (int i = 0; i < 16; i++) {
+            if (b[i].gate && (!a[i].gate || a[i].note != b[i].note)) bad++;  // never invents a note
+            if (a[i].gate && !b[i].gate) rest_silent++;
+        }
+        if (b[0].gate) rest_sounded++;
+    }
+    bool ok = bad == 0 && rest_sounded > 0 && rest_silent > 0;
+    printf("  mismatches=%d rest slot sounded in %d seeds, silenced %d steps -- %s\n",
+           bad, rest_sounded, rest_silent, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // A section's lpgMode override swaps the track's LPG mode for that section only: section 1
 // turns a plain-PLUCK lick into triplet re-picks, and section 0 plays single-picked before
 // and after it. Retrigs are counted per section visit, so bar units do not matter.
@@ -3239,6 +3323,9 @@ bool run_pulsar_sections_tests() {
     tally(test_drum_lead_render_leaves_the_caller_seed_alone());
     tally(test_drum_span_progress_lands_the_climax_on_the_last_bar());
     tally(test_live_lick_octave_jump_is_one_scale());
+    tally(test_mutate_live_lick_never_makes_rest_marker());
+    tally(test_mutate_live_lick_rest_marker_matches_legacy_minus_one());
+    tally(test_melody_variation_rest_marker_matches_legacy_minus_one());
     tally(test_choose_lick_octave_minimizes_leap());
     tally(test_section_lpg_mode_override_applies_for_its_section_only());
     tally(test_choose_lick_octave_no_prior_soloist());
@@ -3250,6 +3337,7 @@ bool run_pulsar_sections_tests() {
     tally(test_articulate_bass_solo_reports_and_strips_slaps());
     tally(test_midi_lick_degree_roundtrip_and_synth());
     tally(test_synthesize_lick_below_root_renders_notes_not_rests());
+    tally(test_handoff_degree_reads_rest_marker_as_legacy_minus_one());
     tally(test_generate_jam_solo_line());
     tally(test_jam_carry_preserves_solo_across_section_seam());
     tally(test_no_jam_carry_resets_solo_at_section_seam());

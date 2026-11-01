@@ -6,6 +6,7 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
@@ -33,16 +34,16 @@ class RustBeltOgVibe : VibeProvider {
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 1.00f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),
             LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),
-            LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),
+            Rest(0.5f, 0f),
             LickStep(scaleDegree = 4, duration = 1.0f, velocity = 0.98f),
             LickStep(scaleDegree = 6, duration = 1.0f, velocity = 0.90f),
-            LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),
+            Rest(0.5f, 0f),
             LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.72f),
             LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.76f),
             LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.80f),
             LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.84f),
             LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.90f),
-            LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),
+            Rest(0.5f, 0f),
             LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.92f),
         ),
         loopLength = 8,

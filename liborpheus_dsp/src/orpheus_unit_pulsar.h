@@ -712,6 +712,11 @@ static_assert(kMaxLickSteps <= kMaxPulsarSteps,
               "a FILL lick is written into a step_count-sized sequencer buffer");
 static constexpr int kMaxProgressionLength = 12;  // up to a literal 12-bar blues
 
+// A rest is this marker; any other degree is a note (negatives sit below the lick base).
+constexpr int8_t kLickRestDegree = -128;
+constexpr int kLickMinDegree = -32, kLickMaxDegree = 63;
+inline bool is_lick_rest(int degree) { return degree == kLickRestDegree; }
+
 struct PulsarLickStep {
     int8_t scale_degree;
     float duration;

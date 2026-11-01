@@ -21,6 +21,7 @@ import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -58,8 +59,8 @@ class DustGrooveVibe : VibeProvider {
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.80f),
                     LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.85f),
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),
-                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.75f),
-                    LickStep(scaleDegree = -2, duration = 1.0f, velocity = 0.80f),
+                    Rest(0.5f, 0.75f),  // silent since authoring; was degree -1
+                    Rest(1.0f),  // silent since authoring; was degree -2
                 ),
                 loopLength = 16,
             ),

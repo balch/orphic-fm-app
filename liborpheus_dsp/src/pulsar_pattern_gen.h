@@ -669,20 +669,15 @@ inline int midi_to_lick_degree(int midi, int root, const PulsarScale& scale) {
 // Build a lick contour from a track's gated steps (degree + duration + velocity),
 // so a Jam/lick-less solo has a shared evolving line to hand around. Returns length.
 //
-// midi_to_lick_degree returns a NEGATIVE degree for any source note below `root`,
-// but the lick renderer (generate_lick_pattern / bar_strategy_call_response) treats
-// scale_degree < 0 as a REST. Emitting raw negatives would silence every below-root
-// note (the DogHouse lick-less fallback bug). So we octave-shift the ENTIRE contour
-// up by whole scale octaves until the lowest degree is >= 0. Shifting all degrees by
-// the same multiple of scale.count is musically transparent (preserves pitch class
-// and the interval contour; the renderer re-bases the absolute octave via lick_octave).
+// midi_to_lick_degree returns a negative degree for a source note below `root`. The
+// whole contour is lifted by whole scale octaves until its lowest degree is >= 0, which
+// keeps the lick-less fallback in the register it has always had (the renderer re-bases
+// the absolute octave via lick_octave). The lift preserves pitch class and contour.
 inline int synthesize_lick_from_steps(const PulsarStep* steps, int step_count,
                                       int root, const PulsarScale& scale,
                                       int8_t* out_degrees, float* out_durations,
                                       float* out_velocities, int max_out) {
     if (scale.count <= 0) return 0;
-    // First pass: collect raw degrees (may be negative) and track the minimum so
-    // the whole contour can be shifted up together, preserving its shape.
     int raw[kMaxLickSteps];
     int cap = (max_out < kMaxLickSteps) ? max_out : kMaxLickSteps;
     int n = 0;
@@ -696,12 +691,12 @@ inline int synthesize_lick_from_steps(const PulsarStep* steps, int step_count,
         out_velocities[n] = steps[i].velocity;
         n++;
     }
-    // Octave-shift the whole contour so the lowest degree is non-negative.
     int shift = 0;
     if (min_deg < 0) shift = ((-min_deg + scale.count - 1) / scale.count) * scale.count;
     for (int i = 0; i < n; i++) {
         int d = raw[i] + shift;
-        if (d < 0) d = 0; if (d > 127) d = 127;
+        if (d < 0) d = 0;
+        if (d > 127) d = 127;
         out_degrees[i] = static_cast<int8_t>(d);
     }
     return n;
@@ -775,7 +770,7 @@ inline void generate_lick_pattern(
         // How many sequencer steps this lick note occupies
         int slots = std::max(1, static_cast<int>(dur * 4.0f + 0.5f));
 
-        if (degree < 0) {
+        if (is_lick_rest(degree)) {
             // Rest — at high mutation, might become a note
             if (!chord_tones && mutate_chance < mutation * 0.3f) {
                 degree = static_cast<int>(pattern_rand(seed) % 5);
@@ -791,7 +786,7 @@ inline void generate_lick_pattern(
                 degree = static_cast<int>(pattern_rand(seed) % 7);
             } else if (intensity > 0.3f) {
                 int shift = static_cast<int>(pattern_rand(seed) % 3) - 1;
-                degree += shift;
+                degree = std::max(kLickMinDegree, std::min(kLickMaxDegree, degree + shift));
             }
             vel += (pattern_rand01(seed) - 0.5f) * 0.2f * mutation;
             vel = std::max(0.2f, std::min(1.0f, vel));

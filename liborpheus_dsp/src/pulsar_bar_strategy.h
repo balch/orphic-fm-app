@@ -197,7 +197,7 @@ inline void bar_strategy_call_response(
 
             int slots = std::max(1, static_cast<int>(dur * 4.0f + 0.5f));
 
-            if (degree < 0) {
+            if (is_lick_rest(degree)) {
                 // Rest — at high mutation, might become a note
                 if (!chord_tones && mutate_chance < lick_mutation * 0.3f) {
                     degree = static_cast<int>(pattern_rand(call_seed) % 5);
@@ -212,7 +212,7 @@ inline void bar_strategy_call_response(
                     degree = static_cast<int>(pattern_rand(call_seed) % 7);
                 } else if (intensity > 0.3f) {
                     int shift = static_cast<int>(pattern_rand(call_seed) % 3) - 1;
-                    degree += shift;
+                    degree = std::max(kLickMinDegree, std::min(kLickMaxDegree, degree + shift));
                 }
                 vel += (pattern_rand01(call_seed) - 0.5f) * 0.2f * lick_mutation;
                 vel = std::max(0.2f, std::min(1.0f, vel));
@@ -269,7 +269,7 @@ inline void bar_strategy_call_response(
                 break;
             }
 
-            if (degree < 0) {
+            if (is_lick_rest(degree)) {
                 if (!chord_tones && mutate_chance < resp_mutation * 0.3f) {
                     degree = static_cast<int>(pattern_rand(resp_seed) % 5);
                     vel = 0.5f + pattern_rand01(resp_seed) * 0.3f;
@@ -283,7 +283,7 @@ inline void bar_strategy_call_response(
                     degree = static_cast<int>(pattern_rand(resp_seed) % 7);
                 } else if (intensity > 0.3f) {
                     int shift = static_cast<int>(pattern_rand(resp_seed) % 3) - 1;
-                    degree += shift;
+                    degree = std::max(kLickMinDegree, std::min(kLickMaxDegree, degree + shift));
                 }
                 vel += (pattern_rand01(resp_seed) - 0.5f) * 0.2f * resp_mutation;
                 vel = std::max(0.2f, std::min(1.0f, vel));

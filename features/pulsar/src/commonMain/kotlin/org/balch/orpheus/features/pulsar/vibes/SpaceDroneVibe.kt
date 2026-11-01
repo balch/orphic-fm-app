@@ -26,6 +26,7 @@ import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -211,7 +212,7 @@ class SpaceDroneVibe : VibeProvider {
                     LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.55f),
                     LickStep(scaleDegree = 1, duration = 0.75f, velocity = 0.45f),
                     LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.55f),
-                    LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.45f),
+                    Rest(1.0f, 0.45f),  // silent since authoring; was degree -1
                 ),
                 loopLength = 8,
             ),

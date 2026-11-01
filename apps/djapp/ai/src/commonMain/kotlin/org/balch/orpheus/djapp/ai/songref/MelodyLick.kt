@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp.ai.songref
 
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
+import org.balch.orpheus.features.pulsar.models.Rest
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -25,7 +26,10 @@ internal fun toMelodies(
             val d = midiToDegree(midi, root, key.scaleType, octave)
             MelodyNote(midi, noteName(midi), d.degree, n.beats, n.technique, d.offScale)
         }
-        val steps = part.zip(melody) { n, m -> LickStep(m.degree, n.beats, if (n.ghost) 0.4f else 0.8f, if (n.restrike) 0f else glideFor(n.technique)) }
+        val steps = part.zip(melody) { n, m ->
+            if (m.midi == null) Rest(n.beats)
+            else LickStep(m.degree, n.beats, if (n.ghost) 0.4f else 0.8f, if (n.restrike) 0f else glideFor(n.technique))
+        }
         val total = part.sumOf { it.beats.toDouble() }
         SongMelody(
             index = firstIndex + p,

@@ -59,6 +59,10 @@ inline float handoff_fill_duck(float density_mod, float fill_mod) {
 // clamped to the genre note range. outgoing_note < 0 => keep auto (-1).
 // Uses lick_degree_to_midi (pulsar_pattern_gen.h) which mirrors the exact
 // formula used by generate_lick_pattern and bar_strategy_call_response.
+// The degree a handoff reads for pitch: a rest marker reads as the legacy rest degree
+// (-1), so octave choice for migrated vibes is unchanged.
+inline int lick_handoff_degree(int degree) { return is_lick_rest(degree) ? -1 : degree; }
+
 inline int choose_lick_octave(int first_degree, int outgoing_note,
                               int root, const PulsarScale& scale,
                               int nr_low, int nr_high) {

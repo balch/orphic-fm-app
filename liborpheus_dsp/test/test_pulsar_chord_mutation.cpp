@@ -19,9 +19,9 @@ namespace {
 // 4 beats = 16 steps with rests at steps 4-7 and 10-11.
 const PulsarLickStep kLick[] = {
     {0, 1.0f, 0.8f, -1.0f, 1.0f},
-    {-1, 1.0f, 0.0f, -1.0f, 1.0f},
+    {kLickRestDegree, 1.0f, 0.0f, -1.0f, 1.0f},
     {2, 0.5f, 0.8f, -1.0f, 1.0f},
-    {-1, 0.5f, 0.0f, -1.0f, 1.0f},
+    {kLickRestDegree, 0.5f, 0.0f, -1.0f, 1.0f},
     {4, 0.5f, 0.7f, -1.0f, 1.0f},
     {1, 0.5f, 0.7f, -1.0f, 1.0f},
 };
@@ -53,7 +53,7 @@ void check_walk(const PulsarStep* steps, int start, int end, int transform,
         lick_idx++;
         const int slots = slots_of(ls);
         if (transform == 3 && lick_idx > kLickLen / 2) break;
-        if (ls.scale_degree < 0) {
+        if (is_lick_rest(ls.scale_degree)) {
             for (int s = pos; s < pos + slots && s < end; s++) {
                 if (steps[s].gate) {
                     if (r.ok) printf("  FAIL %s seed %u: step %d inside a rest is gated\n", label, seed, s);

@@ -137,7 +137,7 @@ static bool test_lick_degree_offset_preserves_rests() {
     unit.enabled = true;
 
     // Second lick note is a rest (-1). Offset +2 must NOT turn it into degree 1.
-    const int8_t degrees[] = {0, -1, 2, 4};
+    const int8_t degrees[] = {0, kLickRestDegree, 2, 4};
     write_lick_atomics(engine, degrees, 4);
     orpheus_engine_set_port(engine, PULSAR_URI, "track_5_lick_degree_offset", 2.0f);
 

@@ -40,6 +40,7 @@ import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.Rest
 import org.balch.orpheus.features.pulsar.models.RhythmicEvolution
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
@@ -82,13 +83,13 @@ public class AetherNatalisVibe : VibeProvider {
   private val ascentLick = Lick(
     steps = listOf(
       LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.62f, glideRate = 0.35f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.55f, glideRate = 0.3f),
       LickStep(scaleDegree = 4, duration = 3.0f, velocity = 0.68f, glideRate = 0.3f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 6, duration = 2.0f, velocity = 0.72f, glideRate = 0.35f),
       LickStep(scaleDegree = 4, duration = 2.0f, velocity = 0.60f, glideRate = 0.3f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.50f, glideRate = 0.3f),
       LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.52f, glideRate = 0.4f),
     ),
@@ -101,10 +102,10 @@ public class AetherNatalisVibe : VibeProvider {
       LickStep(scaleDegree = 7, duration = 3.0f, velocity = 0.70f, glideRate = 0.35f),
       LickStep(scaleDegree = 6, duration = 1.0f, velocity = 0.60f, glideRate = 0.3f),
       LickStep(scaleDegree = 4, duration = 2.0f, velocity = 0.64f, glideRate = 0.3f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 3, duration = 3.0f, velocity = 0.66f, glideRate = 0.35f),
       LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.55f, glideRate = 0.3f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 1, duration = 2.0f, velocity = 0.50f, glideRate = 0.35f),
       LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.55f, glideRate = 0.45f),
     ),
@@ -115,11 +116,11 @@ public class AetherNatalisVibe : VibeProvider {
   private val hoverLick = Lick(
     steps = listOf(
       LickStep(scaleDegree = 4, duration = 4.0f, velocity = 0.55f, glideRate = 0.45f),
-      LickStep(scaleDegree = -1, duration = 2.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(2.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 6, duration = 3.0f, velocity = 0.60f, glideRate = 0.4f),
-      LickStep(scaleDegree = -1, duration = 1.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(1.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 4, duration = 2.0f, velocity = 0.50f, glideRate = 0.4f),
-      LickStep(scaleDegree = -1, duration = 2.0f, velocity = 0.0f, glideRate = 0.0f),
+      Rest(2.0f, velocity = 0f, glideRate = 0f),
       LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.48f, glideRate = 0.5f),
     ),
     loopLength = 16,

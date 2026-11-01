@@ -9,12 +9,11 @@ import kotlinx.serialization.Serializable
  *   hexatonic scale degree 6 is the root an octave up — that is how a figure reaches a
  *   higher register without moving [Lick]'s octave.
  *
- *   **A NEGATIVE degree is a REST** for this step's full [duration], not a note below
- *   the root. It is the only way to author silence inside a figure ([Lick.loopLength]
- *   only pads silence onto the end), so a call-and-response reply opens with one.
- *   Under [LickMutationMode.RANDOM] only, at high [Vibe.lickMutation] a rest can still turn
- *   into a note, with probability `mutation * 0.3` per cycle; set mutation to 0 for a rest
- *   that never moves. [LickMutationMode.CHORD_TONES] never fills a rest.
+ *   A NEGATIVE degree is a note BELOW the lick base (-1 = the scale step under the root,
+ *   down to [MIN_DEGREE]). Silence is a [Rest] step, never a degree.
+ * @param rest Silence for this step's full [duration]; build with [Rest]. Under
+ *   [LickMutationMode.RANDOM] only, at high [Vibe.lickMutation] a rest can still turn into a
+ *   note (probability `mutation * 0.3` per cycle); [LickMutationMode.CHORD_TONES] never fills one.
  * @param duration Note length in beats (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
  * @param velocity Hit strength 0-1 (lower = ghost note feel)
  * @param glideRate Optional per-note portamento. `-1f` (default) = use the active
@@ -34,14 +33,40 @@ import kotlinx.serialization.Serializable
  *   step transport, rather than as a fifth field in that stride, so existing step
  *   indices mean the same thing on both sides of the bridge.
  */
-@Serializable
+@Serializable(with = LickStepSerializer::class)
 data class LickStep(
     val scaleDegree: Int,
     val duration: Float,
     val velocity: Float = 0.8f,
     val glideRate: Float = -1f,
     val hitProbability: Float = 1f,
-)
+    val rest: Boolean = false,
+) {
+    init {
+        require(rest || scaleDegree in MIN_DEGREE..MAX_DEGREE) {
+            "LickStep.scaleDegree must be in $MIN_DEGREE..$MAX_DEGREE, got $scaleDegree"
+        }
+    }
+
+    /** Degree as sent to C++: [REST_DEGREE_WIRE] for a rest. */
+    val wireDegree: Float get() = if (rest) REST_DEGREE_WIRE.toFloat() else scaleDegree.toFloat()
+
+    companion object {
+        /** MUST equal C++ kLickRestDegree. */
+        const val REST_DEGREE_WIRE = -128
+
+        /** MUST equal C++ kLickMinDegree / kLickMaxDegree. */
+        const val MIN_DEGREE = -32
+        const val MAX_DEGREE = 63
+    }
+}
+
+/**
+ * A silent step of [beats] beats. [velocity] and [glideRate] still reach C++: drum leads map the
+ * velocity to a hit and a mutated rest sounds with both, so they default like [LickStep]'s.
+ */
+fun Rest(beats: Float, velocity: Float = 0.8f, glideRate: Float = -1f): LickStep =
+    LickStep(0, beats, velocity = velocity, glideRate = glideRate, rest = true)
 
 /**
  * A repeating melodic figure (bass riff). Assign to a [Vibe] and set
