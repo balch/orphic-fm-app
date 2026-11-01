@@ -103,6 +103,13 @@ static constexpr float kStreetFootDelaySend = 0.25f;
 static constexpr float kStreetTrainReverbSend = 0.35f;
 static constexpr float kStreetTrainDelaySend = 0.10f;
 
+// Fog horn sends: a horn wants a long tail and an echo, so both are generous. Fixed rather
+// than authored, like the storm's; the section's distance scales the reverb. EAR-TUNE.
+static constexpr float kFogReverbSend = 0.55f;
+static constexpr float kFogDelaySend = 0.35f;
+// The horn sits an octave below C3 (MIDI 36 + the vibe's root note + the authored semitones).
+static constexpr int kFogRootMidi = 36;
+
 // Fixed sends for vibe speech, so a phrase sits in the vibe's room. EAR-TUNE.
 static constexpr float kSpeechReverbSend = 0.25f;
 static constexpr float kSpeechDelaySend  = 0.15f;
@@ -1081,6 +1088,19 @@ static void arm_storm_anomaly(PulsarState* state) {
     state->storm_floor_rumble = clamp01(kStormAnomalyFloorScale * intensity);
     state->storm_second_strike_pending = bars >= 2.0f;
     state->storm_voice.trigger_strike(intensity, state->storm_config.distance);
+}
+
+// The fog horn's pitch: the vibe's root an octave below C3, plus authored semitones.
+static float fog_root_hz(const OrpheusEngine* engine, float semitones) {
+    const int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+    const float midi = static_cast<float>(kFogRootMidi + root) + semitones;
+    return 440.0f * std::pow(2.0f, (midi - 69.0f) / 12.0f);
+}
+
+// FogHornAnomaly: one phrase on the fog voice. The caller owns the declared/active guards.
+static void arm_fog_anomaly(PulsarState* state, const OrpheusEngine* engine) {
+    state->fog_voice.Trigger(fog_root_hz(engine, state->fog_config.pitch), state->fog_config.pattern,
+                             clamp01(state->fog_config.intensity), clamp01(state->fog_config.distance));
 }
 
 // Copy lick-pool slot `idx` into the active lick buffers (state->lick / original_lick).
@@ -2098,6 +2118,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.macro_ramp.mood        = P(35);
                 sec.macro_ramp.volume      = P(36);
             }
+            // Slots 50-54: SectionFog (level, interval bars, pattern, pitch semitones, distance).
+            {
+                auto F = [&](int f) {
+                    return engine->pulsar_section_data[base + kSectionFogSlot + f].load(std::memory_order_relaxed);
+                };
+                sec.fog.level = clamp01(F(0));
+                sec.fog.interval_bars = std::max(1, std::min(16, static_cast<int>(F(1) + 0.5f)));
+                sec.fog.pattern = std::max(0, std::min(fog::kPatternCount - 1, static_cast<int>(F(2) + 0.5f)));
+                sec.fog.pitch = std::max(-12.0f, std::min(12.0f, F(3)));
+                sec.fog.distance = clamp01(F(4));
+            }
             // Slot 37: volume envelope point count; 38..: (bar, level) pairs.
             {
                 int n = static_cast<int>(engine->pulsar_section_data[base + 37].load(std::memory_order_relaxed));
@@ -2481,6 +2512,20 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->street_voice.Init(base_seed ^ 0x57EE7u,
                              engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
 
+    // Fog horn voice: same seed/re-Init story as storm, so a vibe switch hard-cuts any horn.
+    state->fog_voice.Init(base_seed ^ 0xF06F06u,
+                          engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
+
+    // Fog Horn Anomaly config bank. Order mirrors the Kotlin marshal in PulsarFeature:
+    // [0]=prob [1]=intensity [2]=distance [3]=pattern [4]=pitch semitones [5]=declared flag.
+    state->fog_config.probability = engine->pulsar_fog_data[0].load(std::memory_order_relaxed);
+    state->fog_config.intensity   = engine->pulsar_fog_data[1].load(std::memory_order_relaxed);
+    state->fog_config.distance    = engine->pulsar_fog_data[2].load(std::memory_order_relaxed);
+    state->fog_config.pattern     = std::max(0, std::min(fog::kPatternCount - 1,
+        static_cast<int>(engine->pulsar_fog_data[3].load(std::memory_order_relaxed) + 0.5f)));
+    state->fog_config.pitch       = engine->pulsar_fog_data[4].load(std::memory_order_relaxed);
+    state->fog_declared = engine->pulsar_fog_data[5].load(std::memory_order_relaxed) > 0.5f;
+
     // Wah Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
     // [0]=prob [1]=durMin [2]=durMax [3]=rateDivision [4]=depth [5]=resonanceQ
     // [6]=centerHz [7]=sweepOctaves [8]=wet [9]=declared flag. Loaded unconditionally,
@@ -2649,6 +2694,12 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         const int cur = state->section_state.current_section;
         if (cur >= 0 && cur < state->arrangement.section_count)
             state->street_voice.OnSectionEntry(state->arrangement.sections[cur].street.train);
+        // And the opening section sounds its fog phrase from the first bar.
+        if (cur >= 0 && cur < state->arrangement.section_count) {
+            const SectionFogParam& fg = state->arrangement.sections[cur].fog;
+            if (fg.level > 0.0f)
+                state->fog_voice.Trigger(fog_root_hz(engine, fg.pitch), fg.pattern, fg.level, fg.distance);
+        }
     }
 
     // Per-track lick-wah insert bank. Order mirrors the Kotlin marshal in PulsarViewModel:
@@ -4076,6 +4127,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (state->storm_declared && !state->storm_voice.strike_active()) {
                             arm_storm_anomaly(state);
                         }
+                        if (state->fog_declared && !state->fog_voice.active()) {
+                            arm_fog_anomaly(state, engine);
+                        }
                         if (state->lick_pool_count > 0 && state->lick_anomaly_index >= 0) {
                             state->force_lick_anomaly = true;   // one-shot; consumed at the next lick resolve
                         }
@@ -4108,6 +4162,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     plan_speech_cues(engine, state,
                                      state->section_state.bars_total - state->section_state.bars_remaining,
                                      step_boundary_samples[b], samples_per_step);
+
+                    // Fog bed: the section sounds its phrase on its first bar and every
+                    // interval_bars after. Not re-sounded while the last phrase still rings.
+                    {
+                        const int fsec = state->section_state.current_section;
+                        if (fsec >= 0 && fsec < state->arrangement.section_count) {
+                            const SectionFogParam& fg = state->arrangement.sections[fsec].fog;
+                            const int cycle = state->section_state.bars_total - state->section_state.bars_remaining;
+                            if (fg.level > 0.0f && cycle % fg.interval_bars == 0 && !state->fog_voice.active()) {
+                                state->fog_voice.Trigger(fog_root_hz(engine, fg.pitch), fg.pattern,
+                                                         fg.level, fg.distance);
+                            }
+                        }
+                    }
 
                     // Rows a previous flip carried forward (positive offsets) count down
                     // here, before the block below can hand this flip's own carries over.
@@ -4508,6 +4576,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             !state->storm_voice.strike_active()) {
                             if (pattern_rand01(state->master_anomaly_seed) < state->storm_config.probability) {
                                 arm_storm_anomaly(state);
+                            }
+                        }
+
+                        // Fog Horn Anomaly: roll the auto trigger at the section boundary.
+                        if (state->fog_declared && state->fog_config.probability > 0.0f &&
+                            !state->fog_voice.active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->fog_config.probability) {
+                                arm_fog_anomaly(state, engine);
                             }
                         }
                     }
@@ -6790,6 +6866,35 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     taps->source_r[taps->kMeasureStreet][i] = (foot_r[i] + train_r[i]) * g;
                 }
             }
+        }
+    }
+
+    // ── Fog horn (the 11th voice) ───────────────────────────────────────
+    // Phrases are started at bar boundaries (the section's fog bed, or the FogHornAnomaly);
+    // here it only renders. Straight into the stereo mix like the storm, under the Void duck
+    // and the vibe trim, with fixed generous sends: the reverb scales with distance.
+    if (state->fog_voice.active()) {
+        float fog_l[kMaxFrames], fog_r[kMaxFrames];
+        std::memset(fog_l, 0, num_frames * sizeof(float));
+        std::memset(fog_r, 0, num_frames * sizeof(float));
+        state->fog_voice.Process(fog_l, fog_r, num_frames);
+        float fog_distance = state->fog_config.distance;
+        if (state->arrangement.active) {
+            const int fcur = state->section_state.current_section;
+            if (fcur >= 0 && fcur < state->arrangement.section_count &&
+                state->arrangement.sections[fcur].fog.level > 0.0f)
+                fog_distance = state->arrangement.sections[fcur].fog.distance;
+        }
+        const float fog_rev = kFogReverbSend * (0.6f + 0.4f * clamp01(fog_distance));
+        for (int i = 0; i < num_frames; i++) {
+            const float g = void_gain_buf[i] * vibe_gain;
+            const float fl = fog_l[i] * g, fr = fog_r[i] * g;
+            out_l[i] += fl;
+            out_r[i] += fr;
+            engine->pulsar_delay_send_l[i]  += fl * kFogDelaySend;
+            engine->pulsar_delay_send_r[i]  += fr * kFogDelaySend;
+            engine->pulsar_reverb_send_l[i] += fl * fog_rev;
+            engine->pulsar_reverb_send_r[i] += fr * fog_rev;
         }
     }
 

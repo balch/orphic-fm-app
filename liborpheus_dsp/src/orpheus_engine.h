@@ -1132,6 +1132,12 @@ struct OrpheusEngine {
     static_assert(kStormDataFields == 6,
                   "storm_data layout: probability, durMin, durMax, intensity, distance, declared");
     std::atomic<float> pulsar_storm_data[kStormDataFields] = {};
+    // Fog Horn Anomaly: 6-float config bank [0]=prob, [1]=intensity, [2]=distance, [3]=pattern,
+    // [4]=pitch (semitones), [5]=declared flag (1.0 when the vibe declares a FogHornAnomaly; gates
+    // the manual trigger). Like the storm it sounds a pulsar-owned voice, so an undeclared vibe
+    // leaves the mix bit-identical.
+    static constexpr int kFogDataFields = 6;
+    std::atomic<float> pulsar_fog_data[kFogDataFields] = {};
     // Generic per-edge section transition effects: kMaxTransFxRows rows of
     // kTransFxRowFields floats — [section_idx, edge_idx, type_id, offset_bars, p0, p1, p2].
     // type_id 0=none, 1=scratch(p0=ms), 2=tape stop(p0=ms), 3=strike(p0=intensity, p1=distance).

@@ -12,6 +12,7 @@
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
+#include "pulsar_fog.h"
 #include "pulsar_speech.h"
 #include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
@@ -858,6 +859,15 @@ struct SectionStreetParam {
     float train = 0.0f;
 };
 
+// Slots 31-35: SectionFog. A zero level renders nothing, which is also what an absent fog reads as.
+struct SectionFogParam {
+    float level = 0.0f;
+    int interval_bars = 4;      // a phrase sounds on the section's first bar and every N bars after
+    int pattern = 0;            // fog::Pattern
+    float pitch = 0.0f;         // semitones from the horn's root (the vibe's key, an octave below C3)
+    float distance = 0.4f;
+};
+
 struct SectionParam {
     int bars_min = 4, bars_max = 8;
     // Step within [bars_min, bars_max] when picking a random length. 1 = any
@@ -934,6 +944,8 @@ struct SectionParam {
     SectionWeatherParam weather;
     // Street bed (slots 27-30), blended toward the staged destination like the weather.
     SectionStreetParam street;
+    // Fog horn bed (slots 31-35): sounds a phrase on a bar interval; nothing to blend.
+    SectionFogParam fog;
 };
 
 struct ArrangementParams {
@@ -1194,6 +1206,16 @@ struct StormConfig {
     float distance = 0.4f;
 };
 
+// Fog Horn Anomaly config (unpacked from pulsar_fog_data). Mirrors the Kotlin FogHornAnomaly.
+// Like the storm it arms no master effect: it sounds the pulsar's own fog voice.
+struct FogConfig {
+    float probability = 0.0f;
+    float intensity = 0.7f;
+    float distance = 0.5f;
+    int pattern = fog::kDumDuum;
+    float pitch = 0.0f;
+};
+
 // Per-track notated-score cursor, field-for-field identical to ScoreTrackCursor
 // (pulsar_score_sched.h). It is a separate type rather than a reuse of that one:
 // pulsar_score_sched.h needs OrpheusEngine::ScoreEvent for score_collect_due's
@@ -1350,6 +1372,9 @@ struct PulsarState {
     // per-section bed model as storm, re-Init'd per vibe load.
     street::StreetVoice street_voice;
 
+    // Fog horn voice — the pulsar's 11th voice. Re-Init'd per vibe load like the storm.
+    fog::FogHornVoice fog_voice;
+
     // Vibe speech (pulsar_speech.h): cues unpacked at load, planned at each loop-cycle start.
     SpeechCueRow speech_cues[kMaxSpeechCueRows];
     int speech_cue_count = 0;
@@ -1427,6 +1452,10 @@ struct PulsarState {
     float storm_floor_rumble = 0.0f;    // the floor level itself, drawn from the intensity
     bool storm_second_strike_pending = false;  // windows >= 2 bars strike again one bar in
     uint32_t storm_weather_seed = 0;    // per-bar strikeChance stream, apart from the anomaly rolls
+
+    // Fog Horn Anomaly (dispatched by the Anomaly Engine, sounds fog_voice above).
+    FogConfig fog_config;
+    bool fog_declared = false;          // true when this vibe opts into the fog horn (fog_data[5])
 
     // Generic per-edge section transition effects (bank: pulsar_trans_fx_data).
     // trans_fx is the whole authored table; pending_fx is only the subset staged for

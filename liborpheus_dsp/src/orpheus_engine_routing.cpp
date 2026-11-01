@@ -1385,6 +1385,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < OrpheusEngine::kStormDataFields)
                 engine->pulsar_storm_data[idx].store(value, std::memory_order_relaxed);
         }
+        else if (std::strncmp(symbol, "fog_data_", 9) == 0) {
+            int idx = std::atoi(symbol + 9);
+            if (idx >= 0 && idx < OrpheusEngine::kFogDataFields)
+                engine->pulsar_fog_data[idx].store(value, std::memory_order_relaxed);
+        }
         else if (std::strncmp(symbol, "trans_fx_data_", 14) == 0) {
             int idx = std::atoi(symbol + 14);
             if (idx >= 0 && idx < kTransFxBankSize)
