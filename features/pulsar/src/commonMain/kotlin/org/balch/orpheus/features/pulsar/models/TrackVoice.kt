@@ -22,7 +22,8 @@ import kotlinx.serialization.Serializable
  * @param macroMap How the 4 macro knobs (energy/complexity/space/mood) affect this track.
  * @param barStrategy How the pattern evolves across bars (REPEAT, MUTATE, FILL, etc.)
  * @param evolutionWeight How much tension-driven timbre evolution affects this track.
- *   -1 = auto (1.0 for MELODIC macroMap, 0.0 for others). 0-1 for explicit control.
+ *   -1 = auto (1.0 for MELODIC macroMap, 0.0 for others). 0-1 blends each picked step from the
+ *   macro value toward the evolution target, so 0.3 keeps the mood knob mostly in charge.
  * @param soloBehavior How this track behaves when chosen as soloist (null = never solos).
  * @param duckingProfile How this track ducks during another track's solo (null = defaults).
  * @param evolution Per-track evolution config for rhythmic and pitch evolution.

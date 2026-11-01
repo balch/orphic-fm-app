@@ -189,7 +189,7 @@ The auto-evolution rule lives in `orpheus_unit_pulsar.cpp`: `evo_weight = (mm.mo
 
 ```kotlin
 macroMap = TrackMacroMap.MELODIC.copy(
-    moodHarmonics = MacroTarget(0.5f, 0.5f),   // PD modulator ratio held near unison
+    moodHarmonics = MacroTarget(0.5f, 0.5f),   // PD ratio step: 0.235 unison, 0.50 octave + shimmer
     moodTimbre = MacroTarget(0.12f, 0.50f),    // stock 0.4-0.8 twangs on PD
 ),
 evolutionWeight = 0f,  // tension would replace timbre on random steps and override MOOD

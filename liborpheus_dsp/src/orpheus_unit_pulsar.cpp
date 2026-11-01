@@ -3806,9 +3806,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (evo_weight > 0.001f) {
             // TENS-2: tension_evo_smooth is advanced once per bar in
             // mutate_patterns (so evo_release_speed expresses a multi-bar decay).
-            // Here we only READ the section-wide smoothed value and scale it by
-            // this track's evolution weight — no per-block stepping.
-            float evo = state->tension_evo_smooth * evo_weight;
+            // Here we only READ the section-wide smoothed value — no per-block stepping.
+            float evo = state->tension_evo_smooth;
+            // The weight blends each picked step's target into the macro value, so a
+            // fractional weight leaves the MOOD knob in charge. 1 replaces it outright.
+            const float w = std::min(evo_weight, 1.0f);
+            auto blend = [w](float base, float target) { return base + (target - base) * w; };
 
             // Timbre sweep (only when not pinned). Unauthored bounds sweep inside the track's
             // OWN mood_timbre range instead of a fixed one the author never chose; morph and
@@ -3827,7 +3830,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                        && state->tension.evo_timbre_high >= 0.0f;
                     float lo = authored ? state->tension.evo_timbre_low : mm.mood_timbre.min_value;
                     float hi = authored ? state->tension.evo_timbre_high : mm.mood_timbre.max_value;
-                    mod_timbre = lo + (hi - lo) * evo;
+                    mod_timbre = blend(mod_timbre, lo + (hi - lo) * evo);
                 }
             }
 
@@ -3838,7 +3841,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_morph_prob) {
                     float lo = state->tension.evo_morph_low;
                     float hi = state->tension.evo_morph_high;
-                    mod_morph = lo + (hi - lo) * evo;
+                    mod_morph = blend(mod_morph, lo + (hi - lo) * evo);
                 }
             }
 
@@ -3849,7 +3852,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_harm_prob) {
                     float lo = state->tension.evo_harm_low;
                     float hi = state->tension.evo_harm_high;
-                    mod_harmonics = lo + (hi - lo) * evo;
+                    mod_harmonics = blend(mod_harmonics, lo + (hi - lo) * evo);
                 }
             }
         }
