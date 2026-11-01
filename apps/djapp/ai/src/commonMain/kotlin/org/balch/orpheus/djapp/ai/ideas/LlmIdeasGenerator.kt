@@ -22,6 +22,8 @@ import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.anthropicModelVersionsMap
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.ai.usage.AiCallSource
+import org.balch.orpheus.features.ai.usage.AiUsageMeter
 
 private val IDEAS_SYSTEM = """
     You suggest what a DJ could ask an AI music partner to do next with the vibe that is playing.
@@ -100,6 +102,7 @@ internal fun ideasPrompt(input: IdeasInput): String = buildString {
 class LlmIdeasGenerator(
     private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
+    private val usageMeter: AiUsageMeter,
 ) : IdeasGenerator {
     private val log = logging("LlmIdeasGenerator")
 
@@ -114,8 +117,9 @@ class LlmIdeasGenerator(
                 system(IDEAS_SYSTEM)
                 user(ideasPrompt(input))
             }
-            val reply = executorFor(apiKey).execute(request, model.llmModel).textContent()
-            parseIdeas(reply, input.mixerOpen)
+            val response = executorFor(apiKey).execute(request, model.llmModel)
+            usageMeter.recordCall(AiCallSource.IDEAS, model.llmModel.id, model.llmModel.provider, response.metaInfo)
+            parseIdeas(response.textContent(), input.mixerOpen)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

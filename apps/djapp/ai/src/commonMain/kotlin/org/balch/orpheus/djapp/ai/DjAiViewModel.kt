@@ -195,11 +195,11 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
             val tail = s.feed.lastOrNull()
             if (tail is DjAiFeedItem.Reply) {
                 s.copy(
-                    feed = s.feed.dropLast(1) + tail.copy(text = e.text),
+                    feed = s.feed.dropLast(1) + tail.copy(text = e.text, usage = e.usage ?: tail.usage),
                 )
             } else {
                 s.copy(
-                    feed = s.feed + DjAiFeedItem.Reply(id = s.nextId, text = e.text),
+                    feed = s.feed + DjAiFeedItem.Reply(id = s.nextId, text = e.text, usage = e.usage),
                     nextId = s.nextId + 1,
                 )
             }
