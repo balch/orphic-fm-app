@@ -44,6 +44,7 @@ class PulsarPlugin : DspPlugin {
     private var _pulsarDelayTimeB = 0.35f
     private var _pulsarDelayFeedback = 0.4f
     private var _pulsarDelayDamping = 0.5f
+    private val _benchDelay = FloatArray(3) { -1f }
     private var _pulsarReverbSize = 0.6f
     private var _pulsarReverbDamping = 0.5f
     private var _pulsarReverbBrightness = 0.5f
@@ -251,6 +252,15 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.PULSAR_DELAY_DAMPING) {
             floatType { default = 0.5f; min = 0f; max = 1f; get { _pulsarDelayDamping }; set { _pulsarDelayDamping = it } }
+        }
+        // Mix Bench delay time A, time B and feedback. Session state: never saved in a preset.
+        for (i in 0..2) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.PULSAR_BENCH_DELAY_TIME_A.ordinal + i]) {
+                floatType {
+                    default = -1f; min = -1f; max = 1f; excludeFromPresets = true
+                    get { _benchDelay[i] }; set { _benchDelay[i] = it }
+                }
+            }
         }
         controlPort(PulsarSymbol.PULSAR_REVERB_SIZE) {
             floatType { default = 0.6f; min = 0f; max = 1f; get { _pulsarReverbSize }; set { _pulsarReverbSize = it } }

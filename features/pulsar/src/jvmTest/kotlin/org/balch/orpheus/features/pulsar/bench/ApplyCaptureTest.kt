@@ -8,6 +8,7 @@ import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.Vibe
 
@@ -23,7 +24,11 @@ private val base: Vibe = mkMinimalVibe("apply").let { v ->
         energy = 0.6f,
         arrangement = Arrangement(
             sections = listOf(
-                Section("verse", trackOverrides = mapOf(5 to TrackSectionOverride(reverbSend = 0.3f, density = 0.4f))),
+                Section(
+                    "verse",
+                    trackOverrides = mapOf(5 to TrackSectionOverride(reverbSend = 0.3f, density = 0.4f)),
+                    delay = SectionDelay(timeA = 0.2f),
+                ),
                 Section(
                     "chorus",
                     macroOverrides = MacroOverrides(energy = 1.2f, volume = 0.9f),
@@ -52,6 +57,12 @@ private val layersByField: Map<CaptureField, BenchLayers> = mapOf(
         sections = mapOf(0 to SectionLayer(levelDb = db(6, -3f))),
     ),
     CaptureField.MACRO_RAMP to BenchLayers(sections = mapOf(1 to SectionLayer(macrosHeard = mapOf(Macro.ENERGY to 0.9f)))),
+    CaptureField.DELAY_TIME_A to BenchLayers(
+        vibe = VibeLayer(delayFx = mapOf(DelayFx.TIME_A to 0.6f)),
+        sections = mapOf(0 to SectionLayer(delayFx = mapOf(DelayFx.TIME_A to 0.45f))),
+    ),
+    CaptureField.DELAY_TIME_B to BenchLayers(sections = mapOf(1 to SectionLayer(delayFx = mapOf(DelayFx.TIME_B to 0.7f)))),
+    CaptureField.DELAY_FEEDBACK to BenchLayers(vibe = VibeLayer(delayFx = mapOf(DelayFx.FEEDBACK to 0.8f))),
 )
 
 /** Every layer at once: whole-vibe and section edits that touch the same tracks. */
@@ -62,9 +73,10 @@ private val everything = BenchLayers(
         reverbRatio = List(8) { if (it == 5) 1.5f else 1f },
         delayRatio = List(8) { if (it == 1) 0.5f else 1f },
         macros = mapOf(Macro.ENERGY to 0.8f, Macro.SPACE to 0.3f),
+        delayFx = mapOf(DelayFx.TIME_A to 0.5f, DelayFx.FEEDBACK to 0.3f),
     ),
     sections = mapOf(
-        0 to SectionLayer(levelDb = db(6, -3f), reverbSend = at(5, 0.4f)),
+        0 to SectionLayer(levelDb = db(6, -3f), reverbSend = at(5, 0.4f), delayFx = mapOf(DelayFx.TIME_B to 0.9f)),
         1 to SectionLayer(levelDb = db(1, 2f), delaySend = at(3, 0.25f), macrosHeard = mapOf(Macro.ENERGY to 0.9f, Macro.SPACE to 0.2f)),
     ),
 )
@@ -93,6 +105,9 @@ private fun assertSoundsTheSame(vibe: Vibe, layers: BenchLayers, updated: Vibe, 
         val want = heardMacros(vibe, layers, s)
         val got = heardMacros(updated, BenchLayers(), s)
         for (i in want.indices) assertEquals(want[i], got[i], 1e-5f, "$label: section $s macro ${Macro.entries[i]}")
+        for (p in DelayFx.entries) {
+            assertEquals(layers.heardDelay(vibe, s, p), BenchLayers().heardDelay(updated, s, p), 1e-5f, "$label: section $s $p")
+        }
     }
 }
 
@@ -141,6 +156,9 @@ class ApplyCaptureTest {
                     CaptureField.DELAY_SEND_SPACE -> v.tracks[r.track!!].engineSpace.delaySend
                     CaptureField.MACRO -> r.macro!!.vibeDefault(v)
                     CaptureField.MACRO_RAMP -> error("no whole-vibe ramp rows")
+                    CaptureField.DELAY_TIME_A -> v.effects.delayTimeA
+                    CaptureField.DELAY_TIME_B -> v.effects.delayTimeB
+                    CaptureField.DELAY_FEEDBACK -> v.effects.delayFeedback
                 }
                 Scope.SECTION -> {
                     val section = v.arrangement!!.sections[r.section!!]
@@ -150,6 +168,9 @@ class ApplyCaptureTest {
                         CaptureField.DELAY_SEND -> section.trackOverrides!![r.track]!!.delaySend!!
                         CaptureField.MACRO -> section.macroOverrides.multiplier(r.macro!!)!!
                         CaptureField.MACRO_RAMP -> section.rampTo.multiplier(r.macro!!)!!
+                        CaptureField.DELAY_TIME_A -> section.delay!!.timeA!!
+                        CaptureField.DELAY_TIME_B -> section.delay!!.timeB!!
+                        CaptureField.DELAY_FEEDBACK -> section.delay!!.feedback!!
                         else -> error("no section ${r.field} rows")
                     }
                 }

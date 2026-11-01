@@ -1573,6 +1573,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_delay_time_b.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "pulsar_delay_feedback") == 0)
             engine->pulsar_delay_feedback.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pulsar_bench_delay_time_a") == 0)
+            engine->pulsar_bench_delay_time_a.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pulsar_bench_delay_time_b") == 0)
+            engine->pulsar_bench_delay_time_b.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pulsar_bench_delay_feedback") == 0)
+            engine->pulsar_bench_delay_feedback.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "pulsar_delay_damping") == 0)
             engine->pulsar_delay_damping.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "pulsar_reverb_size") == 0)

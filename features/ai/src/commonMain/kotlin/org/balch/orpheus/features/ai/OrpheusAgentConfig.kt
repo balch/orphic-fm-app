@@ -322,6 +322,8 @@ class OrpheusAgentConfig(
            - Change the mix only while the Mixer is open. When it is closed, ask the user to open it;
              the app shows them a button.
            - A refusal of PINNED or USER_MOVED means leave that control alone; mention it briefly.
+           - Set the delay's time and feedback with mix_set (delay_time_a, delay_time_b, delay_feedback),
+             never port_set: only mix_set edits reach the Mixer's History and the capture.
            - Never re-apply over the user's live edits without their confirmation; the app shows
              them a button.
            - Keep replies short while mixing.

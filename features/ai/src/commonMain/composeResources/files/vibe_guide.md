@@ -951,7 +951,9 @@ hand the mix to the user. Without them, set the fields from the targets above an
    stereo per track. Use section_jump to hear a high-energy and a low-energy section.
 3. Fix the obvious, one thing at a time, with mix_set (field level_db, pan, reverb or delay;
    scope=vibe for every section, scope=section for the playing one; pan is always whole-vibe), then
-   mix_read again. level_db is the dB the track is heard at in the playing section (0 = as written,
+   mix_read again. The delay's own settings are mix_set fields too: delay_time_a, delay_time_b
+   (0-1) and delay_feedback (0-0.95), no track. scope=vibe writes `effects`, scope=section the
+   section's `delay`. Never use port_set for them: it skips the Mixer's History and the capture. level_db is the dB the track is heard at in the playing section (0 = as written,
    -30 to 3.5).
 4. Loudness, only when it is off: after about 30 s of reads, if lufsIntegrated misses -16 by more
    than 2 LU, the fix is levelDb, which needs a re-apply. A re-apply clears the live mix edits, so

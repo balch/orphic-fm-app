@@ -250,6 +250,9 @@ private fun fieldName(r: CaptureRow): String {
     return when (r.field) {
         CaptureField.MACRO -> macro + if (r.scope == Scope.SECTION) " multiplier" else ""
         CaptureField.MACRO_RAMP -> "$macro rampTo"
+        CaptureField.DELAY_TIME_A -> if (r.scope == Scope.SECTION) "delay.timeA" else "effects.delayTimeA"
+        CaptureField.DELAY_TIME_B -> if (r.scope == Scope.SECTION) "delay.timeB" else "effects.delayTimeB"
+        CaptureField.DELAY_FEEDBACK -> if (r.scope == Scope.SECTION) "delay.feedback" else "effects.delayFeedback"
         else -> FIELD.getValue(r.field)
     }
 }

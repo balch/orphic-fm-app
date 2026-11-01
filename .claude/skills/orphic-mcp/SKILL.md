@@ -32,7 +32,7 @@ disown
 ## Tools
 
 - `mix_read`: vibe, playing section, per-track level/pan/sends/mute/solo, macros, and loudness meters.
-- `mix_set`: `field` is level_db (heard dB in the playing section, -30 to 3.5), pan, reverb, delay or macro. `scope` is vibe or section.
+- `mix_set`: `field` is level_db (heard dB in the playing section, -30 to 3.5), pan, reverb, delay, macro, or the Pulsar delay's own settings delay_time_a, delay_time_b (0-1) and delay_feedback (0-0.95, no track). `scope` is vibe or section; a section delay edit captures to that section's `delay`.
 - `mix_mute`, `mix_solo`: toggle one track (0-7).
 - `mix_reset`: the whole mix back to the vibe as written: levels, pans, sends, section layers, mutes, solos and the four macro knobs. Pinned strips keep their edits, mutes and solos.
 - `section_jump`, `section_loop`: move to a section at the next bar line, or hold the current one.
@@ -115,7 +115,7 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 
 ## Gotchas
 
-- `port_set` is never captured. Use `mix_set` for level, pan, sends and the four macros. A vibe load can overwrite port writes.
+- `port_set` is never captured. Use `mix_set` for level, pan, sends, the four macros and the delay's time and feedback (port_set refuses those delay ports). A vibe load can overwrite port writes.
 - Meters idle off after about 10 s. The first `mix_read` after that starts them and shows silence. Do your other checks (`audio_analyze` takes its N seconds), then read again.
 - The TRACKS view in the app shares this mix. Faders the user moves show up in `mix_read`.
 - Capture on a catalog vibe writes a file only. The live mix stays as it is.

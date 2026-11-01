@@ -1,5 +1,6 @@
 package org.balch.orpheus.djapp.ai.collab
 
+import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.Macro
 
 /** Who made an edit to the mixer. */
@@ -15,6 +16,10 @@ sealed interface MixControl {
     data class Mute(override val track: Int) : MixControl
     data class Solo(override val track: Int) : MixControl
     data class MacroKnob(val macro: Macro) : MixControl {
+        override val track: Int? = null
+    }
+    /** The Pulsar delay's time A, time B or feedback; [Send] is a track's delay send. */
+    data class DelaySetting(val param: DelayFx) : MixControl {
         override val track: Int? = null
     }
     data object Section : MixControl {
@@ -40,6 +45,11 @@ fun MixControl.label(trackNames: (Int) -> String): String = when (this) {
     is MixControl.Mute -> "${trackNames(track)} mute"
     is MixControl.Solo -> "${trackNames(track)} solo"
     is MixControl.MacroKnob -> macro.name
+    is MixControl.DelaySetting -> when (param) {
+        DelayFx.TIME_A -> "delay time A"
+        DelayFx.TIME_B -> "delay time B"
+        DelayFx.FEEDBACK -> "delay feedback"
+    }
     MixControl.Section -> "section"
     MixControl.Loop -> "loop"
     MixControl.EditScope -> "edit scope"

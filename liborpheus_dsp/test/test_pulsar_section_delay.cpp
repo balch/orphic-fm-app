@@ -165,6 +165,24 @@ static bool test_section_delay_moves_the_echo() {
     return ok;
 }
 
+static bool test_bench_delay_wins_over_the_section() {
+    printf("\n=== Test: a Mix Bench delay time wins over the section's, -1 hands it back ===\n");
+    OrpheusEngine* engine = make_delay_engine();
+    engine->pulsar_section_delay_time_a.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_section_delay_time_b.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_bench_delay_time_a.store(0.1f, std::memory_order_relaxed);
+    engine->pulsar_bench_delay_time_b.store(0.1f, std::memory_order_relaxed);
+    const float bench_echo = first_echo_seconds(engine);
+    engine->pulsar_bench_delay_time_a.store(-1.0f, std::memory_order_relaxed);
+    engine->pulsar_bench_delay_time_b.store(-1.0f, std::memory_order_relaxed);
+    const float section_echo = first_echo_seconds(engine);
+    printf("  bench echo=%.3fs section echo=%.3fs\n", bench_echo, section_echo);
+    const bool ok = std::fabs(bench_echo - 0.209f) < 0.01f && std::fabs(section_echo - 1.005f) < 0.01f;
+    printf("Bench delay echo: %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_section_delay_tests() {
     printf("\n========== Pulsar Section Delay Tests ==========\n");
     bool ok = true;
@@ -172,5 +190,6 @@ bool run_pulsar_section_delay_tests() {
     ok &= test_section_delay_publishes_and_clears();
     ok &= test_section_delay_glides_on_pre_roll();
     ok &= test_section_delay_moves_the_echo();
+    ok &= test_bench_delay_wins_over_the_section();
     return ok;
 }

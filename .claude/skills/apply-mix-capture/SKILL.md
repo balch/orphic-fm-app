@@ -31,6 +31,8 @@ Each row has `scope` (VIBE or SECTION), `section` (index), `sectionName`, `track
 | SECTION | VOLUME / REVERB_SEND / DELAY_SEND | `arrangement.sections[section].trackOverrides[track]` (`TrackSectionOverride`). One value covers both edm and space |
 | SECTION | MACRO | that section's `macroOverrides` multiplier for the macro. `old` and `new` are the multiplier, not the knob |
 | SECTION | MACRO_RAMP | that section's `rampTo` multiplier for the macro |
+| VIBE | DELAY_TIME_A / DELAY_TIME_B / DELAY_FEEDBACK (no `track`) | `Vibe.effects` (`VibeEffects` `delayTimeA`, `delayTimeB`, `delayFeedback`) |
+| SECTION | DELAY_TIME_A / DELAY_TIME_B / DELAY_FEEDBACK (no `track`) | that section's `delay` (`SectionDelay` `timeA`, `timeB`, `feedback`); add a `SectionDelay(...)` when the section has none |
 
 Check the enum names in `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/bench/BenchCapture.kt` and the models in `.../models/TrackVoice.kt` and `Arrangement.kt` if anything looks off.
 

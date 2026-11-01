@@ -192,7 +192,8 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
     // A section jump, the loop and the edit scope lose nothing the user would miss.
     private fun MixControl.wipedByLoad() =
         this is MixControl.Level || this is MixControl.Pan || this is MixControl.Send ||
-            this is MixControl.Mute || this is MixControl.Solo || this is MixControl.MacroKnob
+            this is MixControl.Mute || this is MixControl.Solo || this is MixControl.MacroKnob ||
+            this is MixControl.DelaySetting
 
     // A reset clears what a load does; pinned strips are left out by the callers.
     private fun MixControl.clearedByReset() = wipedByLoad()

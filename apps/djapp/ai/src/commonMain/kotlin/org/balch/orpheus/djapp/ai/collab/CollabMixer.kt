@@ -34,6 +34,7 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.diff
+import org.balch.orpheus.features.pulsar.bench.heardDelay
 import org.balch.orpheus.features.pulsar.bench.macroView
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
@@ -339,6 +340,9 @@ class CollabMixer internal constructor(
         is MixControl.Mute -> trackState(control.track)?.let { onOff(it.muted) } ?: NA
         is MixControl.Solo -> trackState(control.track)?.let { onOff(it.soloed) } ?: NA
         is MixControl.MacroKnob -> f2(macroValue(control.macro))
+        is MixControl.DelaySetting -> pulsar.vibeFlow.value.let { vibe ->
+            f2(layers.value.heardDelay(vibe, pulsar.arrangementStateFlow.value.sectionIndex, control.param))
+        }
         MixControl.Section ->
             pulsar.vibeFlow.value.arrangement?.sections?.getOrNull(pulsar.arrangementStateFlow.value.sectionIndex)?.name ?: "none"
         MixControl.Loop -> onOff(loopSection.value != null)
@@ -395,9 +399,10 @@ class CollabMixer internal constructor(
         private fun layerEditCount(layers: BenchLayers): Int {
             val v = layers.vibe
             val vibe = v.levelDb.count { it != 0f } + v.pan.count { it != null } +
-                v.reverbRatio.count { it != 1f } + v.delayRatio.count { it != 1f } + v.macros.size
+                v.reverbRatio.count { it != 1f } + v.delayRatio.count { it != 1f } + v.macros.size + v.delayFx.size
             return vibe + layers.sections.values.sumOf { s ->
-                s.levelDb.count { it != 0f } + s.reverbSend.count { it != null } + s.delaySend.count { it != null } + s.macrosHeard.size
+                s.levelDb.count { it != 0f } + s.reverbSend.count { it != null } + s.delaySend.count { it != null } +
+                    s.macrosHeard.size + s.delayFx.size
             }
         }
 

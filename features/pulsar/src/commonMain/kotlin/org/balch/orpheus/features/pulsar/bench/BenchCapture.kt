@@ -3,10 +3,22 @@ package org.balch.orpheus.features.pulsar.bench
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 @Serializable
-enum class CaptureField { VOLUME, VOLUME_SPACE, PAN, REVERB_SEND, REVERB_SEND_SPACE, DELAY_SEND, DELAY_SEND_SPACE, MACRO, MACRO_RAMP }
+enum class CaptureField {
+    VOLUME, VOLUME_SPACE, PAN, REVERB_SEND, REVERB_SEND_SPACE, DELAY_SEND, DELAY_SEND_SPACE, MACRO, MACRO_RAMP,
+    /** The delay settings: `effects` for a VIBE row, the section's `delay` ([SectionDelay]) for a SECTION row. */
+    DELAY_TIME_A, DELAY_TIME_B, DELAY_FEEDBACK,
+}
+
+/** The row field a delay setting captures to. */
+val DelayFx.captureField: CaptureField get() = when (this) {
+    DelayFx.TIME_A -> CaptureField.DELAY_TIME_A
+    DelayFx.TIME_B -> CaptureField.DELAY_TIME_B
+    DelayFx.FEEDBACK -> CaptureField.DELAY_FEEDBACK
+}
 
 /**
  * One vibe-owned field change. [clampedDb] is the dB that volume clamping at 1.0 swallowed.
@@ -42,6 +54,11 @@ private fun unitRow(
 ): CaptureRow? {
     val new = wanted.coerceIn(lo, 1f)
     return if (abs(new - old) <= EPS) null else CaptureRow(scope, section, name, t, field, null, old, new)
+}
+
+private fun delayRow(scope: Scope, section: Int?, name: String?, p: DelayFx, old: Float, wanted: Float): CaptureRow? {
+    val new = wanted.coerceIn(0f, p.max)
+    return if (abs(new - old) <= EPS) null else CaptureRow(scope, section, name, null, p.captureField, null, old, new)
 }
 
 /**
@@ -82,6 +99,7 @@ fun capture(vibe: Vibe, layers: BenchLayers): List<CaptureRow> {
             rows += CaptureRow(Scope.VIBE, null, null, null, CaptureField.MACRO, m, old, new)
         }
     }
+    for ((p, v) in vl.delayFx) delayRow(Scope.VIBE, null, null, p, p.of(vibe.effects), v)?.let(rows::add)
 
     for ((s, section) in sections.withIndex()) {
         val sl = layers.sections[s]
@@ -121,6 +139,10 @@ fun capture(vibe: Vibe, layers: BenchLayers): List<CaptureRow> {
                 if (ramp != null && old > EPS) {
                     rows += CaptureRow(Scope.SECTION, s, name, null, CaptureField.MACRO_RAMP, m, ramp, ramp * new / old)
                 }
+            }
+            // Old is what the section played as written: its own delay, else the vibe's.
+            for ((p, v) in sl.delayFx) {
+                delayRow(Scope.SECTION, s, name, p, p.of(section.delay) ?: p.of(vibe.effects), v)?.let(rows::add)
             }
         }
     }

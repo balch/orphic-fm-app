@@ -37,10 +37,15 @@ import org.balch.orpheus.djapp.ai.mcp.McpToolAdapter
 import org.balch.orpheus.djapp.di.MixBenchExit
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
+import org.balch.orpheus.features.pulsar.bench.CaptureField
+import org.balch.orpheus.features.pulsar.bench.DelayFx
+import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.StemRecorder
 import org.balch.orpheus.features.pulsar.bench.StemSink
+import org.balch.orpheus.features.pulsar.bench.capture
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,6 +81,7 @@ class MixToolsTest {
                     port(3, "track_4_reverb_send_space"),
                     port(4, "track_3_pan_glide"),
                     port(5, "track_3_audition_gain"),
+                    port(6, "pulsar_delay_feedback"),
                 ),
             ),
             FakePlugin("org.balch.orpheus.plugins.reverb", listOf(port(0, "mode", 0f, 3f, PortType.INT))),
@@ -211,6 +217,44 @@ class MixToolsTest {
     }
 
     @Test
+    fun mixSetDelaySettingsLandInHistoryAndTheCapture() = runTest {
+        pulsar.section(1)
+        val c = controller()
+        val t = tools(c)
+        val vibeWide = t.set.tool.execute(MixSetArgs(field = "delay_time_a", value = 0.6f, scope = "vibe"))
+        assertTrue(vibeWide.ok, vibeWide.message)
+        assertEquals(0.6f, vibeWide.delayHeard)
+        val section = t.set.tool.execute(MixSetArgs(field = "delay_feedback", value = 1f, scope = "section"))
+        assertTrue(section.ok, section.message)
+        assertTrue("clamped" in section.message, section.message)
+        assertEquals(0.95f, section.delayHeard)
+
+        val changes = t.rig.mixer.history.value.changes
+        assertEquals(
+            listOf(MixControl.DelaySetting(DelayFx.TIME_A), MixControl.DelaySetting(DelayFx.FEEDBACK)),
+            changes.map { it.control },
+        )
+        assertEquals(setOf<LayerField>(LayerField.SectionDelayFx(1, DelayFx.FEEDBACK)), changes.last().writes.keys)
+        val rows = capture(pulsar.vibeFlow.value, c.layers.value)
+        assertEquals(
+            listOf(Scope.VIBE to CaptureField.DELAY_TIME_A, Scope.SECTION to CaptureField.DELAY_FEEDBACK),
+            rows.map { it.scope to it.field },
+        )
+        assertEquals(0.95f, rows.last().new)
+        val read = t.read.tool.execute(MixReadArgs(meters = false))
+        assertEquals(0.6f, read.delay["delay_time_a"])
+        assertEquals(0.95f, read.delay["delay_feedback"])
+    }
+
+    @Test
+    fun portSetRefusesDelaySettings() = runTest {
+        val r = tools(controller()).portSet.tool.execute(PortSetArgs("$PULSAR_URI:pulsar_delay_feedback", 0.7f))
+        assertFalse(r.ok)
+        assertTrue("mix_set field=delay_feedback" in r.message, r.message)
+        assertNull(ports["$PULSAR_URI:pulsar_delay_feedback"])
+    }
+
+    @Test
     fun portSetGoesThroughSynthControllerWithAiOrigin() = runTest {
         val key = "$PULSAR_URI:track_3_harmonics"
         val r = Tools({ error("an ungated port never reaches the mixer") }, backgroundScope).portSet.tool.execute(PortSetArgs(key, 0.4f))
@@ -262,7 +306,7 @@ class MixToolsTest {
         val limited = tool.execute(PortsListArgs(filter = "TRACK_3", limit = 1))
         assertEquals(4, limited.matched)
         assertEquals(1, limited.ports.size)
-        assertEquals(7, tool.execute(PortsListArgs()).matched)
+        assertEquals(8, tool.execute(PortsListArgs()).matched)
     }
 
     @Test

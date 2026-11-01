@@ -21,6 +21,11 @@ data class SectionDelay(
     init {
         require(timeA == null || timeA in 0f..1f) { "SectionDelay.timeA must be 0..1, got $timeA" }
         require(timeB == null || timeB in 0f..1f) { "SectionDelay.timeB must be 0..1, got $timeB" }
-        require(feedback == null || feedback in 0f..0.95f) { "SectionDelay.feedback must be 0..0.95, got $feedback" }
+        require(feedback == null || feedback in 0f..MAX_FEEDBACK) { "SectionDelay.feedback must be 0..$MAX_FEEDBACK, got $feedback" }
+    }
+
+    companion object {
+        /** Mirrors C++ `section_delay::kMaxFeedback`; the delay unit caps feedback there too. */
+        const val MAX_FEEDBACK = 0.95f
     }
 }

@@ -22,12 +22,14 @@ import org.balch.orpheus.djapp.ai.collab.Refusal
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
+import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.effective
+import org.balch.orpheus.features.pulsar.bench.heardDelay
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 
 private const val TRACKS = 8
@@ -114,17 +116,19 @@ data class MixReadResult(
     val macros: Map<String, Float> = emptyMap(),
     @property:LLMDescription("Macros a section-scope edit holds in the playing section, as heard (0-1); the engine plays these over the knob.")
     val sectionMacros: Map<String, Float> = emptyMap(),
+    @property:LLMDescription("The Pulsar delay heard in the playing section: delay_time_a, delay_time_b (0-1) and delay_feedback (0-0.95).")
+    val delay: Map<String, Float> = emptyMap(),
     val meters: MixMeters? = null,
 )
 
-@LLMDescription("Arguments for mix_set. Give track for level_db, pan, reverb and delay; give macro for field=macro.")
+@LLMDescription("Arguments for mix_set. Give track for level_db, pan, reverb and delay; give macro for field=macro; the delay_* fields take neither.")
 @Serializable
 data class MixSetArgs(
-    @property:LLMDescription("level_db, pan, reverb, delay or macro.")
+    @property:LLMDescription("level_db, pan, reverb, delay, macro, delay_time_a, delay_time_b or delay_feedback.")
     val field: String,
-    @property:LLMDescription("level_db: dB heard in the playing section, -30 to 3.5. pan: -1 to 1. reverb, delay, macro: 0-1.")
+    @property:LLMDescription("level_db: dB heard in the playing section, -30 to 3.5. pan: -1 to 1. reverb, delay, macro, delay_time_a, delay_time_b: 0-1. delay_feedback: 0-0.95.")
     val value: Float,
-    @property:LLMDescription("Track index 0-7 (see mix_read).")
+    @property:LLMDescription("Track index 0-7 (see mix_read). Not used by macro or the delay_* fields.")
     val track: Int? = null,
     @property:LLMDescription("energy, complexity, mood or space.")
     val macro: String? = null,
@@ -146,6 +150,8 @@ data class MixSetResult(
     val macroKnob: Float? = null,
     @property:LLMDescription("The value heard in the playing section when a section edit holds this macro (engine only), else null.")
     val macroHeard: Float? = null,
+    @property:LLMDescription("For a delay_* field: the value heard in the playing section now.")
+    val delayHeard: Float? = null,
     @property:LLMDescription("True when this turn's mix edits are used up: do not retry, reply to the user now.")
     val budgetSpent: Boolean = false,
     @property:LLMDescription(REFUSAL_FIELD)
@@ -349,6 +355,7 @@ class MixReadTool(
                     macros = Macro.entries.associate { it.name.lowercase() to pulsar.macroKnob(it).r3() },
                     sectionMacros = c.layers.value.sections[section]?.macrosHeard.orEmpty()
                         .entries.associate { (m, v) -> m.name.lowercase() to v.r3() },
+                    delay = DelayFx.entries.associate { "delay_" + it.name.lowercase() to c.layers.value.heardDelay(vibe, section, it).r3() },
                     meters = meters,
                 )
             }
@@ -375,6 +382,8 @@ class MixSetTool(
                 field=level_db: dB the track should be heard at in the playing section, -30 to 3.5 (0 = as written).
                 field=pan: -1 to 1, whole vibe only. field=reverb or delay: send heard in the playing section, 0-1.
                 field=macro: energy, complexity, mood or space knob, 0-1.
+                field=delay_time_a or delay_time_b: the Pulsar delay's tap times, 0-1 (0.01 + v * 1.99 seconds).
+                field=delay_feedback: its repeats, 0-0.95. No track. scope=section writes the section's own delay.
                 scope=vibe edits every section; scope=section edits only the playing one. Omit scope to keep the last one.
                 mix_set, mix_mute and mix_solo share a budget of ${TurnBudget.MAX_MIX_EDITS} edits per turn.
                 $GATE_RULES
@@ -386,7 +395,8 @@ class MixSetTool(
                 if (!args.value.isFinite()) badArg("value must be a number")
                 val field = args.field.trim().lowercase()
                 if (field !in FIELDS) badArg("field must be one of ${FIELDS.joinToString()}, not \"${args.field}\"")
-                val track = if (field == "macro") null else requireTrack(args.track)
+                val delayFx = DELAY_FIELDS[field]
+                val track = if (field == "macro" || delayFx != null) null else requireTrack(args.track)
                 val macro = if (field == "macro") parseMacro(args.macro) else null
                 val newScope = args.scope?.let(::parseScope)
                 if (!turnBudget.allowMixEdit()) return@guarded MixSetResult(false, TurnBudget.SPENT, budgetSpent = true)
@@ -396,7 +406,8 @@ class MixSetTool(
                     "level_db" -> MixControl.Level(track!!)
                     "pan" -> MixControl.Pan(track!!)
                     "reverb", "delay" -> MixControl.Send(track!!, reverb = field == "reverb")
-                    else -> MixControl.MacroKnob(macro!!)
+                    "macro" -> MixControl.MacroKnob(macro!!)
+                    else -> MixControl.DelaySetting(delayFx!!)
                 }
                 val edit = collabMixer.toolEdit(events, control) {
                     newScope?.let { setScope(it) }
@@ -409,7 +420,8 @@ class MixSetTool(
                             SendEdit.ZERO_SEND ->
                                 badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
                         }
-                        else -> setMacro(macro!!, value)
+                        "macro" -> setMacro(macro!!, value)
+                        else -> setDelayFx(delayFx!!, value)
                     }
                 }
                 when (edit) {
@@ -424,6 +436,11 @@ class MixSetTool(
                 if (value != args.value) notes += "$field clamped to ${range.start}..${range.endInclusive} (asked ${args.value})."
                 if (field == "pan" && scope == Scope.SECTION) notes += "Pan is whole-vibe only."
                 val section = pulsar.arrangementStateFlow.value.sectionIndex
+                val vibe = pulsar.vibeFlow.value
+                val delayHeard = delayFx?.let { c.layers.value.heardDelay(vibe, section, it) }
+                if (delayFx != null && delayHeard != null && delayHeard != value) {
+                    notes += "This section plays its own $field ($delayHeard); the whole-vibe value plays where a section sets none. Use scope=section to change it here."
+                }
                 MixSetResult(
                     ok = true,
                     message = notes.joinToString(" ").ifEmpty { "ok" },
@@ -433,20 +450,26 @@ class MixSetTool(
                     macro = macro?.name?.lowercase(),
                     macroKnob = macro?.let { pulsar.macroKnob(it).r3() },
                     macroHeard = macro?.let { c.layers.value.sections[section]?.macrosHeard?.get(it)?.r3() },
+                    delayHeard = delayHeard?.r3(),
                 )
             }
         }
     }
 
     private companion object {
-        val FIELDS = listOf("level_db", "pan", "reverb", "delay", "macro")
+        val DELAY_FIELDS = mapOf(
+            "delay_time_a" to DelayFx.TIME_A,
+            "delay_time_b" to DelayFx.TIME_B,
+            "delay_feedback" to DelayFx.FEEDBACK,
+        )
+        val FIELDS = listOf("level_db", "pan", "reverb", "delay", "macro") + DELAY_FIELDS.keys
         val RANGES = mapOf(
             "level_db" to FADER_MIN_DB..FADER_MAX_DB,
             "pan" to -1f..1f,
             "reverb" to 0f..1f,
             "delay" to 0f..1f,
             "macro" to 0f..1f,
-        )
+        ) + DELAY_FIELDS.mapValues { (_, p) -> 0f..p.max }
     }
 }
 

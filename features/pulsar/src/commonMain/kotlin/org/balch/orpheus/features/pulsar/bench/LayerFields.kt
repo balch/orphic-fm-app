@@ -1,6 +1,6 @@
 package org.balch.orpheus.features.pulsar.bench
 
-/** One value a bench edit can move: a vibe-layer or section-layer level, pan, send ratio or macro. */
+/** One value a bench edit can move: a vibe-layer or section-layer level, pan, send ratio, macro or delay setting. */
 sealed interface LayerField {
     val track: Int?
     val section: Int?
@@ -17,6 +17,15 @@ sealed interface LayerField {
     data class SectionReverb(override val section: Int, override val track: Int) : LayerField
     data class SectionDelay(override val section: Int, override val track: Int) : LayerField
     data class SectionMacro(override val section: Int, val macro: Macro) : LayerField {
+        override val track: Int? get() = null
+    }
+    /** The delay's time or feedback for the whole vibe; [VibeDelay] is a track's send. */
+    data class VibeDelayFx(val param: DelayFx) : LayerField {
+        override val track: Int? get() = null
+        override val section: Int? get() = null
+    }
+    /** The delay's time or feedback in one section; [SectionDelay] is a track's send. */
+    data class SectionDelayFx(override val section: Int, val param: DelayFx) : LayerField {
         override val track: Int? get() = null
     }
 }
@@ -37,6 +46,8 @@ fun BenchLayers.valueOf(f: LayerField): Float? = when (f) {
     is LayerField.SectionReverb -> sections[f.section]?.reverbSend?.getOrNull(f.track)
     is LayerField.SectionDelay -> sections[f.section]?.delaySend?.getOrNull(f.track)
     is LayerField.SectionMacro -> sections[f.section]?.macrosHeard?.get(f.macro)
+    is LayerField.VibeDelayFx -> vibe.delayFx[f.param]
+    is LayerField.SectionDelayFx -> sections[f.section]?.delayFx?.get(f.param)
 }
 
 private fun <T> List<T>.set(i: Int, v: T): List<T> = toMutableList().also { it[i] = v }
@@ -60,9 +71,14 @@ fun BenchLayers.with(f: LayerField, v: Float?): BenchLayers = when (f) {
     is LayerField.SectionMacro -> withSection(f.section) {
         it.copy(macrosHeard = if (v == null) it.macrosHeard - f.macro else it.macrosHeard + (f.macro to v))
     }
+    is LayerField.VibeDelayFx ->
+        copy(vibe = vibe.copy(delayFx = if (v == null) vibe.delayFx - f.param else vibe.delayFx + (f.param to v)))
+    is LayerField.SectionDelayFx -> withSection(f.section) {
+        it.copy(delayFx = if (v == null) it.delayFx - f.param else it.delayFx + (f.param to v))
+    }
 }
 
-/** Every field whose value differs between this and [after]: tracks 0-7, every macro, every section in either. */
+/** Every field whose value differs between this and [after]: tracks 0-7, every macro and delay setting, every section in either. */
 fun BenchLayers.diff(after: BenchLayers): Map<LayerField, LayerWrite> {
     val out = LinkedHashMap<LayerField, LayerWrite>()
     fun check(f: LayerField) {
@@ -77,6 +93,7 @@ fun BenchLayers.diff(after: BenchLayers): Map<LayerField, LayerWrite> {
         check(LayerField.VibeDelay(t))
     }
     for (m in Macro.entries) check(LayerField.VibeMacro(m))
+    for (p in DelayFx.entries) check(LayerField.VibeDelayFx(p))
     for (s in (sections.keys + after.sections.keys).sorted()) {
         for (t in 0 until TRACKS) {
             check(LayerField.SectionLevel(s, t))
@@ -84,6 +101,7 @@ fun BenchLayers.diff(after: BenchLayers): Map<LayerField, LayerWrite> {
             check(LayerField.SectionDelay(s, t))
         }
         for (m in Macro.entries) check(LayerField.SectionMacro(s, m))
+        for (p in DelayFx.entries) check(LayerField.SectionDelayFx(s, p))
     }
     return out
 }

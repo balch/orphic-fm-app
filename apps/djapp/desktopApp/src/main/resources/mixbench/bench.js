@@ -348,6 +348,7 @@
     REVERB_SEND: "reverbSend", REVERB_SEND_SPACE: "reverbSend (space)",
     DELAY_SEND: "delaySend", DELAY_SEND_SPACE: "delaySend (space)",
     MACRO: "", MACRO_RAMP: "",
+    DELAY_TIME_A: "delayTimeA", DELAY_TIME_B: "delayTimeB", DELAY_FEEDBACK: "delayFeedback",
   };
 
   function fieldName(r) {

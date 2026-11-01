@@ -1856,6 +1856,10 @@ enum class PulsarSymbol(
     PULSAR_DELAY_TIME_B("pulsar_delay_time_b"),
     PULSAR_DELAY_FEEDBACK("pulsar_delay_feedback"),
     PULSAR_DELAY_DAMPING("pulsar_delay_damping"),
+    // Mix Bench delay edits, never saved: -1 = none, else wins over the section's and the vibe's value
+    PULSAR_BENCH_DELAY_TIME_A("pulsar_bench_delay_time_a"),
+    PULSAR_BENCH_DELAY_TIME_B("pulsar_bench_delay_time_b"),
+    PULSAR_BENCH_DELAY_FEEDBACK("pulsar_bench_delay_feedback"),
     PULSAR_REVERB_SIZE("pulsar_reverb_size"),
     PULSAR_REVERB_DAMPING("pulsar_reverb_damping"),
     PULSAR_REVERB_BRIGHTNESS("pulsar_reverb_brightness"),

@@ -3,27 +3,49 @@ package org.balch.orpheus.features.pulsar.bench
 import kotlin.math.pow
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeEffects
 
 /** The four user-facing macros the bench can move. */
 @Serializable
 enum class Macro { ENERGY, COMPLEXITY, MOOD, SPACE }
 
-/** Whole-vibe edits: relative moves per track plus absolute macro knob values. */
+/** The Pulsar delay's time A, time B and feedback, on the [VibeEffects] scale (times 0-1, feedback 0-[max]). */
+@Serializable
+enum class DelayFx(val max: Float) {
+    TIME_A(1f), TIME_B(1f), FEEDBACK(SectionDelay.MAX_FEEDBACK);
+
+    fun of(fx: VibeEffects): Float = when (this) {
+        TIME_A -> fx.delayTimeA
+        TIME_B -> fx.delayTimeB
+        FEEDBACK -> fx.delayFeedback
+    }
+
+    fun of(d: SectionDelay?): Float? = when (this) {
+        TIME_A -> d?.timeA
+        TIME_B -> d?.timeB
+        FEEDBACK -> d?.feedback
+    }
+}
+
+/** Whole-vibe edits: relative moves per track, absolute macro knob values and absolute delay settings. */
 data class VibeLayer(
     val levelDb: List<Float> = List(8) { 0f },
     val pan: List<Float?> = List(8) { null },
     val reverbRatio: List<Float> = List(8) { 1f },
     val delayRatio: List<Float> = List(8) { 1f },
     val macros: Map<Macro, Float> = emptyMap(),
+    val delayFx: Map<DelayFx, Float> = emptyMap(),
 )
 
-/** Edits for one section: dB on top of the vibe layer, absolute sends, macros as heard. */
+/** Edits for one section: dB on top of the vibe layer, absolute sends, macros as heard, absolute delay settings. */
 data class SectionLayer(
     val levelDb: List<Float> = List(8) { 0f },
     val reverbSend: List<Float?> = List(8) { null },
     val delaySend: List<Float?> = List(8) { null },
     val macrosHeard: Map<Macro, Float> = emptyMap(),
+    val delayFx: Map<DelayFx, Float> = emptyMap(),
 )
 
 data class BenchLayers(
@@ -136,6 +158,16 @@ fun BenchLayers.macroPortValue(vibe: Vibe, section: Int, m: Macro, live: Float =
     val mult = vibe.arrangement?.sections?.getOrNull(section)?.macroOverrides.multiplier(m) ?: 1f
     return if (mult == 0f) knob else heard / mult
 }
+
+/**
+ * The delay setting [section] plays: the section layer, then the file's [SectionDelay], then the vibe layer,
+ * then the file's [VibeEffects]. A capture writes the layers to those same fields, so it plays the same.
+ */
+fun BenchLayers.heardDelay(vibe: Vibe, section: Int, p: DelayFx): Float =
+    sections[section]?.delayFx?.get(p)
+        ?: p.of(vibe.arrangement?.sections?.getOrNull(section)?.delay)
+        ?: this.vibe.delayFx[p]
+        ?: p.of(vibe.effects)
 
 /** Section edits only make sense when the vibe has an arrangement with at least two sections. */
 fun Vibe.sectionScopeAvailable(): Boolean = (arrangement?.sections?.size ?: 0) >= 2
