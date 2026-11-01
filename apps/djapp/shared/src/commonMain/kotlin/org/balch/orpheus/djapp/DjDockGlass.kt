@@ -3,18 +3,21 @@ package org.balch.orpheus.djapp
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 
 /**
- * The glass the dock's panels and bars use for the playing visualization.
+ * The glass the dock's panels and bars use for the playing visualization: its
+ * [VisualizationLiquidEffects.docked] glass when it sets one, since docked panels float over the
+ * picture rather than cover it, otherwise the same glass a phone gets.
  *
  * A visualization that sets `hidesPanelsWhenIdle` may thin its glass out on the grounds that the
  * panels leave shortly anyway. The dock never fades them (see [fadesPanelsWhenIdle]), so there
- * that glass is permanent and has to hold labels on its own. Only such a visualization is
- * touched; every other one reaches the dock exactly as it reaches a phone.
+ * that glass is permanent and has to hold labels on its own, and gets a floor.
  */
 internal fun dockLiquidEffects(
     effects: VisualizationLiquidEffects,
     vizHidesPanelsWhenIdle: Boolean,
-): VisualizationLiquidEffects =
-    if (vizHidesPanelsWhenIdle) effects.withDockGlassFloor() else effects
+): VisualizationLiquidEffects {
+    val glass = effects.docked ?: effects
+    return if (vizHidesPanelsWhenIdle) glass.withDockGlassFloor() else glass
+}
 
 /**
  * Raises glass that is too thin to stand permanently. A floor, never a replacement: a value

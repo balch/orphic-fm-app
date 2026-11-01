@@ -19,6 +19,12 @@ class DjDockGlassTest {
     }
 
     @Test
+    fun `a visualization's docked glass is the one the dock uses`() {
+        val docked = thin.copy(frostSmall = 2f)
+        assertSame(docked, dockLiquidEffects(thin.copy(docked = docked), vizHidesPanelsWhenIdle = false))
+    }
+
+    @Test
     fun `thin glass gets a fill and a dimmed picture on the dock`() {
         val docked = dockLiquidEffects(thin, vizHidesPanelsWhenIdle = true)
         assertTrue(docked.tintAlpha > 0f, "no fill behind the labels")

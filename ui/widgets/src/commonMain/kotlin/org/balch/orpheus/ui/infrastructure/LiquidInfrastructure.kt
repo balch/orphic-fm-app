@@ -57,6 +57,9 @@ data class CenterPanelStyle(
 
 /**
  * Configuration for liquid glassmorphism effects per visualization.
+ *
+ * @param docked The glass for the large-screen dock, where panels float over the visualization
+ * instead of covering it, so it can be lighter; null uses this glass there too.
  */
 data class VisualizationLiquidEffects(
     val frostSmall: Float = 4f,
@@ -66,6 +69,7 @@ data class VisualizationLiquidEffects(
     val top: VisualizationLiquidScope = VisualizationLiquidScope(),
     val bottom: VisualizationLiquidScope = VisualizationLiquidScope(),
     val title: CenterPanelStyle = CenterPanelStyle(),
+    val docked: VisualizationLiquidEffects? = null,
 ) {
     companion object {
         val Default = VisualizationLiquidEffects()
