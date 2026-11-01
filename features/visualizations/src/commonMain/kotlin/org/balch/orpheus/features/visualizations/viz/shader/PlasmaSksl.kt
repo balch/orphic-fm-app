@@ -3,8 +3,8 @@ package org.balch.orpheus.features.visualizations.viz.shader
 /**
  * The Orphogram and Orphograph shaders: loud regions melt into glossy plasma (metaball-style
  * dome shading, rim glow, a halo outside the surface) over a dark void with faint drifting
- * nebula and stars. Colour follows pitch: bass indigo and violet, mids hot pink, highs electric
- * blue and cyan, with a cyan rim light. Valid as SkSL and AGSL.
+ * nebula and stars. Colour follows pitch: bass indigo and violet, mids blue-violet, highs electric
+ * blue and teal, with a cyan rim light. Valid as SkSL and AGSL.
  */
 object PlasmaSksl {
 
@@ -36,14 +36,14 @@ float fbm(float2 p) {
     return s;
 }
 
-// 0 = lowest pitch, 1 = highest: indigo bass through violet and hot pink to electric blue and cyan highs.
+// 0 = lowest pitch, 1 = highest: indigo bass through violet and blue-violet to electric blue and teal highs.
 float3 pitchHue(float t) {
     float s = clamp(t, 0.0, 1.0) * 5.0;
-    if (s < 1.0) return mix(float3(0.15, 0.0, 0.6), float3(0.5, 0.1, 1.0), s);
-    if (s < 2.0) return mix(float3(0.5, 0.1, 1.0), float3(0.8, 0.2, 1.0), s - 1.0);
-    if (s < 3.0) return mix(float3(0.8, 0.2, 1.0), float3(1.0, 0.2, 0.8), s - 2.0);
-    if (s < 4.0) return mix(float3(1.0, 0.2, 0.8), float3(0.2, 0.6, 1.0), s - 3.0);
-    return mix(float3(0.2, 0.6, 1.0), float3(0.0, 1.0, 1.0), s - 4.0);
+    if (s < 1.0) return mix(float3(0.12, 0.0, 0.5), float3(0.35, 0.06, 0.9), s);
+    if (s < 2.0) return mix(float3(0.35, 0.06, 0.9), float3(0.52, 0.16, 1.0), s - 1.0);
+    if (s < 3.0) return mix(float3(0.52, 0.16, 1.0), float3(0.4, 0.3, 1.0), s - 2.0);
+    if (s < 4.0) return mix(float3(0.4, 0.3, 1.0), float3(0.18, 0.5, 1.0), s - 3.0);
+    return mix(float3(0.18, 0.5, 1.0), float3(0.05, 0.8, 0.95), s - 4.0);
 }
 
 // The void: near-black violet, slow nebula drift, a sparse twinkle of stars.
@@ -57,7 +57,8 @@ float3 voidBg(float2 uv, float2 fragCoord) {
 }
 
 // Lit plasma for a surface with gradient (gx, gy) (field units per pixel) and depth past the surface.
-float3 plasma(float3 hue, float gx, float gy, float depth) {
+// `ambient` lights the shadow side and `lift` brightens deep plasma: low for contrast, high for thin shapes.
+float3 plasma(float3 hue, float gx, float gy, float depth, float ambient, float lift) {
     float dome = sqrt(clamp(depth / 0.4, 0.0, 1.0));
     float3 n = normalize(float3(-gx * 9.0, -gy * 9.0, 0.22 + dome));
     float3 L = normalize(float3(-0.4, 0.7, 0.6));
@@ -67,9 +68,9 @@ float3 plasma(float3 hue, float gx, float gy, float depth) {
     float sheen = pow(max(dot(r, L), 0.0), 8.0) * 0.45;
     float bounce = pow(max(dot(r, normalize(float3(0.6, -0.5, 0.6))), 0.0), 6.0) * 0.25;
     float rim = (1.0 - n.z) * (1.0 - n.z);
-    float3 white = mix(float3(1.0), hue, 0.5);
+    float3 white = mix(float3(0.8, 0.78, 1.0), hue, 0.7);
     // The rim light leans cyan, so every tube carries a blue edge like a plasma globe's.
-    return hue * (0.25 + 0.8 * diff) + mix(hue, float3(0.2, 0.9, 1.0), 0.6) * rim * 1.2 + hue * bounce + white * sheen + white * pow(dome, 4.0) * 0.3;
+    return hue * (ambient + (1.05 - ambient) * diff) + mix(hue, float3(0.2, 0.9, 1.0), 0.6) * rim * 1.2 + hue * bounce + white * sheen + white * pow(dome, 4.0) * lift;
 }
 
 // Plasma texture at p (view heights): x = the bright writhing filaments of a plasma globe, y = a
@@ -99,6 +100,7 @@ float2 plasmaBump(float2 p) {
      */
     const val ORPHOGRAM = COMMON + """
 uniform float head;
+uniform float scroll;
 uniform float2 ringSize;
 uniform shader level;
 uniform shader field;
@@ -119,22 +121,26 @@ half4 main(float2 fragCoord) {
     float dx = 3.0 * px.x;
     float f = fieldAt(uv, dx);
     float3 hue = pitchHue(uv.y);
-    float2 p = float2(uv.x * resolution.x / resolution.y, uv.y);
+    // Pinned to the spectrum, so the filaments and skin scroll with it rather than sit over it.
+    float2 p = float2((uv.x + scroll) * resolution.x / resolution.y, uv.y);
     float2 tex = plasmaTex(p);
-    // The halo outside the surface carries a faint trace of the filaments.
-    float3 col = voidBg(uv, fragCoord) + hue * smoothstep(0.2, 0.5, f) * (0.3 + 0.25 * tex.x);
+    // A tight, dim halo with a faint trace of the filaments; a wide one hazed the gaps.
+    float3 col = voidBg(uv, fragCoord) + hue * smoothstep(0.36, 0.5, f) * (0.14 + 0.12 * tex.x);
     if (f > 0.47) {
         float gx = (fieldAt(uv + float2(2.0 * px.x, 0.0), dx) - fieldAt(uv - float2(2.0 * px.x, 0.0), dx)) * 0.25;
         float gy = (fieldAt(uv + float2(0.0, 2.0 * px.y), dx) - fieldAt(uv - float2(0.0, 2.0 * px.y), dx)) * 0.25;
         float depth = smoothstep(0.5, 0.9, f);
         // The skin wrinkles with the mottle, most where the plasma is deep and the dome flat.
         float2 bump = plasmaBump(p) * (0.03 + 0.05 * depth);
-        float3 surf = plasma(hue, gx + bump.x, gy + bump.y, f - 0.5);
+        // Low ambient and a faint lift keep the shadow side dark, so each body reads as a shape.
+        float3 surf = plasma(hue, gx + bump.x, gy + bump.y, f - 0.5, 0.1, 0.12);
         // Mottled skin, and filaments glowing from inside, brighter the deeper the plasma.
         surf *= 0.8 + 0.3 * tex.y;
-        surf += mix(float3(1.0), hue, 0.5) * tex.x * (0.25 + 0.45 * depth);
-        // White-hot cores where the raw level runs at the peak: the sustained partials.
-        surf += float3(1.0, 0.97, 1.0) * smoothstep(0.86, 1.0, level.eval(texel(uv)).a) * 0.55;
+        surf += mix(float3(0.8, 0.78, 1.0), hue, 0.7) * tex.x * (0.08 + 0.5 * depth);
+        // A darker band just inside the edge outlines each body against its neighbours.
+        surf *= mix(0.5, 1.0, smoothstep(0.5, 0.6, f));
+        // Lavender-hot cores where the raw level runs at the peak: the sustained partials.
+        surf += float3(0.7, 0.68, 1.0) * smoothstep(0.86, 1.0, level.eval(texel(uv)).a) * 0.4;
         col = mix(col, surf, smoothstep(0.48, 0.52, f));
     }
     return half4(half3(col), 1.0);
@@ -208,7 +214,8 @@ half4 main(float2 fragCoord) {
     float3 hue = pitchHue(uv.x);
     float3 col = voidBg(uv, fragCoord) + hue * smoothstep(0.15, 0.5, f) * 0.35;
     if (f > 0.47) {
-        float3 surf = plasma(hue, (fx - f) * 0.75, (fy - f) * 0.75, f - 0.5);
+        // The columns are thin, so most of each faces away from the light: keep the ambient up.
+        float3 surf = plasma(hue, (fx - f) * 0.75, (fy - f) * 0.75, f - 0.5, 0.25, 0.3);
         col = mix(col, surf, smoothstep(0.48, 0.52, f));
     }
     return half4(half3(col), 1.0);

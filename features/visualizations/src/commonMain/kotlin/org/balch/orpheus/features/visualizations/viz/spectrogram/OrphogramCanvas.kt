@@ -51,6 +51,10 @@ internal class OrphogramRing(val cols: Int = 512, paintPalette: Boolean = true) 
     var progress = 0f
         private set
 
+    /** Columns written so far, never wrapping, so the plasma skin can scroll with the picture. */
+    var written = 0L
+        private set
+
     private val held = FloatArray(rows) { OrphogramScale.SILENT_DB }
     private val previous = FloatArray(rows) { OrphogramScale.SILENT_DB }
     private val column = FloatArray(rows)
@@ -110,6 +114,7 @@ internal class OrphogramRing(val cols: Int = 512, paintPalette: Boolean = true) 
         }
         canvas?.let { paintColumn(it) }
         head = (head + 1) % cols
+        written++
     }
 
     private fun paintColumn(canvas: Canvas) {
@@ -178,6 +183,9 @@ private fun DrawScope.drawPlasma(shader: PlasmaShader, ring: OrphogramRing, time
     // Matches drawRing: the newest column slides in from past the right edge as progress grows.
     shader.uniform("head", ring.head + ring.progress + 1f)
     shader.uniform("ringSize", ring.cols.toFloat(), OrphogramScale.ROWS.toFloat())
+    // Screen widths scrolled so far; wrapped so float precision holds over a long session.
+    val screens = (ring.written % (4096L * (ring.cols - 2)) + ring.progress) / (ring.cols - 2)
+    shader.uniform("scroll", screens)
     shader.alphaImage("level", ring.level, ring.cols, OrphogramScale.ROWS)
     shader.alphaImage("field", ring.field, ring.cols, OrphogramScale.ROWS)
     shader.brush()?.let { drawRect(it) }

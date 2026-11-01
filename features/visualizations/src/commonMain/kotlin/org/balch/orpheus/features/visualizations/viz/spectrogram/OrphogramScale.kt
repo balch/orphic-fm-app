@@ -26,10 +26,10 @@ object OrphogramScale {
     /** Where [hz] sits on the axis, 0 at [F_MIN] and 1 at [F_MAX]. */
     fun axisFraction(hz: Float): Float = (ln(hz / F_MIN) / ln(F_MAX / F_MIN))
 
-    // Black -> violet -> magenta -> cyan -> white, as the offline renderer the look comes from.
+    // Black -> indigo -> violet -> electric blue -> pale lavender, cooled from the offline renderer's look.
     private val stops = arrayOf(
-        intArrayOf(7, 6, 12), intArrayOf(90, 40, 200), intArrayOf(255, 61, 240),
-        intArrayOf(61, 245, 255), intArrayOf(255, 255, 255),
+        intArrayOf(7, 6, 12), intArrayOf(60, 20, 160), intArrayOf(130, 50, 245),
+        intArrayOf(60, 150, 255), intArrayOf(200, 195, 255),
     )
 
     /** The colour map in 256 steps, index 0 at the floor and 255 at the peak. */

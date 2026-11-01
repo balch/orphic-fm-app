@@ -8,12 +8,12 @@ import kotlin.test.assertTrue
 
 class OrphogramScaleTest {
 
-    @Test fun `palette runs from near black to white through the reference stops`() {
+    @Test fun `palette runs from near black to pale lavender through cool stops`() {
         val p = OrphogramScale.palette
         assertEquals(Color(7, 6, 12), p[0])
-        assertEquals(Color.White, p[255])
-        assertTrue(p[64].blue > p[64].red, "a quarter up is violet, ${p[64]}")
-        assertTrue(p[128].red > 0.95f && p[128].green < 0.3f, "halfway is magenta, ${p[128]}")
+        assertEquals(Color(200, 195, 255), p[255])
+        assertTrue(p[64].blue > p[64].red, "a quarter up is indigo, ${p[64]}")
+        assertTrue(p[128].blue > 0.95f && p[128].red > p[128].green, "halfway is violet, ${p[128]}")
     }
 
     @Test fun `level index puts the floor rangeDb under the peak`() {
