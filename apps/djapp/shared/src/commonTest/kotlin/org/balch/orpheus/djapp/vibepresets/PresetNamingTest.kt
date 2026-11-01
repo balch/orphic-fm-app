@@ -25,7 +25,7 @@ class PresetNamingTest {
         val changes = listOf(
             PresetChange(PresetField.MIX_BASS, 0.75f, 0.5f),
             PresetChange(PresetField.HORN_SPEED, 0.5f, 0.2f),
-            PresetChange(PresetField.DJ_REVERB_SEND, 0.5f, 0.55f),
+            PresetChange(PresetField.PULSAR_MOOD, 0.5f, 0.55f),
         )
         val name = suggestPresetName(changes, emptySet())
         assertEquals(1, name.split(" + ").size - 1)
@@ -57,7 +57,7 @@ class PresetNamingTest {
         assertEquals("Quiet Keys", name(PresetField.MIX_KEYS, 0.8f, 0.4f))
         assertEquals("Heavy Drive", name(PresetField.MIX_DIST, 0.1f, 0.6f))
         assertEquals("Light Drive", name(PresetField.MIX_DIST, 0.6f, 0.1f))
-        assertEquals("More Reverb", name(PresetField.DJ_REVERB_SEND, 0.1f, 0.6f))
+        assertEquals("More Mood", name(PresetField.PULSAR_MOOD, 0.1f, 0.6f))
         assertEquals("Less Energy", name(PresetField.PULSAR_ENERGY, 0.9f, 0.4f))
         assertEquals("Muted T3", name(PresetField.TRACKS_3_MUTE, 0f, 1f))
         assertEquals("Solo T2", name(PresetField.TRACKS_2_SOLO, 0f, 1f))

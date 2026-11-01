@@ -11,7 +11,6 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
-import org.balch.orpheus.core.plugin.symbols.DjSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -47,14 +46,6 @@ class VibePresetPorts(
     private val hornMix = flow(HornSymbol.MIX.controlId)
     private val hornBrake = flow(HornSymbol.BRAKE.controlId)
 
-    private val wetA = flow(DjSymbol.WET_A.controlId)
-    private val wetB = flow(DjSymbol.WET_B.controlId)
-    private val sourceA = flow(DjSymbol.SOURCE_A.controlId)
-    private val sourceB = flow(DjSymbol.SOURCE_B.controlId)
-    private val crossfader = flow(DjSymbol.CROSSFADER.controlId)
-    private val delaySend = flow(DjSymbol.DELAY_SEND.controlId)
-    private val reverbSend = flow(DjSymbol.REVERB_SEND.controlId)
-
     private val energy = flow(PulsarSymbol.ENERGY.controlId)
     private val complexity = flow(PulsarSymbol.COMPLEXITY.controlId)
     private val mood = flow(PulsarSymbol.MOOD.controlId)
@@ -89,13 +80,6 @@ class VibePresetPorts(
         PresetField.HORN_DEPTH to port(hornDepth, floatPort(hornDepth)),
         PresetField.HORN_MIX to port(hornMix, floatPort(hornMix)),
         PresetField.HORN_BRAKE to port(hornBrake, intPort(hornBrake)),
-        PresetField.DJ_WET_A to port(wetA, floatPort(wetA)),
-        PresetField.DJ_WET_B to port(wetB, floatPort(wetB)),
-        PresetField.DJ_SOURCE_A to port(sourceA, intPort(sourceA)),
-        PresetField.DJ_SOURCE_B to port(sourceB, intPort(sourceB)),
-        PresetField.DJ_CROSSFADER to port(crossfader, floatPort(crossfader)),
-        PresetField.DJ_DELAY_SEND to port(delaySend, floatPort(delaySend)),
-        PresetField.DJ_REVERB_SEND to port(reverbSend, floatPort(reverbSend)),
         // During an accelerando the ramp pre-sets the section multiplier to 1.0 while the live tempo
         // climbs, so baseBpm drifts and the now-dot can flicker until the ramp lands.
         PresetField.PULSAR_BPM to Binding({ pulsar.baseBpm }, { pulsar.setBaseBpm(it) }),
@@ -123,7 +107,6 @@ class VibePresetPorts(
         listOf<Flow<Any>>(
             perc, bass, keys, fx, drive,
             hornSpeed, hornRatio, hornDepth, hornMix, hornBrake,
-            wetA, wetB, sourceA, sourceB, crossfader, delaySend, reverbSend,
             energy, complexity, mood, space, deep, root, scale, envelope,
             pulsar.stateFlow.map { it.bpm }.distinctUntilChanged(),
         ) + if (captureTracks) listOf(tracks.state) else emptyList()

@@ -3,13 +3,15 @@ package org.balch.orpheus.djapp.vibepresets
 enum class PresetModule(val label: String) {
     MIX("MIX"),
     HORN("HORN"),
-    DJ("DJ"),
     PULSAR("PULSAR"),
 }
 
 /**
  * Every value a vibe preset can hold. Keys are stored in prefs, so they never change once
  * shipped; entry order is the order change chips are listed in.
+ *
+ * The DJ panel is left out: it carries across vibe changes for live transitions. Stored
+ * `dj.*` keys from older presets no longer match a field, so they are ignored.
  */
 enum class PresetField(val key: String, val module: PresetModule, val label: String) {
     MIX_PERC("mix.perc", PresetModule.MIX, "PERC"),
@@ -48,14 +50,6 @@ enum class PresetField(val key: String, val module: PresetModule, val label: Str
     HORN_DEPTH("horn.depth", PresetModule.HORN, "DEPTH"),
     HORN_MIX("horn.mix", PresetModule.HORN, "MIX"),
     HORN_BRAKE("horn.brake", PresetModule.HORN, "BRAKE"),
-
-    DJ_WET_A("dj.wetA", PresetModule.DJ, "WET A"),
-    DJ_WET_B("dj.wetB", PresetModule.DJ, "WET B"),
-    DJ_SOURCE_A("dj.sourceA", PresetModule.DJ, "SOURCE A"),
-    DJ_SOURCE_B("dj.sourceB", PresetModule.DJ, "SOURCE B"),
-    DJ_CROSSFADER("dj.crossfader", PresetModule.DJ, "XFADE"),
-    DJ_DELAY_SEND("dj.delaySend", PresetModule.DJ, "DELAY"),
-    DJ_REVERB_SEND("dj.reverbSend", PresetModule.DJ, "REVERB"),
 
     PULSAR_BPM("pulsar.bpm", PresetModule.PULSAR, "BPM"),
     PULSAR_ENERGY("pulsar.energy", PresetModule.PULSAR, "ENERGY"),

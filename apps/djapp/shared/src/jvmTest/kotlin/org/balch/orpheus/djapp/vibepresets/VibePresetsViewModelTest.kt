@@ -18,7 +18,6 @@ import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
-import org.balch.orpheus.core.plugin.symbols.DjSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.preferences.AppPreferences
@@ -59,8 +58,7 @@ class VibePresetsViewModelTest {
 
     // Integer ports hold ints in the engine; the controller's 0.5 fallback would round on write-back.
     private val portValues = listOf(
-        HornSymbol.BRAKE, DjSymbol.SOURCE_A, DjSymbol.SOURCE_B,
-        PulsarSymbol.ROOT_NOTE, PulsarSymbol.SCALE, PulsarSymbol.ENVELOPE_MODE,
+        HornSymbol.BRAKE, PulsarSymbol.ROOT_NOTE, PulsarSymbol.SCALE, PulsarSymbol.ENVELOPE_MODE,
     ).associateTo(mutableMapOf<String, PortValue>()) { it.controlId.key to IntValue(0) }
 
     private val synth = SynthController().apply {

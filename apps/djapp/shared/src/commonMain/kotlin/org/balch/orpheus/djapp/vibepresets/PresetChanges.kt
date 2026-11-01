@@ -23,9 +23,7 @@ private fun PresetChange.format(v: Float): String = when {
     field == PresetField.PULSAR_ROOT -> NOTE_NAMES[v.roundToInt().mod(NOTE_NAMES.size)]
     field == PresetField.PULSAR_BPM ||
         field == PresetField.PULSAR_SCALE ||
-        field == PresetField.PULSAR_ENVELOPE ||
-        field == PresetField.DJ_SOURCE_A ||
-        field == PresetField.DJ_SOURCE_B -> v.roundToInt().toString()
+        field == PresetField.PULSAR_ENVELOPE -> v.roundToInt().toString()
     field == PresetField.HORN_BRAKE ||
         field.key.endsWith(".mute") ||
         field.key.endsWith(".solo") -> if (v >= 0.5f) "on" else "off"
