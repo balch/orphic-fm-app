@@ -52,8 +52,17 @@ import org.balch.orpheus.djapp.ai.mixer.HISTORY_SCRIM_TAG
 import org.balch.orpheus.djapp.ai.mixer.HISTORY_TAG
 import org.balch.orpheus.djapp.ai.mixer.EMPTY_METERS
 import org.balch.orpheus.djapp.ai.mixer.MixerTrack
+import org.balch.orpheus.djapp.ai.mixer.MixerVoiceKnob
 import org.balch.orpheus.djapp.ai.mixer.SHEET_MIXER_TAG
+import org.balch.orpheus.djapp.ai.mixer.VOICE_POPOVER_TAG
+import org.balch.orpheus.djapp.ai.mixer.VOICE_SCRIM_TAG
+import org.balch.orpheus.djapp.ai.mixer.rowTag
 import org.balch.orpheus.djapp.ai.mixer.stripTag
+import org.balch.orpheus.djapp.ai.mixer.voiceButtonTag
+import org.balch.orpheus.djapp.ai.mixer.voiceKnobTag
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.knobMeaning
 import org.balch.orpheus.djapp.djTabs
 import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
 import org.balch.orpheus.djapp.variant.mergeTabContributions
@@ -76,7 +85,12 @@ internal val sheetMixerState = AiMixerUiState(
     section = 1,
     tracks = BenchMeters.CHANNEL_NAMES.take(8).mapIndexed { t, name ->
         MixerTrack(t, name, "VA/FM", levelDb = 0f, pan = 0f, filePan = 0f, reverb = 0.2f, delay = 0.1f,
-            muted = false, soloed = false, silenced = false)
+            muted = false, soloed = false, silenced = false, edmEngine = "VA", spaceEngine = "FM",
+            voice = EngineKnob.entries.map { k ->
+                val m = knobMeaning(OrpheusEngineId.VA, k)
+                MixerVoiceKnob(k, OrpheusEngineId.VA, m.short, m.long, 0.5f, "0.50", pinned = false, changed = false,
+                    source = null, active = m.active)
+            })
     },
 )
 
@@ -309,6 +323,32 @@ class AiSheetLayoutTest {
                 s.click("Show chat")
                 assertTrue(abs(s.bounds(SHEET_CHAT_TAG).width - 440f) < 0.5f)
                 assertNull(s.nodes().firstOrNull { it.config.getOrNull(SemanticsProperties.TestTag) == SHEET_RAIL_TAG })
+            }
+        }
+    }
+
+    @Test
+    fun soundPanelPopsOutOverTheMixerAndCloses() {
+        for (canvas in listOf(SheetCanvas.FOLD, SheetCanvas.DESKTOP, SheetCanvas.PHONE)) {
+            sheet(canvas, FakeChat(mixerMode), landscape = mutableStateOf(canvas != SheetCanvas.PHONE)).use { s ->
+                assertFalse(s.has(voiceKnobTag(0, 0)), "${canvas.name}: the knobs live in the pop-out")
+                // A narrow row keeps its sound chip in the expanded row.
+                if (!s.has(voiceButtonTag(0))) s.clickTag(rowTag(0))
+                s.clickTag(voiceButtonTag(0))
+                assertTrue(s.has(VOICE_POPOVER_TAG), "${canvas.name}: no pop-out")
+                assertTrue((0..2).all { s.has(voiceKnobTag(0, it)) })
+                val pop = s.bounds(VOICE_POPOVER_TAG)
+                val mixer = s.bounds(SHEET_MIXER_TAG)
+                assertTrue(
+                    pop.left >= mixer.left - 0.5f && pop.right <= mixer.right + 0.5f && pop.top >= mixer.top - 0.5f,
+                    "${canvas.name}: the pop-out $pop leaves the Mixer $mixer",
+                )
+
+                s.key(Key.Escape)
+                assertFalse(s.has(VOICE_POPOVER_TAG), "${canvas.name}: Esc should close it")
+                s.clickTag(voiceButtonTag(0))
+                s.clickTag(VOICE_SCRIM_TAG)
+                assertFalse(s.has(VOICE_POPOVER_TAG), "${canvas.name}: a tap outside should close it")
             }
         }
     }

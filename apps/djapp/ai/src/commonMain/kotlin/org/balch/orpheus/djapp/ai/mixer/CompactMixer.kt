@@ -47,6 +47,7 @@ import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 private val ROW_HEIGHT = 40.dp
 private val ROW_GAP = 6.dp
 private val INLINE_SLIDER_GAP = 14.dp
+private val LIST_PAD = 12.dp
 
 /** At or above this width the pan, R and D sliders sit inline in each row; the expanded row then holds the fader. */
 private val INLINE_SLIDERS_MIN = WIDE_MIN
@@ -59,6 +60,7 @@ private val INLINE_SLIDERS_MIN = WIDE_MIN
 private class Grid(textScale: Float) {
     val name = 46.dp * textScale
     val pin = 22.dp * textScale
+    val voice = 56.dp * textScale
     val meter = 30.dp
     val db = 44.dp * textScale
     val lu = 40.dp * textScale
@@ -66,6 +68,10 @@ private class Grid(textScale: Float) {
     val sliderLabel = 24.dp * textScale
     val sliderValue = 34.dp * textScale
     val inlineSlider = 60.dp + sliderLabel + sliderValue
+
+    /** Whether a row at [width] fits the sound chip and still leaves the wave room; else it goes in the expanded row. */
+    fun voiceFits(width: Dp): Boolean =
+        width - LIST_PAD * 2 - 16.dp - (name + pin + voice + meter + db + lu + ms + ROW_GAP * 7) >= 40.dp
 }
 
 internal fun rowTag(index: Int) = "mixer-row-$index"
@@ -81,6 +87,7 @@ internal fun CompactMixer(
     actions: AiMixerActions,
     flashes: AgentFlashes,
     width: Dp,
+    onVoice: (Int) -> Unit,
     modifier: Modifier = Modifier,
     bottomOverhang: Dp = 0.dp,
 ) {
@@ -88,10 +95,11 @@ internal fun CompactMixer(
     val inline = width >= INLINE_SLIDERS_MIN
     val textScale = textScale()
     val grid = remember(textScale) { Grid(textScale) }
+    val voiceInRow = grid.voiceFits(width)
     LazyColumn(
         modifier.fillMaxSize(),
         // The bar's chrome overhangs the bottom edge, so the last rows scroll clear of it.
-        contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + bottomOverhang),
+        contentPadding = PaddingValues(start = LIST_PAD, top = LIST_PAD, end = LIST_PAD, bottom = LIST_PAD + bottomOverhang),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item(key = "header") {
@@ -122,12 +130,14 @@ internal fun CompactMixer(
                 flashKey = flashes.track(i),
                 expanded = expanded == i,
                 inline = inline,
+                voiceInRow = voiceInRow,
                 onToggle = { expanded = if (expanded == i) -1 else i },
+                onVoice = { onVoice(i) },
             )
         }
         item(key = "sources-head") { Kicker("SOURCES  meter only") }
         items(SOURCES, key = { "source-${it.first}" }) { (ch, name, _) ->
-            SourceRow(ch, name, meters, grid, inline)
+            SourceRow(ch, name, meters, grid, inline, voiceInRow)
         }
         item(key = "bus-head") { Kicker("BUS  peak dBFS") }
         items(listOf(DRY, OUT), key = { "bus-$it" }) { ch -> BusRow(ch, meters, grid) }
@@ -172,7 +182,9 @@ private fun TrackRow(
     flashKey: Int,
     expanded: Boolean,
     inline: Boolean,
+    voiceInRow: Boolean,
     onToggle: () -> Unit,
+    onVoice: () -> Unit,
 ) {
     val i = track.index
     val color = MixerInk.tracks.getOrElse(i) { MixerInk.accent }
@@ -194,6 +206,7 @@ private fun TrackRow(
         GridRow(Modifier.testTag(rowTag(i)).clickable(onClick = onToggle)) {
             RowName(track.name, color, grid)
             PinToggle(i, track.name, pinned, { actions.togglePin(i) }, size = grid.pin - 4.dp)
+            if (voiceInRow) VoiceButton(track, onVoice, Modifier.width(grid.voice))
             MixerWave({ meters.waveOf(i) }, color, Modifier.weight(1f).height(22.dp))
             if (inline) Sends(track, actions, grid, Modifier.width(grid.inlineSlider))
             MixerMeter({ meters.fillOf(i) }, Modifier.width(grid.meter).height(6.dp), vertical = false)
@@ -209,12 +222,16 @@ private fun TrackRow(
         }
         if (expanded) {
             Column(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp)) {
-                Text(
-                    track.engine,
-                    style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (voiceInRow) {
+                    Text(
+                        track.engine,
+                        style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    VoiceButton(track, onVoice, Modifier.padding(vertical = 4.dp).width(grid.voice * 2))
+                }
                 DbFaderRow(
                     db = track.levelDb,
                     onDbChange = { actions.setLevelDb(i, it) },
@@ -265,11 +282,12 @@ private fun Sends(
 
 /** A read-only source: wave, meter and loudness, columns aligned with the tracks'. */
 @Composable
-private fun SourceRow(ch: Int, name: String, meters: State<MeterSnapshot>, grid: Grid, inline: Boolean) {
+private fun SourceRow(ch: Int, name: String, meters: State<MeterSnapshot>, grid: Grid, inline: Boolean, voiceInRow: Boolean) {
     val shape = RoundedCornerShape(8.dp)
     GridRow(Modifier.clip(shape).background(MixerInk.sourceCard).border(1.dp, MixerInk.line, shape)) {
         RowName(name, MixerInk.dim, grid)
         Spacer(Modifier.width(grid.pin))
+        if (voiceInRow) Spacer(Modifier.width(grid.voice))
         MixerWave({ meters.waveOf(ch) }, MixerInk.dim, Modifier.weight(1f).height(22.dp))
         if (inline) Spacer(Modifier.width(grid.inlineSlider * 3 + INLINE_SLIDER_GAP * 2))
         MixerMeter({ meters.fillOf(ch) }, Modifier.width(grid.meter).height(6.dp), vertical = false)
