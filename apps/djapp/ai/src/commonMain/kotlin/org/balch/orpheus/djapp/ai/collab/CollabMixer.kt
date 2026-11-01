@@ -96,20 +96,25 @@ class CollabMixer internal constructor(
         syncVibeLoad()
         collab.check(origin, control)?.let { return CollabResult.Refused(it, reasonFor(it)) }
         val c = controller
-        val macro = (control as? MixControl.MacroKnob)?.macro
+        // A reset moves every knob back to the file, so all four are this edit's own writes.
+        val macros = when (control) {
+            is MixControl.MacroKnob -> listOf(control.macro)
+            MixControl.ResetToFile -> Macro.entries
+            else -> emptyList()
+        }
         val before = c.show(control)
-        if (macro != null) own.update { it.copy(inFlight = it.inFlight + (macro to ((it.inFlight[macro] ?: 0) + 1))) }
+        for (m in macros) own.update { it.copy(inFlight = it.inFlight + (m to ((it.inFlight[m] ?: 0) + 1))) }
         try {
             val value = c.block()
             if (value.wasApplied()) collab.record(origin, control, before, shown ?: c.show(control))
             return CollabResult.Done(value)
         } finally {
-            if (macro != null) {
-                val knob = pulsar.macroKnob(macro)
+            for (m in macros) {
+                val knob = pulsar.macroKnob(m)
                 own.update {
                     it.copy(
-                        inFlight = it.inFlight + (macro to ((it.inFlight[macro] ?: 1) - 1)),
-                        expected = it.expected + (macro to knob),
+                        inFlight = it.inFlight + (m to ((it.inFlight[m] ?: 1) - 1)),
+                        expected = it.expected + (m to knob),
                     )
                 }
             }
@@ -196,7 +201,11 @@ class CollabMixer internal constructor(
             pulsar.vibeFlow.value.arrangement?.sections?.getOrNull(pulsar.arrangementStateFlow.value.sectionIndex)?.name ?: "none"
         MixControl.Loop -> onOff(loopSection.value != null)
         MixControl.EditScope -> if (scope.value == Scope.SECTION) "section" else "whole vibe"
-        MixControl.ResetToFile -> if (layerEditCount(layers.value) + muted.value.size + soloed.value.size == 0) "file" else "edited"
+        MixControl.ResetToFile -> {
+            val vibe = pulsar.vibeFlow.value
+            val knobsOff = Macro.entries.count { pulsar.macroKnob(it) != it.vibeDefault(vibe) }
+            if (layerEditCount(layers.value) + muted.value.size + soloed.value.size + knobsOff == 0) "file" else "edited"
+        }
     }
 
     /** The knob, or in section scope the value heard in the playing section, as the panel shows it. */
@@ -232,7 +241,7 @@ class CollabMixer internal constructor(
 
         private fun onOff(on: Boolean) = if (on) "on" else "off"
 
-        /** Values the layers hold over the vibe as written: 0 straight after a load, or a reset with no macro moves. */
+        /** Values the layers hold over the vibe as written: 0 straight after a load or a reset. */
         private fun layerEditCount(layers: BenchLayers): Int {
             val v = layers.vibe
             val vibe = v.levelDb.count { it != 0f } + v.pan.count { it != null } +

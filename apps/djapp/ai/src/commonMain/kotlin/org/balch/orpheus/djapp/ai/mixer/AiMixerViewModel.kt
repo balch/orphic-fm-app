@@ -145,7 +145,7 @@ class AiMixerViewModel(
         // The jump lands at the next bar line, so the move shows the section it is going to.
         jumpTo = { s -> edit(MixControl.Section, shown = sectionName(s)) { jumpTo(s) } },
         setLoop = { on -> edit(MixControl.Loop) { setLoop(on) } },
-        reset = { edit(MixControl.ResetToFile, shown = "file") { resetToFile() } },
+        reset = { edit(MixControl.ResetToFile, shown = "file") { resetToFile(keep = collab.pins.value) } },
         capture = ::capture,
         dismissNotice = { local.update { it.copy(notice = null) } },
         togglePin = collab::togglePin,

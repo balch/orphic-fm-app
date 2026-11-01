@@ -461,7 +461,7 @@ class MixMuteTool(
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_mute",
-            "Toggle mute on one track (0-7). Mutes stay through mix_reset; a vibe load clears them. $GATE_RULES",
+            "Toggle mute on one track (0-7). mix_reset and a vibe load clear mutes (a pinned strip keeps its own). $GATE_RULES",
             controllerProvider,
             turnBudget,
             collabMixer,
@@ -482,7 +482,7 @@ class MixSoloTool(
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_solo",
-            "Toggle solo on one track (0-7); any solo silences the unsoloed tracks. Solos stay through mix_reset; a vibe load clears them. $GATE_RULES",
+            "Toggle solo on one track (0-7); any solo silences the unsoloed tracks. mix_reset and a vibe load clear solos (a pinned strip keeps its own). $GATE_RULES",
             controllerProvider,
             turnBudget,
             collabMixer,
@@ -533,10 +533,10 @@ class MixResetTool(
             resultType = typeToken<MixStatusResult>(),
             name = "mix_reset",
             description = """
-                Reset the mix edits: levels, pans, sends and every section edit (section macros included) go back
-                to the vibe as written. Keeps mutes, solos and whole-vibe macro moves: those stay on the app's
-                knobs and a mix capture still writes them. Pinned strips keep their edits. When it would clear levels,
-                pans or sends the user set, it is refused (WIPE_UNCONFIRMED) until they confirm. Refused while the Mixer is closed.
+                Reset the mix to the vibe as written: levels, pans, sends, every section edit, mutes and solos clear,
+                and the four macro knobs go back to the vibe's values. Pinned strips keep their edits, mutes and solos.
+                When it would clear anything the user set, it is refused (WIPE_UNCONFIRMED) until they confirm.
+                Refused while the Mixer is closed.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: NoArgs): MixStatusResult = guarded({ MixStatusResult(false, it) }) {
@@ -553,7 +553,7 @@ class MixResetTool(
                 val pinned = collab.pins.value
                 MixStatusResult(
                     true,
-                    "Levels, pans, sends and section edits reset; mutes, solos and whole-vibe macro moves kept (a capture includes them)." +
+                    "The mix is back to the vibe as written: levels, pans, sends, section edits, mutes, solos and macro knobs." +
                         if (pinned.isEmpty()) "" else " Pinned tracks ${pinned.sorted().joinToString()} kept their edits.",
                 )
             }

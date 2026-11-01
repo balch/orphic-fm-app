@@ -211,16 +211,19 @@ class AiMixerViewModelTest {
     }
 
     @Test
-    fun resetKeepsMutes() = runTest(testDispatcher) {
+    fun resetClearsMutesButNotPinnedOnes() = runTest(testDispatcher) {
         val r = rig()
         r.vm.actions.toggleMute(1)
+        r.vm.actions.toggleMute(3)
+        r.vm.actions.togglePin(3)
         r.vm.actions.setLevelDb(2, -3f)
         advanceUntilIdle()
         assertEquals(-3f, r.vm.stateFlow.value.tracks[2].levelDb)
         r.vm.actions.reset()
         advanceUntilIdle()
         val s = r.vm.stateFlow.value
-        assertTrue(s.tracks[1].muted)
+        assertFalse(s.tracks[1].muted)
+        assertTrue(s.tracks[3].muted)
         assertEquals(0f, s.tracks[2].levelDb)
     }
 

@@ -295,13 +295,18 @@ class MixBenchController(
     }
 
     /**
-     * Drops every layer edit and hands their tracks, the overlay and held section macros back to the app.
-     * Mutes and solos stay, with the tracks they need. Whole-vibe macro moves stay on the app's knobs,
-     * and in the vibe layer, so a capture still writes what the knob plays. Tracks in [keep] keep their
-     * levels, pans and sends (a pinned strip); section macros are not a track's, so they go.
+     * Puts the mix back to the vibe as written: drops every layer edit, mute and solo, moves each macro knob
+     * back to the vibe's value, and hands the tracks, the overlay and held section macros back to the app.
+     * Tracks in [keep] (pinned strips) keep their levels, pans, sends, mutes and solos.
      */
     suspend fun resetToFile(keep: Set<Int> = emptySet()) = lock.withLock {
-        _layers.value = _layers.value.onlyTracks(keep)
+        _layers.value = _layers.value.onlyTracks(keep).let { it.copy(vibe = it.vibe.copy(macros = emptyMap())) }
+        _muted.value = _muted.value intersect keep
+        _soloed.value = _soloed.value intersect keep
+        for (m in Macro.entries) {
+            val file = m.vibeDefault(vibe)
+            if (pulsar.macroKnob(m) != file) setKnob(m, file)
+        }
         val stay = (if (_soloed.value.isNotEmpty()) owned.toSet() else owned intersect _muted.value) + (owned intersect keep)
         val released = owned - stay
         owned.retainAll(stay)

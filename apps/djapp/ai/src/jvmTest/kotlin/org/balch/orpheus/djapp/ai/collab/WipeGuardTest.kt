@@ -220,31 +220,44 @@ class WipeGuardTest {
         val refused = reset.execute(NoArgs())
         assertFalse(refused.ok)
         assertEquals("WIPE_UNCONFIRMED", refused.refusal)
-        // Only the level is the reset's to clear; the user's mute stays.
-        assertEquals(DjVibeApplyGuard.reason(1), refused.message)
-        assertEquals(listOf<CollabEvent>(CollabEvent.WipeConfirmRequested(1)), r.events)
+        // A full reset clears the level and the mute.
+        assertEquals(DjVibeApplyGuard.reason(2), refused.message)
+        assertEquals(listOf<CollabEvent>(CollabEvent.WipeConfirmRequested(2)), r.events)
         assertEquals(-4f, r.controller.layers.value.vibe.levelDb[1])
         r.collab.collab.confirmWipe()
         assertTrue(reset.execute(NoArgs()).ok)
         assertEquals(0f, r.controller.layers.value.vibe.levelDb[1])
+        assertFalse(2 in r.controller.muted.value)
         // A capture would write the edits back into an AI vibe and undo the reset, so a confirmed reset takes none.
         assertEquals(0, r.collab.capture.calls)
-        assertEquals(setOf<MixControl>(MixControl.Mute(2)), r.collab.collab.userChanged.value)
+        assertEquals(emptySet<MixControl>(), r.collab.collab.userChanged.value)
         // Over MCP a reset never asks.
         r.userEdits()
         assertTrue(withContext(TurnBudget.Exempt) { reset.execute(NoArgs()) }.ok)
     }
 
     @Test
-    fun aResetWithOnlyAUserMuteNeedsNoConfirmation() = runTest {
+    fun aResetWithOnlyAUserMuteAsksFirst() = runTest {
         val r = rig()
         r.collab.mixer.edit(EditOrigin.USER, MixControl.Mute(2)) { toggleMute(2) }
         val reset = MixResetTool(r.collab.mixer, r.collab.events, r.collab.guard, r.collab.collab).tool
+        val refused = reset.execute(NoArgs())
+        assertFalse(refused.ok)
+        assertEquals("WIPE_UNCONFIRMED", refused.refusal)
+        assertEquals(listOf<CollabEvent>(CollabEvent.WipeConfirmRequested(1)), r.events)
+        assertTrue(2 in r.controller.muted.value)
+    }
+
+    @Test
+    fun aResetLeavesAPinnedStripsMuteAlone() = runTest {
+        val r = rig()
+        r.collab.mixer.edit(EditOrigin.USER, MixControl.Mute(2)) { toggleMute(2) }
+        r.collab.collab.togglePin(2)
+        val reset = MixResetTool(r.collab.mixer, r.collab.events, r.collab.guard, r.collab.collab).tool
+        // The pinned mute is not the reset's to clear, so there is nothing to ask about.
         val result = reset.execute(NoArgs())
         assertTrue(result.ok, result.message)
         assertTrue(r.events.isEmpty())
         assertTrue(2 in r.controller.muted.value)
-        // An apply would clear the mute, so it still asks.
-        assertEquals(DjVibeApplyGuard.reason(1), r.collab.guard.refusal())
     }
 }

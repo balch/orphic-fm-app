@@ -269,12 +269,15 @@ class MixCollabTest {
         collab.record(EditOrigin.USER, MixControl.Send(4, reverb = true), "0.20", "0.50")
         collab.record(EditOrigin.USER, MixControl.Mute(3), "off", "on")
         collab.record(EditOrigin.USER, MixControl.MacroKnob(Macro.MOOD), "0.50", "0.70")
+        collab.record(EditOrigin.USER, MixControl.Mute(4), "off", "on")
         collab.togglePin(4)
-        // Mutes, macros and the pinned strip stay through a reset, so they are not counted.
-        assertEquals(1, collab.userChangesClearedByReset())
+        // A reset clears mutes, solos and macro knobs too; only the pinned strip stays, so it is not counted.
+        assertEquals(3, collab.userChangesClearedByReset())
         collab.record(EditOrigin.AGENT, MixControl.ResetToFile, "edited", "file")
-        assertEquals(setOf(MixControl.Send(4, reverb = true), MixControl.Mute(3), MixControl.MacroKnob(Macro.MOOD)), collab.userChanged.value)
+        assertEquals(setOf(MixControl.Send(4, reverb = true), MixControl.Mute(4)), collab.userChanged.value)
+        collab.record(EditOrigin.USER, MixControl.Level(2), "0.0 dB", "-2.0 dB")
         collab.record(EditOrigin.USER, MixControl.ResetToFile, "edited", "file")
-        assertTrue(collab.userChanged.value.isEmpty())
+        // The user's own reset leaves the pinned strip's changes too.
+        assertEquals(setOf(MixControl.Send(4, reverb = true), MixControl.Mute(4)), collab.userChanged.value)
     }
 }
