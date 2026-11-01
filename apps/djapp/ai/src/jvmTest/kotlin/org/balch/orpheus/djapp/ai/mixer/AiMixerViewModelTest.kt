@@ -200,6 +200,24 @@ class AiMixerViewModelTest {
     }
 
     @Test
+    fun historyShowsEditsToggleAndCapturePoint() = runTest(testDispatcher) {
+        val r = rig()
+        r.vm.actions.setLevelDb(3, -6f)
+        advanceUntilIdle()
+        val change = r.vm.stateFlow.value.history.single() as ChangeRow
+        assertEquals("you", change.who)
+        assertEquals("BASS · level", change.label)
+        r.vm.actions.toggleChange(change.id)
+        advanceUntilIdle()
+        assertFalse((r.vm.stateFlow.value.history.single() as ChangeRow).on)
+        assertEquals(0, r.vm.stateFlow.value.onCount)
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[3])
+        r.vm.actions.capture()
+        advanceUntilIdle()
+        assertEquals("Captured", (r.vm.stateFlow.value.history.last() as PointRow).label)
+    }
+
+    @Test
     fun dismissCaptureClearsIt() = runTest(testDispatcher) {
         val r = rig()
         r.vm.actions.capture()

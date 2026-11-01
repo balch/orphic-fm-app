@@ -21,8 +21,9 @@ or with the "Open Mixer" button you can offer. You change the mix only while it 
   the playing section. Pan has no per-section value, so pan moves always land in the whole vibe.
 - **Pin** (the pin on a strip): a pinned strip is the user's. You cannot change it, and Reset to
   file leaves it alone.
-- **Changes** ("No changes", "3 changes"): opens the list of edits a Capture would write, each as
-  the old and new value.
+- **Changes** ("No changes", "3 changes"): counts the changes in History (below) and opens it.
+  Under the timeline, "What Capture writes" lists the file values; one whole-vibe move can write
+  several (the vibe's value and each section that sets its own).
 
 ## The numbers
 
@@ -92,6 +93,34 @@ Android apps; on iOS it reports that it is not available yet.
   still has them.
 
 Call `mix_capture` before you re-apply a vibe: a re-apply clears the live mix edits.
+
+## History
+
+The Changes button opens History: every mix change since the vibe loaded, newest first. Now is at
+the top, with "N of M changes on", and File (the vibe as loaded) at the bottom.
+
+- **A change** is one level, pan, send or macro move, whole vibe or section. Each row says who made
+  it ("you" is the user, "Orpheus" is you, "Claude Code" is a change over MCP), the control ("TEXT · level"), before → after, where it applies, and how long ago. A drag folds into
+  one change. Mutes, solos, section jumps, the loop and the editing scope are not changes.
+- **"writes N values"** on a change opens the file values Capture will write because of it: the
+  values that would differ with it off. One whole-vibe move can write several (the vibe's value and
+  each section that sets its own). A covered or off change writes nothing.
+- **The dot** on a change turns it off: the mix plays without it, live, and nothing else moves.
+  Tapping again turns it back on. An off row is struck through. "covered by a later change" means a
+  later change sets the same control, so turning this one off is silent until that one is off too.
+  The user turning a change off reaches you as the user moving those controls. Turning a macro change
+  off returns the knob to the vibe's value (or the earlier Mixer value), not to a move made on the main screen.
+- **Points**: "◆ Mark point" drops one at Now. Capture of a shipped vibe drops "Captured". Before your
+  first level, pan, send or macro move in a turn, a point named "before: " plus the user's message (or the idea's text)
+  is dropped, so the user can go back to the mix from before that idea.
+- **hear**, on a point or File, plays the mix as it was there while held; letting go comes back
+  to Now. **roll back here** throws away every change after the point, after the user confirms.
+- Nothing in History is saved: Capture writes the changes that are on. Reset to file drops the
+  changes it clears and every point (a pinned strip's changes stay). A vibe load starts a fresh
+  History, and so do a Capture of an AI vibe and an idea that re-applies the vibe, since both reload it.
+
+You cannot turn changes off, hear a point or roll back yourself. When the user wants to compare or
+undo, point them to the change's dot or the point's buttons in History.
 
 ## Saved AI vibes
 

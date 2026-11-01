@@ -25,6 +25,11 @@ data class AiMixerActions(
     val dismissNotice: () -> Unit,
     val togglePin: (Int) -> Unit,
     val dismissCapture: () -> Unit = {},
+    val toggleChange: (Int) -> Unit = {},
+    val markPoint: () -> Unit = {},
+    val hear: (Int) -> Unit = {},
+    val endHear: () -> Unit = {},
+    val rollBack: (Int) -> Unit = {},
 ) {
     companion object {
         val EMPTY = AiMixerActions(

@@ -78,8 +78,23 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
         _pins.update { if (track in it) it - track else it + track }
     }
 
+    /** The turn's label and whether its History point was taken, held together so the claim is one atomic step. */
+    private data class TurnPoint(val label: String? = null, val used: Boolean = false)
+
+    private val turnPoint = MutableStateFlow(TurnPoint())
+
+    /** What the turn is about, for the History point before its first move; null outside a turn. */
+    val turnLabel: String? get() = turnPoint.value.label
+
+    /** The turn's label the first time it is asked, null after that: one History point per turn. */
+    fun claimTurnLabel(): String? {
+        val was = turnPoint.getAndUpdate { it.copy(used = true) }
+        return was.label.takeUnless { was.used }
+    }
+
     /** A confirmation from an earlier turn never authorises a wipe in this one. */
-    fun beginTurn() {
+    fun beginTurn(label: String? = null) {
+        turnPoint.value = TurnPoint(label)
         userMovedThisTurn.value = emptySet()
         wipeConfirmed.value = false
         _turnActive.value = true
@@ -87,6 +102,7 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
 
     /** A confirmation the turn never spent goes with it. */
     fun endTurn() {
+        turnPoint.value = TurnPoint()
         _turnActive.value = false
         userMovedThisTurn.value = emptySet()
         _agentTouched.value = emptySet()
@@ -149,6 +165,7 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
 
     /** A new vibe replaces the tracks, so pins, the glow, this turn's user moves, the pending log and a wipe confirmation go. */
     fun clearForNewVibe() {
+        turnPoint.value = TurnPoint()
         _pins.value = emptySet()
         userMovedThisTurn.value = emptySet()
         _agentTouched.value = emptySet()

@@ -104,9 +104,10 @@ internal class CollabRig(
     controller: () -> MixBenchController,
     scope: CoroutineScope,
     val capture: CountingCapture = CountingCapture(),
+    nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) {
     val collab = MixCollab().apply { setMixerVisible(true) }
     val events = CollabEvents()
-    val mixer = CollabMixer(controller, { pulsar }, collab, scope)
+    val mixer = CollabMixer(controller, { pulsar }, collab, scope, nowMs)
     val guard = DjVibeApplyGuard(collab, mixer, events, capture)
 }

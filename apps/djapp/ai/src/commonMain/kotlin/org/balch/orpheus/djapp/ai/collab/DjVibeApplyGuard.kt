@@ -49,6 +49,8 @@ class DjVibeApplyGuard(
     // A failed capture never blocks the wipe the user confirmed.
     private suspend fun captureBeforeWipe() {
         try {
+            // Runs outside CollabMixer's lock (only wipeRefusal captures), so it can end a hear and save the history.
+            collabMixer.endHear()
             val outcome = captureService.capture()
             if (!outcome.ok) log.warn { "capture before wipe failed: ${outcome.message}" }
         } catch (e: CancellationException) {
