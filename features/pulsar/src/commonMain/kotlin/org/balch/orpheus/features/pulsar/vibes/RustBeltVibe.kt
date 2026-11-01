@@ -468,9 +468,9 @@ class RustBeltVibe : VibeProvider {
             seed = 0,
             // --- macro defaults: relaxed pocket, warm, dry-forward ---
             energy = 0.58f,
-            complexity = 0.64f,
+            complexity = 0.74f,
             space = 0.34f,
-            mood = 0.50f,
+            mood = 0.54f,
             deep = 0.30f,
             levelDb = -2.1f,  // loudness match to -16 LUFS
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
@@ -588,15 +588,17 @@ class RustBeltVibe : VibeProvider {
                         density = 0.95f,  // the hook fires on (nearly) every step
                         envelopeProfile = EnvelopeProfile.MELODIC,
                         // Mood stays the wah, over a darker range. PD timbre is distortion
-                        // amount (squared): stock 0.4-0.8 twangs. Harmonics (modulator ratio)
-                        // locked near unison, off-unison goes clangy. EAR-TUNE(user owns after ear test)
+                        // amount (squared): stock 0.4-0.8 twangs. Harmonics is a stepped
+                        // modulator ratio, clangy between steps: 0.235 unison, 0.477 octave,
+                        // 0.50 octave +16 cents (shimmer), 0.648 octave+fifth (nasal twang).
+                        // EAR-TUNE(user owns after ear test)
                         macroMap = TrackMacroMap.MELODIC.copy(
                             moodHarmonics = MacroTarget(0.5f, 0.5f),
                             moodTimbre = MacroTarget(0.12f, 0.50f),
                         ),
-                        // The vibe's evolution sweep replaced timbre on most steps, which both
-                        // flickered the tone and overrode the mood knob.
-                        evolutionWeight = 0f,
+                        // A light blend of the vibe's evolution sweep: some movement without
+                        // the per-step flicker or losing the mood knob.
+                        evolutionWeight = .3f,
                         barStrategy = BarStrategy.REPEAT,  // locked; variation = lickMutation only
                     )
                 },
@@ -746,7 +748,9 @@ class RustBeltVibe : VibeProvider {
                 volume = 0.28f,
                 tonal = TonalTension(
                     octaveShift = true,        // hook jumps the octave at the peak
-                    chromaticPassing = 0.12f,  // chromatic approach notes — walking-bass DNA
+                    // Off: it nudges a random note a semitone, and on the ROOT_ONLY bass
+                    // pedal that lands a held C# or D# against the D vamp.
+                    chromaticPassing = 0f,
                 ),
                 timing = 0.18f,
                 evolution = EvolutionTension(
