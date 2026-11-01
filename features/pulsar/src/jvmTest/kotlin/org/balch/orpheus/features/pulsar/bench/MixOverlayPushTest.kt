@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.engagement.DefaultEngagementTracker
@@ -188,6 +189,37 @@ class MixOverlayPushTest {
         // Anything but a knob field is a reload's job.
         assertFalse(vm.retuneVibe(tuned.copy(bpm = tuned.bpm + 1f)))
         assertEquals(tuned, vm.vibeFlow.value)
+        scope.cancel()
+    }
+
+    // An engine switch retunes too: only the switched slot's engine port takes the new id, with no load.
+    @Test
+    fun retuneWritesTheSwitchedEnginePortWithoutALoad() = runTest(testDispatcher) {
+        writes.clear()
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), lore, scope)
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()
+        val loads = vm.vibeLoadCount.value
+        writes.clear()
+
+        val track = lore.tracks[4]
+        assertTrue(track.engineEdm.engineId != OrpheusEngineId.VOWEL_FOF)
+        val switched = lore.copy(
+            tracks = lore.tracks.toMutableList().also {
+                it[4] = track.copy(engineEdm = track.engineEdm.copy(engineId = OrpheusEngineId.VOWEL_FOF))
+            },
+        )
+        assertTrue(vm.retuneVibe(switched))
+        advanceUntilIdle()
+
+        assertEquals(loads, vm.vibeLoadCount.value)
+        assertEquals(switched, vm.vibeFlow.value)
+        val last = writes.toMap()
+        assertEquals(107f, last["track_4_engine_edm"])
+        assertEquals(track.engineSpace.engineId.id.toFloat(), last["track_4_engine_space"])
+        assertTrue(writes.none { it.first.startsWith("track_3_") }, "an unchanged track is not re-pushed")
+        assertTrue(writes.none { it.first == "vibe_generation" }, "no reload")
         scope.cancel()
     }
 
