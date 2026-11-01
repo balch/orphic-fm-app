@@ -16,6 +16,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.modules.SerializersModule
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
@@ -25,6 +31,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
 import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
@@ -129,7 +136,8 @@ private fun unescapeDoubledQuotes(raw: String): String =
  * Decode + construct a Vibe; the schema and the model's init { require(...) } blocks are the
  * validator. Tries the sanitized JSON as-is first, the normal case, where any escaped quote in a
  * field value is legitimate content and must survive intact. Only falls back to stripping a layer
- * of backslash-escaping if that first decode fails, recovering the case where the model emitted
+ * of backslash-escaping, or to [upgradeLegacyFields], if that first decode fails. The unescape
+ * recovers the case where the model emitted
  * the whole blob as if it were still wrapped in its own string literal. On a genuine parse
  * failure (neither attempt decodes), the direct attempt's error is the more useful one to
  * surface, since the fallback's extra unescaping only mangles already-broken JSON further.
@@ -138,8 +146,37 @@ fun decodeVibe(json: Json, raw: String): Result<Vibe> {
     val sanitized = sanitizeVibeJson(raw)
     val direct = runCatching { json.decodeFromString<Vibe>(sanitized) }
     if (direct.isSuccess) return direct
-    val unescaped = runCatching { json.decodeFromString<Vibe>(unescapeDoubledQuotes(sanitized)) }
-    return if (unescaped.isSuccess) unescaped else direct
+    val unescaped = unescapeDoubledQuotes(sanitized)
+    // An old archived save can need both repairs, so the legacy upgrade runs on each text.
+    val fallbacks = listOf(
+        { decodeLegacy(json, sanitized) },
+        { json.decodeFromString<Vibe>(unescaped) },
+        { decodeLegacy(json, unescaped) },
+    )
+    for (attempt in fallbacks) runCatching(attempt).onSuccess { return Result.success(it) }
+    return direct
+}
+
+private fun decodeLegacy(json: Json, text: String): Vibe =
+    json.decodeFromJsonElement<Vibe>(upgradeLegacyFields(json.parseToJsonElement(text)))
+
+/**
+ * Rewrites fields older archived saves wrote in a since-changed shape. `halfLick` was a Boolean
+ * before [HalfLick] became an enum: `true` looped bar 1, which is [HalfLick.JAM] now.
+ */
+private fun upgradeLegacyFields(element: JsonElement): JsonElement = when (element) {
+    is JsonObject -> JsonObject(
+        element.mapValues { (key, value) ->
+            val legacyBool = (value as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
+            if (key == "halfLick" && legacyBool != null) {
+                JsonPrimitive(if (legacyBool) HalfLick.JAM.name else HalfLick.OFF.name)
+            } else {
+                upgradeLegacyFields(value)
+            }
+        },
+    )
+    is JsonArray -> JsonArray(element.map(::upgradeLegacyFields))
+    else -> element
 }
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())

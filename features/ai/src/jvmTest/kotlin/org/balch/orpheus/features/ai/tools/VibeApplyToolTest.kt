@@ -17,6 +17,9 @@ import org.balch.orpheus.features.pulsar.models.CastProvenance
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.HalfLick
+import org.balch.orpheus.features.pulsar.models.TensionProfile
+import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
@@ -157,6 +160,22 @@ class VibeApplyToolTest {
         val mangled = encoded.replace("LickMode.Squash", "LickMode.GHOST")
         val decoded = vibeApplyJson.decodeFromString<LickMode>(mangled)
         assertEquals(LickMode.None, decoded)
+    }
+
+    @Test
+    fun `a pre-enum boolean halfLick decodes as JAM or OFF`() {
+        // Saves archived before HalfLick became an enum carry "halfLick":true/false. The AI
+        // edition lists only saves that decode, so without this they vanish from the list.
+        val dh = DogHouseVibe().vibe
+        val vibe = dh.copy(tension = (dh.tension ?: TensionProfile()).copy(tonal = TonalTension(halfLick = HalfLick.JAM)))
+        val encoded = vibeApplyJson.encodeToString(vibe)
+        assertTrue("\"halfLick\":\"JAM\"" in encoded, "precondition: halfLick was not encoded")
+
+        val jam = decodeVibe(vibeApplyJson, encoded.replace("\"halfLick\":\"JAM\"", "\"halfLick\":true"))
+        assertEquals(HalfLick.JAM, jam.getOrThrow().tension?.tonal?.halfLick)
+
+        val off = decodeVibe(vibeApplyJson, encoded.replace("\"halfLick\":\"JAM\"", "\"halfLick\":false"))
+        assertEquals(HalfLick.OFF, off.getOrThrow().tension?.tonal?.halfLick)
     }
 
     @Test
