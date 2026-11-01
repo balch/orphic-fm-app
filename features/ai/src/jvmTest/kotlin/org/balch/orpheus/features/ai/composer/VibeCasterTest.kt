@@ -295,6 +295,87 @@ class VibeCasterTest {
     }
 
     @Test
+    fun stepCountFollowsTheKindOfVibe() {
+        val table = listOf(
+            Triple(emptyList<String>(), true, false) to 64,
+            Triple(listOf("ambient"), false, false) to 64,
+            Triple(emptyList<String>(), null, true) to 64,
+            Triple(listOf("electro"), false, true) to 16,
+            Triple(listOf("electro"), null, false) to 16,
+            Triple(listOf("electro", "funk"), false, false) to 32,
+            Triple(listOf("reggae"), false, false) to 32,
+            Triple(emptyList<String>(), null, false) to 32,
+        )
+        for ((input, want) in table) {
+            assertEquals(want, castStepCount(input.first, input.second, input.third), "$input")
+        }
+    }
+
+    @Test
+    fun castWithALeadPlaysSixtyFourSteps() {
+        for (seed in 1L..50L) {
+            val v = cast(CastMode.ALL_ROLLED, seed, listOf(CastPin(track = 4, role = "lead"))).vibe
+            assertEquals(64, v.stepCount, "seed $seed")
+            assertEquals(4, v.genre.chordsPerBar, "seed $seed")
+        }
+    }
+
+    @Test
+    fun castStepCountAndChordsAgree() {
+        val tagSets = listOf(emptySet(), setOf("ambient"), setOf("electro"), setOf("electro", "funk"), setOf("reggae"))
+        for (mode in CastMode.entries) {
+            for (seed in 1L..200L) {
+                val tags = tagSets[(seed % tagSets.size).toInt()]
+                val v = VibeCaster.cast(CastRequest(mode, seed, styleTags = tags)).vibe
+                assertTrue(v.stepCount in setOf(16, 32, 64), "$mode seed $seed: ${v.stepCount}")
+                assertEquals(v.stepCount / 16, v.genre.chordsPerBar, "$mode seed $seed")
+            }
+        }
+    }
+
+    @Test
+    fun leadLineDoesNotMoveTheRoll() {
+        for (seed in 1L..50L) {
+            val on = VibeCaster.cast(CastRequest(CastMode.ALL_ROLLED, seed, leadLine = true)).vibe
+            val off = VibeCaster.cast(CastRequest(CastMode.ALL_ROLLED, seed, leadLine = false)).vibe
+            assertEquals(on.tracks, off.tracks, "seed $seed")
+        }
+    }
+
+    @Test
+    fun leadsAndSingersAreDoubled() {
+        var leads = 0
+        var singers = 0
+        for (mode in CastMode.entries) {
+            for (seed in 1L..200L) {
+                val pins = if (mode == CastMode.ALL_ROLLED) listOf(CastPin(track = 4, role = "lead")) else emptyList()
+                val v = cast(mode, seed, pins).vibe
+                for ((i, t) in v.tracks.withIndex()) {
+                    for (e in listOf(t.engineEdm, t.engineSpace)) {
+                        val at = "$mode seed $seed track $i ${e.engineId}"
+                        when {
+                            // A drone bed's tracks are hand-authored, so only rolled casts are held to the rule.
+                            mode == CastMode.BED_FIXED -> if (i in 0..3 && e.vibratoDepth == 0f) assertEquals(0f, e.doubleDetune, at)
+                            e.vibratoDepth > 0f -> {
+                                singers++
+                                assertEquals(18f, e.doubleDetune, at)
+                                assertEquals(0.8f, e.doubleSpread, at)
+                            }
+                            i == 4 -> {
+                                leads++
+                                assertEquals(10f, e.doubleDetune, at)
+                                assertEquals(0.4f, e.doubleSpread, at)
+                            }
+                            i in 0..3 -> assertEquals(0f, e.doubleDetune, at)
+                        }
+                    }
+                }
+            }
+        }
+        assertTrue(leads > 0 && singers > 0, "precondition: $leads lead and $singers singer voices")
+    }
+
+    @Test
     fun noShippedTemplate() {
         val shipped = shippedVibes().associateBy(edmTuple) { it.name }
         for (mode in CastMode.entries) {

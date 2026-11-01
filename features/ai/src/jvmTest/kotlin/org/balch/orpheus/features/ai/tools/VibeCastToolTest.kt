@@ -54,6 +54,19 @@ class VibeCastToolTest {
     }
 
     @Test
+    fun leadLineReachesTheCast() {
+        fun stepCount(leadLine: Boolean): Int {
+            val r = castVibe(VibeCastArgs(seed = 7, leadLine = leadLine, styleTags = listOf("electro")), null)
+            assertTrue(r.ok, r.message)
+            return vibeApplyJson.decodeFromString<Vibe>(r.vibeJson).stepCount.also {
+                assertTrue("stepCount $it" in r.message, r.message)
+            }
+        }
+        assertEquals(16, stepCount(false))
+        assertEquals(64, stepCount(true))
+    }
+
+    @Test
     fun nullSeedIsRolledAndReported() = runTest {
         val r = cast(args = VibeCastArgs())
         assertTrue(r.ok, r.message)

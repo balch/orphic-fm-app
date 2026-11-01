@@ -41,6 +41,8 @@ data class VibeCastArgs(
     val styleTags: List<String>? = null,
     @property:LLMDescription("Optional pins that hold tracks to a part or engine while the rest are rolled.")
     val pins: List<PinArg>? = null,
+    @property:LLMDescription("True when the vibe carries a melody line (a lead, lyric or solo line), false for a groove with no melody line. Omit to decide from the style tags and the cast.")
+    val leadLine: Boolean? = null,
 )
 
 @LLMDescription("A cast vibe skeleton, or the reason the cast was refused.")
@@ -65,6 +67,12 @@ private fun refuse(message: String) = VibeCastResult(ok = false, message = messa
 /** The skeleton without its default values: about half the size, and [vibeApplyJson] decodes it back the same. */
 internal val vibeCastJson = Json(from = vibeApplyJson) { encodeDefaults = false }
 
+private fun stepCountClause(stepCount: Int): String = when (stepCount) {
+    64 -> "stepCount 64: a Fill lick plays up to 16 beats (4 bars)"
+    32 -> "stepCount 32: a Fill lick plays up to 8 beats (2 bars)"
+    else -> "stepCount $stepCount: a one-bar loop, 4 beats"
+}
+
 /** Validates [args] against [savedMode] and casts; every refusal names the valid set. */
 internal fun castVibe(args: VibeCastArgs, savedMode: String?, rollSeed: () -> Long = { Random.nextLong() }): VibeCastResult {
     val modes = CastMode.entries.joinToString(" or ") { it.name }
@@ -88,10 +96,10 @@ internal fun castVibe(args: VibeCastArgs, savedMode: String?, rollSeed: () -> Lo
     }
     val seed = args.seed ?: rollSeed()
     return try {
-        val cast = VibeCaster.cast(CastRequest(mode, seed, tags.toSet(), pins))
+        val cast = VibeCaster.cast(CastRequest(mode, seed, tags.toSet(), pins, args.leadLine))
         VibeCastResult(
             ok = true,
-            message = "Cast ${cast.mode.name} with seed ${cast.seed}. Edit this skeleton (name, frame, arrangement, tweaks) and apply it.",
+            message = "Cast ${cast.mode.name} with seed ${cast.seed}, ${stepCountClause(cast.vibe.stepCount)}. Edit this skeleton (name, frame, arrangement, tweaks) and apply it.",
             seed = cast.seed,
             mode = cast.mode.name,
             summary = cast.summary,
