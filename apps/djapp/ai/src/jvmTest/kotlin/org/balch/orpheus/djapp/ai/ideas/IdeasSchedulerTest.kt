@@ -39,8 +39,76 @@ class IdeasSchedulerTest {
         }
     }
 
-    private fun TestScope.scheduler(generator: IdeasGenerator) =
-        IdeasScheduler(backgroundScope, generator, clock = { testScheduler.currentTime })
+    private fun TestScope.scheduler(generator: IdeasGenerator, active: Boolean = true) =
+        IdeasScheduler(backgroundScope, generator, clock = { testScheduler.currentTime }, active = active)
+
+    @Test
+    fun foldedMakesNoCalls() = runTest {
+        val gen = FakeGenerator { ideas("x") }
+        val s = scheduler(gen, active = false)
+
+        s.onTurnStarted()
+        s.onTurnEnded(input("turn"))
+        s.onUserMove { input("move") }
+        advanceTimeBy(20_000)
+        runCurrent()
+        assertEquals(0, gen.calls.size)
+    }
+
+    @Test
+    fun openingRefreshesAndClosingStops() = runTest {
+        val gen = FakeGenerator { ideas(it.vibeSummary) }
+        val s = scheduler(gen, active = false)
+
+        s.setActive(true) { input("open") }
+        runCurrent()
+        assertEquals(listOf("open"), gen.calls.map { it.vibeSummary })
+        assertEquals(ideas("open"), s.ideas.value)
+
+        s.setActive(false) { input("close") }
+        s.onTurnEnded(input("turn"))
+        s.onUserMove { input("move") }
+        advanceTimeBy(20_000)
+        runCurrent()
+        assertEquals(1, gen.calls.size, "folded again: no calls")
+        assertEquals(ideas("open"), s.ideas.value, "the last ideas stay for the next open")
+    }
+
+    @Test
+    fun openingDuringTurnWaitsForItsEnd() = runTest {
+        val gen = FakeGenerator { ideas(it.vibeSummary) }
+        val s = scheduler(gen, active = false)
+
+        s.onTurnStarted()
+        s.setActive(true) { input("open") }
+        runCurrent()
+        assertEquals(0, gen.calls.size)
+
+        s.onTurnEnded(input("end"))
+        runCurrent()
+        assertEquals(listOf("end"), gen.calls.map { it.vibeSummary })
+    }
+
+    @Test
+    fun closingCancelsTheCallInFlight() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val gen = FakeGenerator { gate.await(); ideas(it.vibeSummary) }
+        val s = scheduler(gen)
+
+        s.onTurnEnded(input("a"))
+        runCurrent()
+        s.onTurnEnded(input("b"))
+        s.setActive(false) { input("close") }
+        runCurrent()
+        assertEquals(0, gen.inFlight, "the call was cancelled")
+
+        // Reopening starts afresh; the cancelled call's queued follow-up is gone.
+        gate.complete(Unit)
+        s.setActive(true) { input("reopen") }
+        runCurrent()
+        assertEquals(listOf("a", "reopen"), gen.calls.map { it.vibeSummary })
+        assertEquals(ideas("reopen"), s.ideas.value)
+    }
 
     @Test
     fun refreshesAfterTurn() = runTest {

@@ -130,8 +130,6 @@ private fun ChatColumnContent(
     onCollapse: (() -> Unit)?,
 ) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
-    // Held here so a fold outlives the strip leaving while the ideas are empty.
-    var ideasOpen by rememberSaveable { mutableStateOf(true) }
     var headerBottom by remember { mutableIntStateOf(0) }
     val overlay = rememberOverlayFocus()
     val closeSettings = {
@@ -165,11 +163,12 @@ private fun ChatColumnContent(
                 onCollapse = onCollapse,
                 modifier = Modifier.onSizeChanged { headerBottom = it.height },
             )
-            if (state.ideas.isNotEmpty()) {
+            // Shown even with no ideas yet: they are made only once the user unfolds it.
+            if (state.isKeySet) {
                 IdeasStrip(
                     ideas = state.ideas,
-                    open = ideasOpen,
-                    onOpenChange = { ideasOpen = it },
+                    open = state.ideasOpen,
+                    onOpenChange = actions.setIdeasOpen,
                     onTry = actions.tryIdea,
                     modifier = Modifier.fillMaxWidth().testTag(CHAT_IDEAS_TAG),
                 )
@@ -356,7 +355,7 @@ internal fun ChatButton(
     )
 }
 
-/** Two or three idea cards above the conversation, each with Try; the label folds them away. */
+/** Two or three idea cards above the conversation, each with Try; the label unfolds them on demand. */
 @Composable
 private fun IdeasStrip(
     ideas: List<Idea>,
@@ -385,7 +384,10 @@ private fun IdeasStrip(
                 modifier = Modifier.size(legibleDp(16.dp)).rotate(if (open) 90f else 0f),
             )
             Text("Ideas", style = chatStyle(LegibleText.SECONDARY, ChatInk.dim, FontWeight.SemiBold), modifier = Modifier.weight(1f))
-            if (!open) Text("${ideas.size}", style = chatStyle(LegibleText.SECONDARY, ChatInk.dim))
+            if (!open && ideas.isNotEmpty()) Text("${ideas.size}", style = chatStyle(LegibleText.SECONDARY, ChatInk.dim))
+        }
+        if (open && ideas.isEmpty()) {
+            Text("Thinking up ideas…", style = chatStyle(LegibleText.SECONDARY, ChatInk.dim))
         }
         if (open) {
             for (idea in ideas.take(3)) {
@@ -468,6 +470,7 @@ private fun ChatColumnPreview() {
                     feed = previewFeed,
                     nextId = 5,
                     ideas = listOf(Idea("Add a breakdown before the drop", "Add a breakdown before the drop", mix = false)),
+                    ideasOpen = true,
                 ),
             ),
             showMixerToggle = false,

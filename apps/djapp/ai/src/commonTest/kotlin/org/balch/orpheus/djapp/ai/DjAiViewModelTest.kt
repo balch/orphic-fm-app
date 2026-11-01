@@ -521,7 +521,12 @@ class DjAiViewModelTest {
     @Test
     fun userMovesFeedIdeasOnlyWhileTheSheetIsOpen() = runTest {
         val calls = mutableListOf<IdeasInput>()
-        val ideas = IdeasScheduler(backgroundScope, IdeasGenerator { calls += it; emptyList() }, clock = { testScheduler.currentTime })
+        val ideas = IdeasScheduler(
+            backgroundScope,
+            IdeasGenerator { calls += it; emptyList() },
+            clock = { testScheduler.currentTime },
+            active = true,
+        )
         val rig = ChatRig()
         val input = IdeasInput(mixerOpen = false, vibeSummary = "", mixSnapshot = "", recentMoves = emptyList(), recentChat = emptyList())
         fun move(open: Boolean, origin: EditOrigin = EditOrigin.USER) =
