@@ -216,6 +216,11 @@ class TabParserTest {
         assertEquals(listOf(45, 48, 48, 45, 48, 48), twice.map { it.midi }); assertEquals(listOf(1f, 2.5f, 0.5f, 1f, 2.5f, 0.5f), twice.map { it.beats })
     }
 
+    @Test fun powerChordRootsSetTheKeyNotTheirFifths() {
+        val r = parseSongReference(TabParserFixtures.CHUG_IN_A.joinToString("\n"))
+        assertEquals("notes", r.key!!.from); assertEquals(RootNote.A, r.key!!.rootNote, r.key!!.name)
+    }
+
     @Test fun lowercaseLowEStaysInItsSystem() {
         val lowE = RIFF_BARS.dropLast(1) + RIFF_BARS.last().replaceFirst("E|", "e|")
         val sys = findTabSystems(lowE).single()

@@ -228,6 +228,16 @@ internal object TabParserFixtures {
         E|-----|-----------------|
     """.trimIndent().lines()
 
+    // An A5 chug in eighths that walks up and ends on the low E: every dyad's top note is the fifth, E.
+    val CHUG_IN_A = """
+        e|-----------------|-----------------|
+        B|-----------------|-----------------|
+        G|-----------------|-----------------|
+        D|-2-2-2-2-2-2-2-2-|-2-2-2-2---------|
+        A|-0-0-0-0-0-0-0-0-|-0-0-0-0-5-7-----|
+        E|-----------------|-------------0---|
+    """.trimIndent().lines()
+
     // Eight strokes four columns apart (4 Am then 4 D), no separator after the label and only a closing bar.
     val SKANK_NO_BARS = """
         e--0---0---0---0---2---2---2---2----|
