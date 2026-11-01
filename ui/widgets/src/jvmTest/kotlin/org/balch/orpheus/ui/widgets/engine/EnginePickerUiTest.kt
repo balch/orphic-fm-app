@@ -314,6 +314,33 @@ class EnginePickerUiTest {
         }
     }
 
+    /** A mouse drag across the chip row scrolls it, and the chip under the press is not picked. */
+    @OptIn(InternalComposeUiApi::class, ExperimentalComposeUiApi::class)
+    @Test
+    fun mouseDragScrollsTheChipRow() {
+        val scene = ImageComposeScene(1024, 768, Density(1f)) {
+            Host(current = EngineChoice.Engine(OrpheusEngineId.VA), onPick = {})
+        }
+        try {
+            scene.render()
+            scene.render()
+            scene.tap(scene.node("p"))
+            scene.render()
+            // The popover is its own layer, so its nodes are placed by window bounds.
+            val startLeft = scene.node("p-chip-TEXTURE").boundsInWindow.left
+            val from = scene.node("p-chip-HARMONIC").boundsInWindow.center
+            scene.sendPointerEvent(PointerEventType.Press, from); scene.render()
+            for (step in 1..10) {
+                scene.sendPointerEvent(PointerEventType.Move, from.copy(x = from.x - step * 15f)); scene.render()
+            }
+            scene.sendPointerEvent(PointerEventType.Release, from.copy(x = from.x - 150f)); scene.render()
+            assertTrue(scene.node("p-chip-TEXTURE").boundsInWindow.left < startLeft - 100f, "the row followed the drag")
+            assertEquals(false, scene.node("p-chip-HARMONIC").config.getOrNull(SemanticsProperties.Selected))
+        } finally {
+            scene.close()
+        }
+    }
+
     private fun hasTestTagPrefix(prefix: String) =
         androidx.compose.ui.test.SemanticsMatcher("tag starts with $prefix") {
             it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true

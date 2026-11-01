@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -403,6 +406,11 @@ private fun ChipRow(state: EnginePickerState, tag: String) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxWidth()
+            // Desktop lazy rows ignore mouse drags; touch drags are taken by the row's own scroll first.
+            .draggable(
+                state = rememberDraggableState { delta -> rowState.dispatchRawDelta(-delta) },
+                orientation = Orientation.Horizontal,
+            )
             .drawWithContent {
                 drawContent()
                 if (rowState.canScrollForward) {
