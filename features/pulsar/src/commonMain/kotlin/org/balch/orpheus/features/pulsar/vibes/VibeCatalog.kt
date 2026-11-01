@@ -159,6 +159,7 @@ object VibeCatalog {
         VibeNames.SYMPHONY_NO_5 to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "electro", "riff")),
         VibeNames.JUPITER to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
         VibeNames.SIMIAN_SWAGGER to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        VibeNames.ALBATROSS_SONAR to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
     )
 
     /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */
