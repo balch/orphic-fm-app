@@ -77,8 +77,8 @@ are in the vibe's source); you cannot call it.
 
 ## Capture
 
-Saves the Mixer's edits: levels, pans, sends and macro moves, for the whole vibe and per section.
-Mutes and solos are not saved. `mix_capture` does the same. Capture works in the desktop and
+Saves the Mixer's edits: levels, pans, sends and macro moves, for the whole vibe and per section,
+plus the sound edits made with `pulsar_edit_vibe`. Mutes and solos are not saved. `mix_capture` does the same. Capture works in the desktop and
 Android apps; on iOS it reports that it is not available yet.
 
 - Capture writes a capture file for the developer and adds a "Captured" checkpoint to History. It
@@ -86,19 +86,25 @@ Android apps; on iOS it reports that it is not available yet.
 - The changes under a checkpoint are saved in its file, and a new edit of the same control starts
   a new change above it. With no uncaptured changes, Capture adds nothing.
 - Mixes persist per vibe: loading another vibe keeps this one's changes, and they come back when
-  the same unchanged vibe loads again, even after the app restarts. A re-apply of an edited vibe
-  (for example a new `levelDb`) starts with a clean mix; capture files stay on disk.
+  the same unchanged vibe loads again, even after the app restarts. A sound edit, or an apply
+  under the playing vibe's name, keeps them; a new vibe starts with a clean mix. Capture files
+  stay on disk.
 - The app also captures before and after your turn when you change the mix, as "before: ..." and
   "after: ..." checkpoints, so the user can go back to the mix from before.
 
 ## History
 
-The Changes button opens History: every mix change since the vibe loaded, newest first. Now is at
+The Changes button opens History: every mix and sound change since the vibe loaded, newest first. Now is at
 the top, and File (the vibe as loaded) at the bottom.
 
 - **A change** is one level, pan, send or macro move, whole vibe or section. Each row says who made
   it ("you" is the user, "Orpheus" is you, "Claude Code" is a change over MCP), the control ("TEXT · level"), before → after, where it applies, and how long ago. A drag folds into
   one change. Mutes, solos, section jumps, the loop and the editing scope are not changes.
+- **A sound change** is one field of the vibe that you changed with `pulsar_edit_vibe` (or an
+  apply under the playing vibe's name): an engine, a knob, a section's setting, a lick, the
+  tempo. Each changed field is its own row, with before → after ("KEYS · EDM engine", MST →
+  STR). Its dot works like a mix change's, but turning it off or on restarts the song. Hear and
+  roll back on a point play or restore the sound rows too, and restart the song when they differ.
 - **"writes N values"** on a change opens the file values Capture will write because of it: the
   values that would differ with it off. One whole-vibe move can write several (the vibe's value and
   each section that sets its own). A covered or off change writes nothing.
@@ -127,7 +133,8 @@ first, one entry per name (the newest version), with the day it was saved. Tap o
 They never join the automatic rotation. The trash icon asks "Delete <name>?" before it removes one.
 
 Because the list keeps one entry per name, give each new vibe its own name; applying a new vibe
-under an old name replaces that entry.
+under an old name replaces that entry. Applying under the name of the vibe that plays now is an
+edit instead: it lands in History and writes no new entry.
 
 ## From an AI vibe to a vibe in the app's catalog
 

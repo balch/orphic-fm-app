@@ -1,6 +1,6 @@
 ---
 name: orphic-mcp
-description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like, on the desktop app or on an Android phone (adb forward), or wants Claude to make a new vibe in the running app (pulsar_vibe_guide, pulsar_cast_vibe, pulsar_apply_vibe). Covers launching the app, connecting over MCP, the tools, making a vibe, the mixing workflow, raw audio and troubleshooting.
+description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like, on the desktop app or on an Android phone (adb forward), or wants Claude to make a new vibe in the running app (pulsar_vibe_guide, pulsar_cast_vibe, pulsar_apply_vibe) or change the sound of the playing one (pulsar_edit_vibe). Covers launching the app, connecting over MCP, the tools, making a vibe, the mixing workflow, raw audio and troubleshooting.
 ---
 
 # Orphic MCP
@@ -42,7 +42,8 @@ disown
 - `vibe_list`, `vibe_load`, `transport`: pick a vibe, and play, pause or read state.
 - `pulsar_vibe_guide`: the composition guide, plus a catalog of shipped vibes for ideas only.
 - `pulsar_cast_vibe`: rolls an 8-track skeleton. Args `mode` (BED_FIXED or ALL_ROLLED; omit for the user's saved mode), `seed` (omit for a random roll), `styleTags` (rock, electro, ambient, reggae, psych, funk) and `pins` (`{track, role, engine}`). Returns `seed`, `summary` (one line per track) and `vibeJson`.
-- `pulsar_apply_vibe`, `pulsar_get_vibe`, `pulsar_vibe_schema`, the other `pulsar_*` tools, `start_composition`: the rest of the vibe-authoring tools.
+- `pulsar_edit_vibe`: change fields of the playing vibe, keeping the rest. `edits: [{path, value}]`, where `path` is like `tracks[2].engineEdm.harmonics` or `arrangement.sections[3].trackOverrides.2.morph` and `value` is JSON text (a string carries its own quotes: `"\"MAJOR\""`). Each changed field becomes a History row (shown as yours, Claude Code), the vibe keeps its name and mix rows, and the song restarts. It refuses the Mixer's fields (levels, pans, sends, the four macros, section macro and ramp multipliers, delay settings: use `mix_set`) and any change to the section or track structure (offer a brand new vibe instead). MCP edits get no before/after captures; call `mix_capture` yourself around an idea.
+- `pulsar_apply_vibe`, `pulsar_get_vibe`, `pulsar_vibe_schema`, the other `pulsar_*` tools, `start_composition`: the rest of the vibe-authoring tools. A `pulsar_apply_vibe` under the playing vibe's name is recorded as an edit too: no archive is written, and its mixer changes are dropped and named.
 - `agent_errors`: the in-app agent's last 100 failures, newest last: AGENT (LLM/API error or a crash in the run), TOOL (a tool call that threw or had bad arguments) and VIBE (`pulsar_apply_vibe` rejections). `clear: true` empties it after reading. MCP only; the in-app agent never sees it.
 - `ai_cost`: what the in-app AI has spent, per song (the vibe playing when each turn ended) per model, plus recent rows: one per agent turn or ideas refresh, with real provider token counts and a USD estimate from `AiPrices` (`core/ai/.../AiPricing.kt`). `song` filters. MCP only. The same rows are in `~/.config/orpheus-dj/ai-usage/turns.jsonl`; `python3 -I scripts/ai/cost_report.py` prints the per-song baseline from that file without the app running.
 - `audio_analyze`: record the next 0.5-15 s (default 5) and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo. `stems` and `kinds` narrow it.
@@ -86,10 +87,10 @@ The `aiDebug` build of Orphic DJ on a phone or emulator runs the same server. Th
 The same loop the in-app agent follows (its "Creating Pulsar vibes" prompt in `OrpheusAgentConfig.kt`), driven over MCP:
 
 1. **New vibe:** `pulsar_vibe_guide`, then `pulsar_cast_vibe`. Pass `styleTags` from the request and `pins` for anything the user named (a part or an engine on a track). Never copy a shipped vibe: `pulsar_get_vibe` with a shipped name is for borrowing an idea only.
-2. **Tweak of the vibe playing now** ("slower", "swap the lead to a bell"): `pulsar_get_vibe` with `'current'`, change only what was asked, and go to step 4. Do not cast.
+2. **Tweak of the vibe playing now** ("slower", "swap the lead to a bell", "make the pipes a thin guitar"): `pulsar_get_vibe` with `'current'`, then one `pulsar_edit_vibe` with only the fields that change. Say what changed and let the user listen before the next idea. Do not cast. The guide's section 14 has the loop and which fields shape a sound or a section arc; section 15 has what each kind of vibe uses.
 3. **Compose on the skeleton** per the guide: the frame (`name`, `bpm`, `rootNote`, `scaleType`), the groove, the progression (`genre.customProgression`), the melodies, the arrangement's sections and the effects. Keep the guide's section B rules and the skeleton's `cast` block (it records the roll, so the archived vibe can be cast again). Invent an original name (no real artist, band, song or album).
 4. **`pulsar_apply_vibe`** with the complete JSON. It applies and plays at once. On `success: false`, fix the JSON per the message and apply again.
-5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. A re-apply of an edited vibe (a `levelDb` change) starts with a clean mix, so call `mix_capture` first to write the user's edits to a capture file. The guide's section 11 has the targets and the pass in full.
+5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. For loudness, change `levelDb` with `pulsar_edit_vibe`: the mix stays. The guide's section 11 has the targets and the pass in full.
 6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. The user may be mixing at the same time, so see the next section for the rules your edits follow. `mix_capture` saves the mix as a capture file and a checkpoint; the vibe and the song are untouched.
 
 The in-app agent is capped per turn (3 applies and 12 mix edits; `TurnBudget`). MCP calls are exempt, since no agent turn ever resets them, so the cap is yours to keep: stick to one or two passes and let the user judge.
@@ -103,7 +104,7 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 - **Pins:** the user can pin a strip in the Mixer. Edits to a pinned strip are refused with `PINNED`, over MCP too, and the message says the user pinned it. Do not retry: ask the user. `mix_reset` skips pinned strips. Pins last until the user unpins or another vibe loads.
 - **Moves made mid-turn:** the in-app agent skips a control the user just moved (`USER_MOVED`). MCP has no turn, so this does not apply: your edit lands and overwrites the user's value. Read before you set, and leave a control alone if the user is on it.
 - **The Mixer need not be open** for MCP edits (`MIXER_CLOSED` is for the in-app agent), but the user sees nothing move unless it is. Say what you changed.
-- **Loads keep the mix:** change sets persist per vibe and come back when the same unchanged vibe loads again. A re-apply of an edited vibe starts clean (capture files stay on disk). Pins clear on a load. Only Clear All and `mix_clear_changes` empty a change set.
+- **Loads keep the mix:** change sets persist per vibe and come back when the same unchanged vibe loads again. A `pulsar_edit_vibe` edit or a same-name apply keeps them; a new vibe starts clean (capture files stay on disk). Pins clear on a load. Only Clear All and `mix_clear_changes` empty a change set.
 - Your edits flash on the strips like the in-app agent's, and the in-app agent sees them marked (Claude Code).
 
 ## Mixing workflow
@@ -112,7 +113,7 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 2. `mix_set` one change at a time. Use `scope: section` to fix one section only.
 3. Ask the user to listen. They judge the sound, not you.
 4. `mix_read` again to confirm the numbers and the meters. To check the sound itself, `audio_analyze` for numbers, `audio_capture` plus Python for anything deeper (`soundfile` or `scipy.io.wavfile` read 32-bit float).
-5. When the user likes it, `mix_capture`. It returns the rows and the file path.
+5. When the user likes it, `mix_capture`. It returns the rows and the file path. Sound edits made with `pulsar_edit_vibe` ride along as `vibeRows`.
 6. Hand the file to the `apply-mix-capture` skill. It edits the vibe's Kotlin source (or the `ai-vibes/` JSON for an AI vibe), then clears the change set with `mix_clear_changes`.
 
 ## Gotchas
