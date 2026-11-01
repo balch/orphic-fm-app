@@ -68,6 +68,15 @@ if (providers.gradleProperty("showKraken").orNull.toBoolean()) {
     }
 }
 
+// The AI edition ships every vibe (see :features:pulsar's orphic.liveVibesOnly).
+if (providers.gradleProperty("orphic.liveVibesOnly").orNull == "true") {
+    tasks.configureEach {
+        if (name.startsWith("linkReleaseFrameworkIos")) {
+            doFirst { throw GradleException("AI release framework ships every vibe; drop -Porphic.liveVibesOnly=true") }
+        }
+    }
+}
+
 // Nor the Pulsar grid's track editing (see :apps:djapp:shared's trackEdit).
 if (providers.gradleProperty("trackEdit").orNull.toBoolean()) {
     tasks.configureEach {

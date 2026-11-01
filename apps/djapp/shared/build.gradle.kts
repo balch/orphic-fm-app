@@ -135,6 +135,68 @@ listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
         }
     }
 
+// The OG iOS app links this framework, so its release links ship only LIVE vibes
+// (see :features:pulsar's orphic.liveVibesOnly). :apps:djapp:ai refuses the switch.
+val liveVibesOnly = providers.gradleProperty("orphic.liveVibesOnly").orNull == "true"
+if (!liveVibesOnly) {
+    tasks.configureEach {
+        if (name.startsWith("linkReleaseFrameworkIos")) {
+            doFirst { throw GradleException("OG release framework needs -Porphic.liveVibesOnly=true") }
+        }
+    }
+}
+
+// Reads the linked binary's symbol table (local symbols too: Kotlin classes link as `s`/`t`, e.g.
+// `_kclass:<fqcn>`). A removed class hits on its own name or any nested `.`/`$` name under it.
+listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
+    .forEach { (linkSuffix, kmpTarget) ->
+        val link = "linkReleaseFramework$linkSuffix"
+        val verify = tasks.register("verifyOgFrameworkHasOnlyLiveVibes$linkSuffix") {
+            group = "verification"
+            description = "Fails if the $kmpTarget OG release framework links a non-LIVE vibe class."
+
+            val binary = layout.buildDirectory.file("bin/$kmpTarget/releaseFramework/DjAppShared.framework/DjAppShared")
+            val removableList = rootProject.layout.projectDirectory.file("features/pulsar/build/vibe-trace/removable-classes.txt")
+            dependsOn(link, ":features:pulsar:printRemovableVibes")
+            inputs.file(binary)
+            inputs.file(removableList)
+
+            doLast {
+                val liveControl = "org.balch.orpheus.features.pulsar.vibes.DogHouseVibe"
+                val removable = removableList.asFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                require(removable.isNotEmpty()) { "Empty removable-classes list at ${removableList.asFile}" }
+                val watched = removable + liveControl
+                val nm = ProcessBuilder("nm", binary.get().asFile.absolutePath).redirectErrorStream(true).start()
+                val hits = mutableMapOf<String, String>()
+                val nameToken = Regex("[A-Za-z_][A-Za-z0-9_$.]*")
+                nm.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { line ->
+                        nameToken.findAll(line).forEach { match ->
+                            val token = match.value
+                            // The token itself, then each prefix that ends before a `.` or `$`.
+                            val owners = sequenceOf(token) +
+                                token.indices.asSequence().filter { token[it] == '.' || token[it] == '$' }.map { token.substring(0, it) }
+                            owners.firstOrNull { it in watched }?.let { hits.putIfAbsent(it, line.trim()) }
+                        }
+                    }
+                }
+                check(nm.waitFor() == 0) { "nm failed on ${binary.get().asFile}" }
+                require(liveControl in hits) {
+                    "Expected LIVE $liveControl in the $kmpTarget framework symbols; this check would pass against any binary"
+                }
+                val kept = (hits.keys - liveControl).sorted()
+                if (kept.isNotEmpty()) {
+                    throw GradleException(
+                        "OG $kmpTarget framework links non-LIVE vibe classes (build with -Porphic.liveVibesOnly=true):\n" +
+                            kept.joinToString("\n") { "  - $it   e.g. ${hits.getValue(it)}" },
+                    )
+                }
+            }
+        }
+        // Without the switch the link already throws; a second error from verify would only confuse.
+        if (liveVibesOnly) tasks.named(link) { finalizedBy(verify) }
+    }
+
 // The jvmTest guard sees only the JVM runtime classpath. This sees every target, and names the
 // configuration carrying the GPL module rather than just reporting that a class is present.
 tasks.register("checkGplIsolation") {
