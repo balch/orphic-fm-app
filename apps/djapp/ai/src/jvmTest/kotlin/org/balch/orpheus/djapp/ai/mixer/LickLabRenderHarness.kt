@@ -15,9 +15,14 @@ import org.balch.orpheus.djapp.ai.licklab.Take
 import org.balch.orpheus.djapp.ai.licklab.TakeNote
 import org.balch.orpheus.djapp.ai.licklab.TrackChip
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
+import org.balch.orpheus.features.pulsar.bench.ChannelMeter
+import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 import kotlin.test.Test
 
 /** Writes Lick Lab inside the wide mixer to build/djapp-render/mixer; asserts nothing (run with -PrenderHarness). */
@@ -32,8 +37,25 @@ class LickLabRenderHarness {
                     muted = false, soloed = false, silenced = false)
             },
         ),
-        EMPTY_METERS,
+        MeterSnapshot(
+            lufsShort = -14.0, lufsIntegrated = -14.5, preClipPeakDb = -1.0, pastKneePct = 0.0, correlation = 0.8,
+            channels = BenchMeters.CHANNEL_NAMES.mapIndexed { c, name ->
+                ChannelMeter(name, relLu = -4.0, peakDb = -6.0, pan = 0.0, subPct = 0.0, lowPct = 0.0, wave = wave(c))
+            },
+            section = 1,
+        ),
     )
+
+    // A different envelope per channel, so the wave row reads as audio.
+    private fun wave(c: Int): FloatArray {
+        val w = FloatArray(400)
+        for (j in 0 until 200) {
+            val env = 0.15f + 0.85f * abs(sin(j * PI.toFloat() * (c % 4 + 1) / 200f + c * 0.7f))
+            w[2 * j] = -0.8f * env
+            w[2 * j + 1] = 0.8f * env * (0.7f + 0.3f * sin(j * 1.3f + c))
+        }
+        return w
+    }
 
     // B minor from B3: degrees 0..6 are B C# D E F# G A.
     private val bMinor = listOf(0, 2, 3, 5, 7, 8, 10)
@@ -50,6 +72,11 @@ class LickLabRenderHarness {
         scale = bMinor,
         poolSize = 2,
         chordRootDegree = 5,
+        // Half way through the hint window: the next chord (degree 3, E minor) a half beat off.
+        nextChordRootDegree = 3,
+        changeBeat = 10.5,
+        hintWindowBeats = 1.0,
+        boost = true,
         heldMidi = 62,
         tracks = listOf(3, 4, 5, 6).map { TrackChip(it, BenchMeters.CHANNEL_NAMES[it], "SPK/MST") },
         callNotes = listOf(
@@ -66,7 +93,7 @@ class LickLabRenderHarness {
         ),
     )
 
-    private val lab = object : LickLabFeature {
+    private fun feature(state: LickLabUiState) = object : LickLabFeature {
         override val stateFlow: StateFlow<LickLabUiState> = MutableStateFlow(state)
         override val actions: LickLabActions = LickLabActions.EMPTY
         override fun currentBeat() = 10.0
@@ -77,7 +104,9 @@ class LickLabRenderHarness {
         }
     }
 
-    private fun render(name: String, w: Int, h: Int) {
+    private val lab = feature(state)
+
+    private fun render(name: String, w: Int, h: Int, lab: LickLabFeature = this.lab) {
         val scene = ImageComposeScene(w * 2, h * 2, Density(2f)) {
             OrpheusTheme { AiMixerPanel(mixer, Modifier.fillMaxSize(), lickLab = lab) }
         }
@@ -95,4 +124,8 @@ class LickLabRenderHarness {
     @Test fun desktop() = render("lick_lab_1280x800", 1280, 800)
 
     @Test fun narrowWide() = render("lick_lab_700x560", 700, 560)
+
+    // The zip almost home, its band straddling the lap's start at top centre: the lap anchors on the 0 ms frame
+    // and the last frame renders at 80 ms, so 0.19 beat (95 ms) to the change puts that frame at 0.97 of the lap.
+    @Test fun zipEnd() = render("lick_lab_zip_end", 1280, 800, feature(state.copy(changeBeat = 10.19)))
 }

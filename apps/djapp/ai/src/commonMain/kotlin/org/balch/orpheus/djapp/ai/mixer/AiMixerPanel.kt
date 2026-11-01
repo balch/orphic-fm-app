@@ -285,7 +285,6 @@ private fun WideMixer(
                             actions,
                             oneRow = width >= HEADER_ONE_ROW_MIN,
                             tight = tight,
-                            lickLab = lickLab?.actions?.let { LickLabToggle(lickShown, it::toggleShown) },
                             onChanges = {
                                 if (changesOpen) {
                                     closeChanges()
@@ -305,13 +304,18 @@ private fun WideMixer(
                             flashes = flashes,
                             aboveChips = scopeToggle,
                             underLastChip = { SectionReadoutLine(readout) },
+                            underLoop = lickLab?.actions?.let { lab ->
+                                {
+                                    MixerButton("Lick Lab", lab::toggleShown, Modifier.testTag(LICK_LAB_TOGGLE_TAG), primary = lickShown)
+                                }
+                            },
                         )
                         if (state.sectionScope) SectionPanNote()
                     }
                 },
                 strips = {
                     if (lickShown && lickLab != null) {
-                        LickLabPanel(lickLab, Modifier.fillMaxSize())
+                        LickLabPanel(lickLab, Modifier.fillMaxSize(), meters = meters)
                     } else {
                         Strips(state, meters, actions, flashes, stripWidth, wave, tight, onVoice)
                     }
@@ -362,12 +366,10 @@ private fun TopThenStrips(viewport: Dp, gap: Dp, top: @Composable () -> Unit, st
     }
 }
 
-/** The header's Lick Lab button: lit while Lick Lab replaces the strips. */
-private class LickLabToggle(val shown: Boolean, val onToggle: () -> Unit)
-
+/** The Lick Lab button, under the Loop chip and lit while Lick Lab replaces the strips. */
 internal const val LICK_LAB_TOGGLE_TAG = "mixer-lick-lab"
 
-/** Title, the Lick Lab and changes buttons, Capture and Reset; the bus readout beside them when [oneRow], else under. */
+/** Title, the changes button, Capture and Reset; the bus readout beside them when [oneRow], else under. */
 @Composable
 private fun WideHeader(
     state: AiMixerUiState,
@@ -375,7 +377,6 @@ private fun WideHeader(
     actions: AiMixerActions,
     oneRow: Boolean,
     tight: Boolean,
-    lickLab: LickLabToggle?,
     onChanges: () -> Unit,
     onRowHeight: (Int) -> Unit,
 ) {
@@ -389,7 +390,6 @@ private fun WideHeader(
             Title(state.vibeName, state.aiCostUsd, Modifier.weight(1f))
             if (oneRow) BusReadout(meters)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                lickLab?.let { MixerButton("Lick Lab", it.onToggle, Modifier.testTag(LICK_LAB_TOGGLE_TAG), primary = it.shown) }
                 MixerButton(changesLabel(state.historyChangeCount), onChanges, Modifier.testTag(HISTORY_TAG))
                 MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
                 MixerButton("Clear All", actions.reset)
@@ -403,7 +403,8 @@ private fun WideHeader(
 
 /**
  * The macro knobs and the section chips: one row when [beside], else knobs (scrolling if cramped) over chips.
- * [aboveChips] goes right over the chips' row either way; [underLastChip] sits below it, right-aligned to the last chip.
+ * [aboveChips] goes right over the chips' row either way; [underLastChip] sits below it, right-aligned to the last chip,
+ * and [underLoop] below the Loop chip.
  */
 @Composable
 internal fun KnobsAndChips(
@@ -415,6 +416,7 @@ internal fun KnobsAndChips(
     flashes: AgentFlashes? = null,
     aboveChips: (@Composable () -> Unit)? = null,
     underLastChip: (@Composable () -> Unit)? = null,
+    underLoop: (@Composable () -> Unit)? = null,
 ) {
     @Composable
     fun chips() = SectionChips(
@@ -426,6 +428,7 @@ internal fun KnobsAndChips(
         Modifier.fillMaxWidth(),
         flashes = flashes,
         underLastChip = underLastChip,
+        underLoop = underLoop,
     )
     if (beside) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KNOBS_CHIPS_GAP)) {

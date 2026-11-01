@@ -36,6 +36,17 @@ data class LickLabUiState(
     /** Tracks with a solo melodic override, each a [LickSlot.Solo] export target. */
     val soloTracks: Set<Int> = emptySet(),
     val chordRootDegree: Int = -1,
+    val hintMode: HintMode = HintMode.Near,
+    /** Root degree of the chord a beat or so ahead while a track is armed, else -1. */
+    val nextChordRootDegree: Int = -1,
+    /** Absolute [LickClock] beat of that change, null when unknown. */
+    val changeBeat: Double? = null,
+    /** How far before [changeBeat] the hint shows: min(1 beat, chord length), 1 when the length is unknown. */
+    val hintWindowBeats: Double = 1.0,
+    /** +4 dB on the armed live track; drops with the arm. */
+    val boost: Boolean = false,
+    /** The last note played this arm, in the vibe's own key. */
+    val lastPlayedMidi: Int? = null,
     /** The sounding note in the vibe's own key, before any Kraken shift. */
     val heldMidi: Int? = null,
     val answerNotes: List<LiveNote> = emptyList(),
@@ -45,4 +56,7 @@ data class LickLabUiState(
     val tracks: List<TrackChip> = emptyList(),
     /** The Kraken shift in effect (-1 home); played notes move with it, exported degrees do not. */
     val krakenTarget: Int = -1,
-)
+) {
+    /** Where the hint measures from: the held key, else the last played, else [baseMidi]. */
+    val handMidi: Int get() = heldMidi ?: lastPlayedMidi ?: baseMidi
+}

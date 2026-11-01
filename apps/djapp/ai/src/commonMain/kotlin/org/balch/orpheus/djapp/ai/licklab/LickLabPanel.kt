@@ -10,7 +10,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +45,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -72,8 +75,12 @@ import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.copyPlainText
 import org.balch.orpheus.djapp.ai.mixer.MixerButton
 import org.balch.orpheus.djapp.ai.mixer.MixerInk
+import org.balch.orpheus.djapp.ai.mixer.MixerWave
+import org.balch.orpheus.djapp.ai.mixer.NO_WAVE
 import org.balch.orpheus.djapp.ai.mixer.mixText
+import org.balch.orpheus.djapp.ai.mixer.waveOf
 import org.balch.orpheus.djapp.legible
+import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.PI
@@ -91,21 +98,42 @@ private val BODY_MIN_HEIGHT = 160.dp
 private val KEY_STRIP_HEIGHT = 64.dp
 private val TAKES_WIDTH = 270.dp
 
+private val GRID_LABEL_WIDTH = 40.dp
+private val GRID_LAST_WIDTH = 84.dp
+private val GRID_GAP = 6.dp
+private val WAVE_HEIGHT = 28.dp
+
+private val BOOST_INK = OrpheusColors.evoGold
 private val CALL_INK = OrpheusColors.galaxyStarBlue
 private val ANSWER_INK = OrpheusColors.mixerFxAmber
 private val ROOT_INK = OrpheusColors.neonMagenta
 
 internal fun takeTag(id: Long, what: String) = "lick-take-$id-$what"
 
+internal fun playChipTag(track: Int) = "lick-lab-play-$track"
+
+internal fun callChipTag(track: Int) = "lick-lab-call-$track"
+
+internal fun waveCellTag(track: Int) = "lick-lab-wave-$track"
+
+internal fun hintModeTag(mode: HintMode) = "lick-lab-hint-${mode.name.lowercase()}"
+
+internal const val BOOST_TAG = "lick-lab-boost"
+
 internal const val FOLLOWS_CHORDS_MARK = "follows chords: paste may transpose"
 
 /**
  * Lick Lab in the mixer's strips area: track, caller and slot pickers, the call (top) and answer (bottom)
  * constellation, the takes and the key strip. The surface holds keyboard focus while shown; [animate] scrolls the
- * constellation every frame (off in tests, which would never go idle).
+ * constellation every frame (off in tests, which would never go idle). [meters] feeds the track waves.
  */
 @Composable
-fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate: Boolean = true) {
+fun LickLabPanel(
+    feature: LickLabFeature,
+    modifier: Modifier = Modifier,
+    animate: Boolean = true,
+    meters: State<MeterSnapshot>? = null,
+) {
     val live = feature.stateFlow.collectAsState()
     // Everything but the notes, which change every viz frame and are read only while drawing.
     val ui by remember(live) { derivedStateOf { live.value.copy(answerNotes = emptyList(), callNotes = emptyList()) } }
@@ -134,6 +162,7 @@ fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate
         }
     }
     val beatNow = remember(feature) { { feature.currentBeat() } }
+    val msPerBeat = remember(feature) { { feature.msPerBeat() } }
 
     // Scrolls only while there is something to scroll: an armed track, a caller or notes still in the window.
     val frame = remember { mutableLongStateOf(0L) }
@@ -158,7 +187,7 @@ fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LickHeader(ui, actions)
+        LickHeader(ui, actions, meters)
         Row(Modifier.weight(1f).fillMaxWidth().minIntrinsicHeight(BODY_MIN_HEIGHT), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Constellation(live, beatNow, frame, Modifier.weight(1f).fillMaxHeight())
             Takes(ui, feature, copiedNote, Modifier.width(TAKES_WIDTH).fillMaxHeight())
@@ -166,6 +195,7 @@ fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate
         val keys = remember(ui.keyMode, ui.baseMidi, ui.scale) { stripKeys(ui.keyMode, ui.baseMidi, ui.scale) }
         val chordRoot = ui.chordRootDegree
         val n = ui.scale.size
+        val hint = keyHint(ui, keys)
         KeyStrip(
             keys,
             ui.heldMidi,
@@ -174,6 +204,11 @@ fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate
             actions = actions,
             onPress = { requester.requestFocus() },
             modifier = Modifier.fillMaxWidth().height(KEY_STRIP_HEIGHT),
+            hint = hint,
+            beatNow = beatNow,
+            msPerBeat = msPerBeat,
+            // Null once the frame clock stops, so a flash cannot freeze on screen.
+            frame = if (animate && moving) frame else null,
         )
         if (!focused) {
             Text(
@@ -185,32 +220,49 @@ fun LickLabPanel(feature: LickLabFeature, modifier: Modifier = Modifier, animate
     }
 }
 
-/** A triad's root, third and fifth, as scale steps above the chord root. */
-private val CHORD_STEPS = setOf(0, 2, 4)
+/** One grid row: a label, a column per track and the last column, so every row lines up. */
+@Composable
+private fun GridRow(
+    label: String,
+    tracks: List<TrackChip>,
+    last: @Composable () -> Unit,
+    cell: @Composable (TrackChip, Modifier) -> Unit,
+) {
+    Row(Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GRID_GAP)) {
+        Box(Modifier.width(GRID_LABEL_WIDTH)) { if (label.isNotEmpty()) Label(label) }
+        for (t in tracks) cell(t, Modifier.weight(1f).fillMaxHeight())
+        Box(Modifier.width(GRID_LAST_WIDTH), contentAlignment = Alignment.Center) { last() }
+    }
+}
 
 @Composable
-private fun LickHeader(ui: LickLabUiState, actions: LickLabActions) {
+private fun LickHeader(ui: LickLabUiState, actions: LickLabActions, meters: State<MeterSnapshot>?) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Label("PLAY")
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (t in ui.tracks) {
-                    TrackChipView(t, selected = t.index == ui.armedTrack, selectedFill = MixerInk.accent) { actions.arm(t.index) }
-                }
+        GridRow("PLAY", ui.tracks, last = { BoostButton(ui.boost, enabled = ui.armedTrack != null, actions::toggleBoost) }) { t, m ->
+            TrackChipView(t, selected = t.index == ui.armedTrack, selectedFill = MixerInk.accent, m.testTag(playChipTag(t.index))) {
+                actions.arm(t.index)
             }
-            RecordButton(ui.recording, actions::toggleRecording)
+        }
+        GridRow("", ui.tracks, last = {}) { t, m ->
+            TrackWave(t.index, lit = t.index == ui.armedTrack, meters, m.height(WAVE_HEIGHT).testTag(waveCellTag(t.index)))
+        }
+        GridRow("CALL", ui.tracks, last = { ChoicePill("none", ui.callerTrack == null) { actions.setCaller(null) } }) { t, m ->
+            TrackChipView(
+                t,
+                selected = t.index == ui.callerTrack,
+                selectedFill = CALL_INK.copy(alpha = 0.35f),
+                m.testTag(callChipTag(t.index)),
+                // A track cannot both play and call.
+                enabled = t.index != ui.armedTrack,
+            ) {
+                actions.setCaller(if (t.index == ui.callerTrack) null else t.index)
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Label("CALL")
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                ChoicePill("none", ui.callerTrack == null) { actions.setCaller(null) }
-                for (t in ui.tracks) {
-                    if (t.index == ui.armedTrack) continue
-                    TrackChipView(t, selected = t.index == ui.callerTrack, selectedFill = CALL_INK.copy(alpha = 0.35f)) {
-                        actions.setCaller(if (t.index == ui.callerTrack) null else t.index)
-                    }
-                }
-            }
+            Label("HINT")
+            HintSwitch(ui.hintMode, actions::setHintMode)
+            Spacer(Modifier.weight(1f))
+            RecordButton(ui.recording, actions::toggleRecording)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(ui.keyLabel, style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text, FontWeight.SemiBold), maxLines = 1)
@@ -243,19 +295,90 @@ private fun Label(text: String) {
 }
 
 @Composable
-private fun TrackChipView(track: TrackChip, selected: Boolean, selectedFill: Color, onClick: () -> Unit) {
+private fun TrackChipView(
+    track: TrackChip,
+    selected: Boolean,
+    selectedFill: Color,
+    modifier: Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(6.dp)
     val color = MixerInk.tracks.getOrElse(track.index) { MixerInk.accent }
     Column(
-        Modifier
+        modifier
+            .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
             .clip(shape)
             .background(if (selected) selectedFill else MixerInk.chip)
             .border(1.dp, if (selected) color else MixerInk.line, shape)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(track.name, style = mixText(legible(LegibleText.MIXER_MIN), color, FontWeight.Bold), maxLines = 1)
-        Text(track.engine, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
+        Text(track.name, style = mixText(legible(LegibleText.MIXER_MIN), color, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.engine, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The mixer strip's own live wave for [track], lit while it is the armed track. */
+@Composable
+private fun TrackWave(track: Int, lit: Boolean, meters: State<MeterSnapshot>?, modifier: Modifier) {
+    val shape = RoundedCornerShape(6.dp)
+    val color = MixerInk.tracks.getOrElse(track) { MixerInk.accent }
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (lit) MixerInk.accent.copy(alpha = 0.35f) else Color.Transparent)
+            .border(1.dp, if (lit) MixerInk.accentSoft else Color.Transparent, shape)
+            .padding(2.dp),
+    ) {
+        MixerWave({ meters?.waveOf(track) ?: NO_WAVE }, color, Modifier.fillMaxSize())
+    }
+}
+
+/** +4 dB on the armed track while on; gold like the mockup, live only. */
+@Composable
+private fun BoostButton(on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        Modifier
+            .testTag(BOOST_TAG)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
+            .clip(shape)
+            .background(if (on) BOOST_INK else Color.Transparent)
+            .border(1.dp, BOOST_INK, shape)
+            .clickable(enabled = enabled, role = Role.Switch, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            if (on) "BOOST on" else "BOOST",
+            style = mixText(legible(LegibleText.MIXER_MIN), if (on) MixerInk.onBright else BOOST_INK, FontWeight.Bold),
+            maxLines = 1,
+        )
+    }
+}
+
+/** ROOT · NEAR · MOVE: what the next-chord hint points the hand at. */
+@Composable
+private fun HintSwitch(mode: HintMode, onMode: (HintMode) -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(Modifier.clip(shape).border(1.dp, MixerInk.line, shape)) {
+        for (m in HintMode.entries) {
+            val on = m == mode
+            Box(
+                Modifier
+                    .testTag(hintModeTag(m))
+                    .background(if (on) HINT_INK else MixerInk.chip)
+                    .clickable(role = Role.RadioButton, onClick = { onMode(m) })
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    m.name.uppercase(),
+                    style = mixText(legible(LegibleText.MIXER_MIN), if (on) MixerInk.onBright else MixerInk.text, if (on) FontWeight.Bold else FontWeight.Normal),
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 

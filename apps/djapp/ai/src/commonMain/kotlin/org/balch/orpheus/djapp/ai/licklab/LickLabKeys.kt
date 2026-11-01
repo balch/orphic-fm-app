@@ -16,9 +16,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.State
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -42,7 +55,10 @@ import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.mixer.MixerInk
 import org.balch.orpheus.djapp.ai.mixer.mixText
 import org.balch.orpheus.djapp.legible
+import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sign
 
 internal const val LICK_LAB_TAG = "lick-lab"
@@ -151,14 +167,21 @@ internal fun KeyStrip(
     actions: LickLabActions,
     onPress: () -> Unit,
     modifier: Modifier = Modifier,
+    hint: KeyHint? = null,
+    beatNow: () -> Double = { 0.0 },
+    msPerBeat: () -> Double = { 500.0 },
+    frame: State<Long>? = null,
 ) {
     val latestKeys by rememberUpdatedState(keys)
     val latestOnPress by rememberUpdatedState(onPress)
     val deadZone = with(LocalDensity.current) { BEND_DEAD_ZONE.toPx() }
+    val flash = remember { HintFlash() }
+    val lap = remember { ZipLap() }
     Row(
         modifier
             .testTag(KEY_STRIP_TAG)
             .graphicsLayer { alpha = if (focused) 1f else 0.45f }
+            .keyHints(keys.size, hint, beatNow, msPerBeat, frame, flash, lap)
             .pointerInput(actions) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -202,6 +225,230 @@ internal fun KeyStrip(
         keys.forEachIndexed { i, key ->
             StripKeyCell(key, lit = key.midi == heldMidi, chordTone = isChordTone(key), Modifier.weight(1f).testTag(stripKeyTag(i)))
         }
+    }
+}
+
+/**
+ * The next chord on the keys: [tones] (key indices) and [preferred] light over the [windowBeats] before [changeBeat],
+ * an absolute [LickClock] beat.
+ */
+@Immutable
+internal data class KeyHint(val changeBeat: Double, val windowBeats: Double, val tones: Set<Int>, val preferred: Int?)
+
+/** The hint for [keys] while the next chord is known, else null. */
+internal fun keyHint(ui: LickLabUiState, keys: List<StripKey>): KeyHint? {
+    val change = ui.changeBeat ?: return null
+    val next = ui.nextChordRootDegree
+    val n = ui.scale.size
+    if (next < 0 || n == 0 || ui.hintWindowBeats <= 0.0) return null
+    val tones = keys.indices.filterTo(mutableSetOf()) { i -> keys[i].degree?.let { (it - next).mod(n) in CHORD_STEPS } == true }
+    val preferred = LickHint.pick(ui.hintMode, keys, ui.chordRootDegree, next, n, ui.handMidi)
+    return KeyHint(change, ui.hintWindowBeats, tones, preferred)
+}
+
+internal val HINT_INK = OrpheusColors.krakenTeal
+private val ZIP_GLOW = OrpheusColors.engineYellow
+private val ZIP_CORE = lerp(OrpheusColors.engineYellow, Color.White, 0.6f)
+private const val FLASH_MS = 350f
+
+/** The zip band's half width as a share of the key's border, its peak alpha, and the nested runs that taper it. */
+private const val ZIP_HALF = 0.045f
+private const val ZIP_PEAK = 0.55f
+private const val ZIP_LAYERS = 16
+
+/** The lap's opening share it takes to fade in, like the transport zip's ends. */
+private const val ZIP_FADE_IN = 0.15f
+
+/** A change estimate within this of a running lap's is the same change, matching the view model's re-anchor. */
+private const val LAP_NUDGE_BEATS = 0.25
+
+private fun easeInOut(u: Float): Float = u * u * (3f - 2f * u)
+
+/** Each of [layers] nested runs' alpha, so where all of them overlap the band reaches [peak]. */
+internal fun zipLayerAlpha(peak: Float, layers: Int): Float = 1f - (1f - peak).pow(1f / layers)
+
+/**
+ * One zip lap timed on frame time, fixed when its window opens, so beat-clock nudges never jerk it. A window
+ * opened late keeps the share already gone, so the lap still ends on the change.
+ */
+internal class ZipLap {
+    private var change = Double.NaN
+    private var startMs = 0L
+    private var endMs = 0L
+
+    /** The lap's progress 0..1 at frame time [ms], beat [now], or null outside [hint]'s window. */
+    fun progress(hint: KeyHint, now: Double, ms: Long, msPerBeat: Double): Float? {
+        // A running lap rides out the small nudges the change estimate gets, instead of restarting backwards.
+        val nudged = ms < endMs && abs(hint.changeBeat - change) <= LAP_NUDGE_BEATS
+        if (hint.changeBeat != change && !nudged) {
+            if (now < hint.changeBeat - hint.windowBeats || now >= hint.changeBeat) return null
+            change = hint.changeBeat
+            endMs = ms + ((hint.changeBeat - now) * msPerBeat).toLong()
+            startMs = endMs - (hint.windowBeats * msPerBeat).toLong().coerceAtLeast(1L)
+        }
+        if (ms >= endMs) return null
+        return ((ms - startMs).toFloat() / (endMs - startMs)).coerceIn(0f, 1f)
+    }
+}
+
+/** Draw-phase memory of the change the zip last ran toward, so the flash fires once the clock passes it. */
+internal class HintFlash {
+    var pendingBeat = 0.0
+    var pendingKey = -1
+    var key = -1
+    var startMs = 0L
+
+    /**
+     * Moves to beat [now] and frame time [ms], null while the frame clock is stopped (which ends any flash), and
+     * returns the flash's progress 0..1 on [key], or null with none showing.
+     */
+    fun step(hint: KeyHint?, now: Double, ms: Long?, count: Int): Float? {
+        if (ms == null) {
+            pendingKey = -1
+            key = -1
+            return null
+        }
+        // A change the clock has passed fires before the next hint can replace it.
+        if (pendingKey >= 0 && now >= pendingBeat) {
+            // A change passed long ago (the panel was idle) never flashes late.
+            if (now - pendingBeat < 0.5) {
+                key = pendingKey
+                startMs = ms
+            }
+            pendingKey = -1
+        }
+        if (hint == null) {
+            // Retracted before its change: that change may not land.
+            pendingKey = -1
+        } else if (hint.preferred != null && now >= hint.changeBeat - hint.windowBeats && now < hint.changeBeat) {
+            pendingBeat = hint.changeBeat
+            pendingKey = hint.preferred
+        }
+        if (key < 0) return null
+        val t = (ms - startMs) / FLASH_MS
+        if (t !in 0f..1f || key >= count) {
+            key = -1
+            return null
+        }
+        return t
+    }
+}
+
+/**
+ * Teal inset borders on the next chord's keys, rising over the window; one zip lap around the preferred key from
+ * top centre, back there on the change; then a soft gold flash. Reads the clock only while drawing.
+ */
+private fun Modifier.keyHints(
+    count: Int,
+    hint: KeyHint?,
+    beatNow: () -> Double,
+    msPerBeat: () -> Double,
+    frame: State<Long>?,
+    flash: HintFlash,
+    lap: ZipLap,
+): Modifier =
+    if (count == 0) this else drawWithCache {
+        val keyW = size.width / count
+        val h = size.height
+        val line = 2.5.dp.toPx()
+        // One border for the teal and the zip, so the zip rides the teal line instead of running beside it.
+        val border = keyBorder(keyW, h, line / 2 + 1.dp.toPx(), 4.dp.toPx())
+        val measure = PathMeasure().apply { setPath(border, true) }
+        val length = measure.length
+        val zip = Path()
+        val tealStroke = Stroke(1.5.dp.toPx())
+        val glow = Stroke(4.5.dp.toPx(), cap = StrokeCap.Round)
+        val core = Stroke(line, cap = StrokeCap.Round)
+        val ring = 2.dp.toPx()
+        val ringStroke = Stroke(ring)
+        val corner = 4.dp.toPx()
+        onDrawWithContent {
+            drawContent()
+            val ms = frame?.value
+            val now = beatNow()
+            val t = flash.step(hint, now, ms, count)
+            if (hint != null) {
+                val start = hint.changeBeat - hint.windowBeats
+                if (now >= start && now < hint.changeBeat) {
+                    val p = ((now - start) / hint.windowBeats).toFloat().coerceIn(0f, 1f)
+                    val teal = HINT_INK.copy(alpha = 0.3f + 0.7f * p)
+                    for (i in hint.tones) translate(left = i * keyW) { drawPath(border, teal, style = tealStroke) }
+                    val u = if (ms == null) null else lap.progress(hint, now, ms, msPerBeat())
+                    if (hint.preferred != null && u != null) {
+                        // One eased lap from top centre, back there on the change. Nested continuous runs, shortest
+                        // last, stack into a band brightest at its centre with no seams between pieces.
+                        val centre = easeInOut(u) * length
+                        val half = ZIP_HALF * length
+                        val peak = ZIP_PEAK * (u / ZIP_FADE_IN).coerceAtMost(1f)
+                        val a = zipLayerAlpha(peak, ZIP_LAYERS)
+                        translate(left = hint.preferred * keyW) {
+                            zip.reset()
+                            segment(measure, length, centre - half, centre + half, zip)
+                            drawPath(zip, ZIP_GLOW.copy(alpha = peak * 0.12f), style = glow)
+                            for (k in ZIP_LAYERS downTo 1) {
+                                val w = half * k / ZIP_LAYERS
+                                zip.reset()
+                                segment(measure, length, centre - w, centre + w, zip)
+                                drawPath(zip, ZIP_CORE.copy(alpha = a), style = core)
+                            }
+                        }
+                    }
+                }
+            }
+            if (t != null) {
+                val e = (1f - t) * (1f - t)
+                val x = flash.key * keyW
+                drawRect(ZIP_GLOW.copy(alpha = 0.25f * e), Offset(x, 0f), Size(keyW, h))
+                for (r in 1..3) {
+                    val d = r * ring
+                    drawRoundRect(
+                        ZIP_GLOW.copy(alpha = 0.6f * e / r),
+                        Offset(x - d, -d),
+                        Size(keyW + 2 * d, h + 2 * d),
+                        CornerRadius(corner + d),
+                        style = ringStroke,
+                    )
+                }
+            }
+        }
+    }
+
+/** A rounded rect [inset] into a [w] by [h] key, starting at top centre and running clockwise. */
+private fun keyBorder(w: Float, h: Float, inset: Float, radius: Float): Path {
+    val l = inset
+    val t = inset
+    val r = w - inset
+    val b = h - inset
+    val c = radius.coerceAtMost(min(r - l, b - t) / 2)
+    return Path().apply {
+        moveTo(w / 2, t)
+        lineTo(r - c, t)
+        arcTo(Rect(r - 2 * c, t, r, t + 2 * c), -90f, 90f, false)
+        lineTo(r, b - c)
+        arcTo(Rect(r - 2 * c, b - 2 * c, r, b), 0f, 90f, false)
+        lineTo(l + c, b)
+        arcTo(Rect(l, b - 2 * c, l + 2 * c, b), 90f, 90f, false)
+        lineTo(l, t + c)
+        arcTo(Rect(l, t, l + 2 * c, t + 2 * c), 180f, 90f, false)
+        close()
+    }
+}
+
+/**
+ * The border from [from] to [to] (either may run past an end of the lap) into [out]. A run across the lap's start
+ * continues as one path, so no cap lands on the seam.
+ */
+private fun segment(measure: PathMeasure, length: Float, from: Float, to: Float, out: Path) {
+    when {
+        from < 0f -> {
+            measure.getSegment(length + from, length, out, true)
+            measure.getSegment(0f, to, out, false)
+        }
+        to > length -> {
+            measure.getSegment(from, length, out, true)
+            measure.getSegment(0f, to - length, out, false)
+        }
+        else -> measure.getSegment(from, to, out, true)
     }
 }
 

@@ -36,6 +36,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -225,6 +226,26 @@ class LickLabViewModelTest {
         writes.clear()
         r.vm.actions.keyDown(Key.A)
         assertEquals(1f, value("track_4_live_gate"))
+    }
+
+    @Test
+    fun `a restart of the same vibe keeps the armed track, caller, slot and boost`() = labTest {
+        val r = shownAndArmed()
+        r.vm.actions.setCaller(5)
+        val slot = r.vm.stateFlow.value.slot
+        r.vm.actions.toggleBoost()
+        r.vm.actions.keyDown(Key.A)
+        writes.clear()
+        r.pulsar.applyVibe(r.pulsar.vibeFlow.value)
+        runCurrent()
+        val s = r.vm.stateFlow.value
+        assertEquals(4, s.armedTrack)
+        assertEquals(5, s.callerTrack)
+        assertEquals(slot, s.slot)
+        assertEquals(true, s.boost)
+        assertNull(s.heldMidi)
+        assertEquals(1f, value("track_4_live_active"))
+        assertEquals(1.585f, value("track_4_live_boost"))
     }
 
     @Test
@@ -451,5 +472,196 @@ class LickLabViewModelTest {
         r.pulsar.applyVibe(drums)
         runCurrent()
         assertNull(r.vm.stateFlow.value.callerTrack)
+    }
+
+    @Test
+    fun `boost writes the gain and 1 and needs an armed track`() = labTest {
+        val r = rig()
+        r.vm.actions.toggleShown()
+        r.vm.actions.toggleBoost()
+        assertEquals(false, r.vm.stateFlow.value.boost)
+        r.vm.actions.arm(4)
+        writes.clear()
+        r.vm.actions.toggleBoost()
+        assertEquals(listOf("track_4_live_boost" to 1.585f), writes)
+        assertEquals(true, r.vm.stateFlow.value.boost)
+        r.vm.actions.toggleBoost()
+        assertEquals("track_4_live_boost" to 1f, writes.last())
+        assertEquals(false, r.vm.stateFlow.value.boost)
+    }
+
+    private fun TestScope.boosted(): Rig = shownAndArmed().also {
+        it.vm.actions.toggleBoost()
+        writes.clear()
+    }
+
+    private fun assertBoostDropped(r: Rig, track: Int = 4) {
+        assertEquals(false, r.vm.stateFlow.value.boost)
+        assertEquals(1f, value("track_${track}_live_boost"))
+    }
+
+    @Test
+    fun `boost drops on disarm`() = labTest {
+        val r = boosted()
+        r.vm.actions.disarm()
+        assertBoostDropped(r)
+    }
+
+    @Test
+    fun `boost drops on hide`() = labTest {
+        val r = boosted()
+        r.vm.actions.toggleShown()
+        assertBoostDropped(r)
+    }
+
+    @Test
+    fun `boost follows a switch to another track and drops on another vibe`() = labTest {
+        val r = boosted()
+        r.vm.actions.arm(5)
+        assertEquals(1f, value("track_4_live_boost"))
+        assertEquals(1.585f, value("track_5_live_boost"))
+        assertEquals(true, r.vm.stateFlow.value.boost)
+        writes.clear()
+        r.pulsar.applyVibe(r.pulsar.vibeList[1])
+        runCurrent()
+        assertBoostDropped(r, 5)
+    }
+
+    @Test
+    fun `boost drops when the armed track is armed again`() = labTest {
+        val r = boosted()
+        r.vm.actions.arm(4)
+        assertBoostDropped(r)
+    }
+
+    @Test
+    fun `the clearing of the view model drops the boost port`() = labTest {
+        val r = boosted()
+        scope.cancel()
+        runCurrent()
+        assertEquals(1f, value("track_4_live_boost"))
+    }
+
+    @Test
+    fun `the next chord and its beat come from the viz while armed`() = labTest {
+        val r = shownAndArmed()
+        advanceTimeBy(1000)
+        val now = r.vm.currentBeat()
+        viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = 1.5f)
+        runCurrent()
+        val s = r.vm.stateFlow.value
+        assertEquals(3, s.nextChordRootDegree)
+        assertEquals(now + 1.5, s.changeBeat!!, 0.05)
+        viz.value = PulsarVizData(nextChordRootDegree = -1, beatsToChordChange = -1f)
+        runCurrent()
+        assertEquals(-1, r.vm.stateFlow.value.nextChordRootDegree)
+        assertNull(r.vm.stateFlow.value.changeBeat)
+    }
+
+    @Test
+    fun `polls counting down to the same change leave the state unchanged`() = labTest {
+        val r = shownAndArmed()
+        advanceTimeBy(1000)
+        val target = r.vm.currentBeat() + 2.0
+        viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = 2f)
+        runCurrent()
+        val first = r.vm.stateFlow.value
+        // Each poll is late by up to 1/32 beat, as the monitor's rounding and staleness make it.
+        repeat(20) { i ->
+            advanceTimeBy(16)
+            val late = (1 + i % 3) / 128.0
+            viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = (target - r.vm.currentBeat() + late).toFloat())
+            runCurrent()
+            assertSame(first, r.vm.stateFlow.value)
+        }
+        assertEquals(target, first.changeBeat!!, 0.05)
+    }
+
+    @Test
+    fun `a new next chord or a real jump re-anchors the change`() = labTest {
+        val r = shownAndArmed()
+        advanceTimeBy(1000)
+        val now = r.vm.currentBeat()
+        viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = 2f)
+        runCurrent()
+        viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = 1f)
+        runCurrent()
+        assertEquals(now + 1.0, r.vm.stateFlow.value.changeBeat!!, 0.05)
+        viz.value = PulsarVizData(nextChordRootDegree = 5, beatsToChordChange = 1.1f)
+        runCurrent()
+        assertEquals(now + 1.1, r.vm.stateFlow.value.changeBeat!!, 0.05)
+    }
+
+    @Test
+    fun `no hint is shown while nothing is armed`() = labTest {
+        val r = rig()
+        r.vm.actions.toggleShown()
+        runCurrent()
+        viz.value = PulsarVizData(nextChordRootDegree = 3, beatsToChordChange = 1.5f)
+        runCurrent()
+        assertEquals(-1, r.vm.stateFlow.value.nextChordRootDegree)
+        assertNull(r.vm.stateFlow.value.changeBeat)
+    }
+
+    @Test
+    fun `the hand is the held key then the last played then degree 0`() = labTest {
+        val r = shownAndArmed()
+        assertEquals(71, r.vm.stateFlow.value.handMidi)
+        r.vm.actions.keyDown(Key.S)
+        val held = r.vm.stateFlow.value.heldMidi!!
+        assertEquals(held, r.vm.stateFlow.value.handMidi)
+        r.vm.actions.keyUp(Key.S)
+        assertEquals(held, r.vm.stateFlow.value.handMidi)
+        assertEquals(held, r.vm.stateFlow.value.lastPlayedMidi)
+        r.vm.actions.setHintMode(HintMode.Move)
+        assertEquals(HintMode.Move, r.vm.stateFlow.value.hintMode)
+    }
+
+    private fun TestScope.windowAfter(vararg samples: Pair<Int, Float>): Double {
+        val r = shownAndArmed()
+        samples.forEach { (chord, left) ->
+            viz.value = PulsarVizData(chordRootDegree = chord, nextChordRootDegree = 3, beatsToChordChange = left)
+            runCurrent()
+        }
+        return r.vm.stateFlow.value.hintWindowBeats
+    }
+
+    @Test
+    fun `a half beat chord gives a half beat window`() = labTest {
+        assertEquals(0.5, windowAfter(0 to 0.5f, 0 to 0.25f), 1e-6)
+    }
+
+    @Test
+    fun `a four beat chord gives a two beat window`() = labTest {
+        assertEquals(2.0, windowAfter(0 to 4f, 0 to 1f), 1e-6)
+    }
+
+    @Test
+    fun `a two beat chord gives a one beat window and a long one stops at two`() = labTest {
+        assertEquals(1.0, windowAfter(0 to 2f), 1e-6)
+        assertEquals(2.0, windowAfter(1 to 8f), 1e-6)
+    }
+
+    @Test
+    fun `an unknown chord length gives a one beat window`() = labTest {
+        val r = shownAndArmed()
+        assertEquals(1.0, r.vm.stateFlow.value.hintWindowBeats, 1e-6)
+        assertEquals(1.0, windowAfter(0 to 0f), 1e-6)
+    }
+
+    @Test
+    fun `a late first sample keeps the longest countdown of the chord`() = labTest {
+        // First seen with 0.3 left, but an earlier sample of this chord had 0.5.
+        assertEquals(0.5, windowAfter(0 to 0.5f, 0 to 0.3f), 1e-6)
+        // The next chord starts its own count.
+        assertEquals(0.25, windowAfter(2 to 0.25f), 1e-6)
+    }
+
+    @Test
+    fun `the compact switch disarm drops the boost`() = labTest {
+        val r = boosted()
+        r.vm.actions.disarm()
+        assertBoostDropped(r)
+        assertEquals(null, r.vm.stateFlow.value.armedTrack)
     }
 }

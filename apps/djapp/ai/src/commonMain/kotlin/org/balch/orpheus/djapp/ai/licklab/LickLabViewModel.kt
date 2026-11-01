@@ -37,8 +37,10 @@ import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.Vibe
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
 
@@ -95,8 +97,15 @@ class LickLabViewModel internal constructor(
     private val call = ArrayList<LiveNote>()
     private var callSounding: Int? = null
 
+    // The chord now sounding and the longest countdown seen for it, which is its length in beats.
+    private var hintChord = -2
+    private var chordBeats = 0f
+
     // Subtracted from the clock so beat 0 of a bar is a bar line; moved only between takes.
     private var barOffset = 0
+
+    // The vibe the armed track was armed in, so a restart of it keeps the arm.
+    private var armedVibe: String? = null
 
     private var shownJob: Job? = null
     private var pulseHold: DisposableHandle? = null
@@ -114,8 +123,7 @@ class LickLabViewModel internal constructor(
             }
         }
         scope.launch(dispatchers.main) {
-            // A reload may change the key and the tracks, so it disarms.
-            pulsarFeature.vibeLoadCount.drop(1).collect { disarm() }
+            pulsarFeature.vibeLoadCount.drop(1).collect { onVibeLoad() }
         }
         scope.onCleared {
             _state.value.armedTrack?.let(live::disarm)
@@ -158,9 +166,29 @@ class LickLabViewModel internal constructor(
         }
         disarm()
         live.arm(track)
+        // Boost moves with the player onto the new track.
+        if (s.boost) live.boost(track, BOOST_GAIN)
+        armedVibe = vibe.name
         // The armed track cannot also be its own caller.
         if (s.callerTrack == track) setCaller(null)
-        _state.update { keyed(it.copy(armedTrack = track, slot = LickPitch.defaultSlotFor(vibe, track)), vibe) }
+        _state.update {
+            keyed(it.copy(armedTrack = track, slot = LickPitch.defaultSlotFor(vibe, track), boost = s.boost), vibe)
+        }
+    }
+
+    /**
+     * A restart or loop of the same vibe keeps the armed track, its slot and boost (re-armed, since the reload
+     * releases held notes); another vibe may change the key and the tracks, so it disarms.
+     */
+    private fun onVibeLoad() {
+        val s = _state.value
+        val track = s.armedTrack ?: return
+        val same = pulsarFeature.vibeFlow.value.name == armedVibe && s.tracks.any { it.index == track }
+        disarm()
+        if (!same) return
+        arm(track)
+        setSlot(s.slot)
+        if (s.boost) toggleBoost()
     }
 
     override fun setCaller(track: Int?) {
@@ -173,6 +201,15 @@ class LickLabViewModel internal constructor(
     override fun setSlot(slot: SlotRef) = _state.update { keyed(it.copy(slot = slot), vibe) }
 
     override fun setKeyMode(mode: KeyMode) = _state.update { it.copy(keyMode = mode) }
+
+    override fun setHintMode(mode: HintMode) = _state.update { it.copy(hintMode = mode) }
+
+    override fun toggleBoost() {
+        val s = _state.value
+        val track = s.armedTrack ?: return
+        live.boost(track, if (s.boost) 1f else BOOST_GAIN)
+        _state.update { it.copy(boost = !s.boost) }
+    }
 
     override fun toggleRecording() {
         if (_state.value.recording) {
@@ -341,6 +378,7 @@ class LickLabViewModel internal constructor(
         }
         closeAnswer(b)
         answer += LiveNote(home, b, degree = degreeOf(home))
+        _state.update { it.copy(lastPlayedMidi = home) }
         publishNotes(b, heldMidi = home)
     }
 
@@ -366,7 +404,14 @@ class LickLabViewModel internal constructor(
         live.disarm(track)
         if (_state.value.recording) flushTake()
         if (hadNotes) closeAnswer(beat())
-        _state.update { it.copy(armedTrack = null, heldMidi = null, answerNotes = answer.toList()) }
+        _state.update {
+            it.copy(
+                armedTrack = null, heldMidi = null, answerNotes = answer.toList(), boost = false,
+                nextChordRootDegree = -1, changeBeat = null, hintWindowBeats = 1.0, lastPlayedMidi = null,
+            )
+        }
+        hintChord = -2
+        chordBeats = 0f
     }
 
     private fun stopRecording() {
@@ -405,7 +450,36 @@ class LickLabViewModel internal constructor(
                 callSounding = midi
             }
         }
-        _state.update { it.copy(chordRootDegree = v.chordRootDegree, krakenTarget = v.krakenShift) }
+        // The engine publishes the next chord always; it is exact only while armed (the freeze), so the hint shows
+        // only then. The countdown becomes an absolute clock beat.
+        val hint = _state.value.armedTrack != null && v.nextChordRootDegree >= 0 && v.beatsToChordChange >= 0f
+        val newChord = v.chordRootDegree != hintChord
+        if (newChord) {
+            hintChord = v.chordRootDegree
+            chordBeats = 0f
+        }
+        // The poll can land late in a chord, so the largest countdown seen is the closest to its length.
+        if (hint) chordBeats = max(chordBeats, v.beatsToChordChange)
+        val held = _state.value.changeBeat
+        val estimate = b + v.beatsToChordChange
+        // Each poll is late by its staleness plus rounding, so one change keeps its earliest estimate; only a new
+        // chord or a real jump re-anchors it, which keeps the state still between changes.
+        val sameChange = hint && held != null && !newChord &&
+            v.nextChordRootDegree == _state.value.nextChordRootDegree && abs(estimate - held) <= REANCHOR_BEATS
+        _state.update {
+            it.copy(
+                chordRootDegree = v.chordRootDegree,
+                krakenTarget = v.krakenShift,
+                nextChordRootDegree = if (hint) v.nextChordRootDegree else -1,
+                changeBeat = if (!hint) null else if (sameChange && held != null) min(held, estimate) else estimate,
+                hintWindowBeats = when {
+                    sameChange -> it.hintWindowBeats
+                    // Half the chord up to 2 beats, so a bar-long chord gets an unhurried lap; a short one keeps up to 1.
+                    hint && chordBeats > 0f -> min(MAX_WINDOW_BEATS, max(min(1.0, chordBeats.toDouble()), chordBeats / 2.0))
+                    else -> 1.0
+                },
+            )
+        }
         publishNotes(b, _state.value.heldMidi)
     }
 
@@ -436,7 +510,7 @@ class LickLabViewModel internal constructor(
         LickKraken.apply(home, vibe.rootNote.noteIndex, vibe.scaleType, synthEngine.pulsarVizFlow.value.krakenShift)
             .coerceIn(0, 127).toFloat()
 
-    private fun msPerBeat(): Double {
+    override fun msPerBeat(): Double {
         val pulse = pulsarFeature.musicPulseFlow.value.msPerBeat
         if (pulse > 0f) return pulse.toDouble()
         return 60_000.0 / pulsarFeature.stateFlow.value.bpm.coerceAtLeast(1f)
@@ -474,11 +548,17 @@ class LickLabViewModel internal constructor(
         const val MAX_TAKES = 20
         // onBarLine snaps to whole beats of this bar; it assumes the bar-line poll lags under one beat.
         private const val BEATS_PER_BAR = 4
+        /** +4 dB. */
+        private const val BOOST_GAIN = 1.585f
         private const val KEY_VELOCITY = 0.8f
         private const val SLIDE_GLIDE = 0.3f
         private const val MAX_BEND = 2f
         private const val TICK_MS = 50L
         private const val WINDOW_BEATS = 8.0
+
+        // A change estimate further than this from the held one is a real move (a cut, the clock re-snapping).
+        private const val REANCHOR_BEATS = 0.25
+        private const val MAX_WINDOW_BEATS = 2.0
 
         private fun monotonicMs(): () -> Long {
             val start = TimeSource.Monotonic.markNow()

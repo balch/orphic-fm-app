@@ -16,6 +16,10 @@ interface LickLabActions {
     fun setSlot(slot: SlotRef) {}
     fun setKeyMode(mode: KeyMode) {}
     fun toggleRecording() {}
+    fun setHintMode(mode: HintMode) {}
+
+    /** +4 dB on the armed track, live only. */
+    fun toggleBoost() {}
     fun keyDown(key: Key) {}
     fun keyUp(key: Key) {}
     fun pointerDown(id: Long, midi: Int, velocity: Float) {}
@@ -44,6 +48,9 @@ interface LickLabFeature : SynthFeature<LickLabUiState, LickLabActions> {
 
     /** The Lick Lab clock now, in beats, for a canvas that scrolls each frame. */
     fun currentBeat(): Double = 0.0
+
+    /** The live beat length in ms, so an animation can run on frame time between clock nudges. */
+    fun msPerBeat(): Double = 500.0
 
     /** The take as Kotlin, exported against the vibe and slot it was played in. */
     fun kotlinFor(takeId: Long): String? = null

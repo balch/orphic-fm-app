@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -24,9 +25,11 @@ import org.balch.orpheus.djapp.ai.licklab.LickLabUiState
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class LickLabMixerTest {
@@ -62,7 +65,7 @@ class LickLabMixerTest {
     }
 
     @Test
-    fun `the header toggle swaps the strips for Lick Lab and back`() = runComposeUiTest {
+    fun `the toggle swaps the strips for Lick Lab and back`() = runComposeUiTest {
         val lab = Lab(shown = false)
         setContent { OrpheusTheme { AiMixerPanel(mixer, Modifier.requiredSize(1000.dp, 720.dp), lickLab = lab) } }
         onAllNodesWithTag(LICK_LAB_TAG).assertCountEquals(0)
@@ -78,6 +81,16 @@ class LickLabMixerTest {
         waitForIdle()
         onAllNodesWithTag(LICK_LAB_TAG).assertCountEquals(0)
         onAllNodesWithTag(stripTag(0)).assertCountEquals(1)
+    }
+
+    @Test
+    fun `the Lick Lab toggle sits under the Loop section chip`() = runComposeUiTest {
+        setContent { OrpheusTheme { AiMixerPanel(mixer, Modifier.requiredSize(1000.dp, 720.dp), lickLab = Lab(shown = false)) } }
+        val loop = onNodeWithText("Loop section").getBoundsInRoot()
+        val toggle = onNodeWithTag(LICK_LAB_TOGGLE_TAG).getBoundsInRoot()
+        assertTrue(toggle.top >= loop.bottom, "toggle top ${toggle.top} under loop bottom ${loop.bottom}")
+        assertTrue(toggle.top - loop.bottom < 24.dp, "toggle right under the loop chip")
+        assertTrue(abs((toggle.left - loop.left).value) < 12f, "toggle ${toggle.left} lines up with loop ${loop.left}")
     }
 
     @Test

@@ -66,6 +66,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
@@ -129,6 +130,9 @@ internal object MixerInk {
 
 /** Pills and chips, between the labels and the values. */
 private const val PILL_SP = 12f
+
+private const val UNDER_LOOP = "under-loop"
+private const val UNDER_LAST = "under-last"
 
 /** A strip knob's value while it is held. */
 private const val READOUT_SP = 15f
@@ -818,7 +822,7 @@ private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp
 /**
  * The Loop toggle, then the arrangement's sections in a scrolling row. The playing chip is filled, the looped one
  * outlined amber; a tap jumps at the next bar line. [underLastChip] goes on a line below, its right edge under the
- * last chip's.
+ * last chip's; [underLoop] starts that line, under the Loop chip.
  */
 @Composable
 internal fun SectionChips(
@@ -830,6 +834,7 @@ internal fun SectionChips(
     modifier: Modifier = Modifier,
     flashes: AgentFlashes? = null,
     underLastChip: (@Composable () -> Unit)? = null,
+    underLoop: (@Composable () -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     var listX by remember { mutableIntStateOf(0) }
@@ -866,15 +871,31 @@ internal fun SectionChips(
                 }
             }
         }
-        if (underLastChip != null) {
+        if (underLastChip != null || underLoop != null) {
+            val gap = 8.dp
             // Read at measure time, so a scroll or a new bar moves only this line.
-            Layout(underLastChip, Modifier.fillMaxWidth()) { measurables, constraints ->
+            Layout(
+                {
+                    if (underLoop != null) Box(Modifier.layoutId(UNDER_LOOP)) { underLoop() }
+                    if (underLastChip != null) Box(Modifier.layoutId(UNDER_LAST)) { underLastChip() }
+                },
+                Modifier.fillMaxWidth(),
+            ) { measurables, constraints ->
+                val loose = constraints.copy(minWidth = 0)
+                val loop = measurables.firstOrNull { it.layoutId == UNDER_LOOP }?.measure(loose)
+                val left = loop?.let { it.width + gap.roundToPx() } ?: 0
                 // Empty while no section plays (loading, between vibes): the readout draws nothing.
-                val p = measurables.firstOrNull()?.measure(constraints.copy(minWidth = 0)) ?: return@Layout layout(0, 0) {}
+                val p = measurables.firstOrNull { it.layoutId == UNDER_LAST }
+                    ?.measure(loose.copy(maxWidth = (constraints.maxWidth - left).coerceAtLeast(0)))
                 val info = listState.layoutInfo
                 val end = info.visibleItemsInfo.lastOrNull()?.let { minOf(it.offset + it.size, info.viewportEndOffset) } ?: 0
-                val right = (listX + end).coerceIn(minOf(p.width, constraints.maxWidth), constraints.maxWidth)
-                layout(constraints.maxWidth, p.height) { p.placeRelative(right - p.width, 0) }
+                val pw = p?.width ?: 0
+                // Right-aligned under the last chip, never over the button under Loop.
+                val right = (listX + end).coerceIn(minOf(left + pw, constraints.maxWidth), constraints.maxWidth)
+                layout(constraints.maxWidth, maxOf(loop?.height ?: 0, p?.height ?: 0)) {
+                    loop?.placeRelative(0, 0)
+                    p?.placeRelative(right - pw, 0)
+                }
             }
         }
     }
