@@ -33,6 +33,11 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class VibePresetBarTest {
 
+    private companion object {
+        const val VIBE = "A Whale's Dream"
+        const val ORIGINAL = "A Whale's Dream - OG"
+    }
+
     private val three = listOf(
         PresetRow(1, "Quiet Night", 1_000L),
         PresetRow(2, "Deep Bass", 2_000L),
@@ -82,7 +87,7 @@ class VibePresetBarTest {
         VibePresetsUiState(
             available = true,
             barShown = true,
-            vibeName = "A Whale's Dream",
+            vibeName = VIBE,
             presets = presets,
             selectedId = selectedId,
             changed = changed,
@@ -116,14 +121,14 @@ class VibePresetBarTest {
         show(holder)
         onAllNodesWithContentDescription(PRESET_DOT_PREFIX, substring = true).assertCountEquals(3)
         onNodeWithContentDescription("${PRESET_DOT_PREFIX}Deep Bass").assertIsSelected()
-        onNodeWithContentDescription(ORIGINAL_LABEL).assertIsNotSelected()
+        onNodeWithContentDescription(ORIGINAL).assertIsNotSelected()
         onNodeWithText(CAPTURE_LABEL).assertExists()
 
         // No presets and nothing changed: the original, selected, then ≡ and CAPTURE.
         holder.state.update { it.copy(presets = emptyList(), selectedId = null, changed = false) }
         waitForIdle()
         onAllNodesWithContentDescription(PRESET_DOT_PREFIX, substring = true).assertCountEquals(0)
-        onNodeWithContentDescription(ORIGINAL_LABEL).assertIsSelected()
+        onNodeWithContentDescription(ORIGINAL).assertIsSelected()
         onAllNodesWithContentDescription(NOW_DOT_DESCRIPTION).assertCountEquals(0)
         onNodeWithContentDescription(MANAGE_DESCRIPTION).assertExists()
         onNodeWithText(CAPTURE_LABEL).assertExists()
@@ -178,11 +183,11 @@ class VibePresetBarTest {
     fun manageButtonOpensManage() = runComposeUiTest {
         val holder = holder()
         show(holder)
-        onAllNodesWithText(ORIGINAL_LABEL).assertCountEquals(0)
+        onAllNodesWithText(ORIGINAL).assertCountEquals(0)
         onNodeWithContentDescription(MANAGE_DESCRIPTION).performClick()
         waitForIdle()
         onNodeWithText("PRESETS · A WHALE'S DREAM").assertExists()
-        onNodeWithText(ORIGINAL_LABEL).assertExists()
+        onNodeWithText(ORIGINAL).assertExists()
         assertTrue(holder.selected.isEmpty(), "opening the sheet also selected a preset")
     }
 
@@ -194,14 +199,14 @@ class VibePresetBarTest {
         waitForIdle()
         onNodeWithText("0 of 5").assertExists()
         // The bar's label and the sheet's row.
-        onAllNodesWithText(ORIGINAL_LABEL).assertCountEquals(2)
+        onAllNodesWithText(ORIGINAL).assertCountEquals(2)
     }
 
     @Test
     fun originalDotLoadsStraightAwayWhenNothingChanged() = runComposeUiTest {
         val holder = holder(changed = false)
         show(holder)
-        onNodeWithContentDescription(ORIGINAL_LABEL).performClick()
+        onNodeWithContentDescription(ORIGINAL).performClick()
         waitForIdle()
         assertEquals(1, holder.originalLoads)
         onAllNodesWithText(DISCARD_PROMPT).assertCountEquals(0)
@@ -211,7 +216,7 @@ class VibePresetBarTest {
     fun originalDotAsksBeforeDiscardingChanges() = runComposeUiTest {
         val holder = holder(changed = true)
         show(holder)
-        onNodeWithContentDescription(ORIGINAL_LABEL).performClick()
+        onNodeWithContentDescription(ORIGINAL).performClick()
         waitForIdle()
         assertEquals(0, holder.originalLoads, "the first tap discarded the changes")
         onNodeWithText(DISCARD_PROMPT).assertExists()
@@ -221,7 +226,7 @@ class VibePresetBarTest {
         onAllNodesWithText(DISCARD_PROMPT).assertCountEquals(0)
         assertEquals(0, holder.originalLoads, "cancel discarded the changes")
 
-        onNodeWithContentDescription(ORIGINAL_LABEL).performClick()
+        onNodeWithContentDescription(ORIGINAL).performClick()
         waitForIdle()
         onNodeWithText(DISCARD_LABEL).performClick()
         assertEquals(1, holder.originalLoads)
