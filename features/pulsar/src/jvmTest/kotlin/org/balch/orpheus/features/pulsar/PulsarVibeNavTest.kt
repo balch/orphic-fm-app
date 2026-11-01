@@ -32,6 +32,8 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.playback.PlaylistEdit
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
+import org.balch.orpheus.features.pulsar.playback.SavedVibeLibrary
 import org.balch.orpheus.features.pulsar.playback.VibePlaylistStore
 import org.balch.orpheus.features.pulsar.playback.VibeRequest
 import org.balch.orpheus.features.pulsar.playback.stepInRotation
@@ -62,6 +64,7 @@ class PulsarVibeNavTest {
         controller: SynthController = navTestController(),
         albums: AlbumCatalog = AlbumCatalog(emptyList()),
         providers: Set<VibeProvider> = vibes.mapTo(mutableSetOf()) { NavTestVibeProvider(it) },
+        saved: SavedVibeLibrary = SavedVibeLibrary.InMemory(),
     ): Pair<PulsarViewModel, PulsarSession> {
         val tempo = GlobalTempo(NavTestAudioEngine())
         val engine = SongEndingStubSynthEngine()
@@ -87,6 +90,7 @@ class PulsarVibeNavTest {
             musicPulseSource = MusicPulseSource.Silent,
             vibePlaylistStore = store,
             albumCatalog = albums,
+            savedVibeLibrary = saved,
         )
         advanceUntilIdle()
         return vm to session
@@ -320,6 +324,43 @@ class PulsarVibeNavTest {
         val first = upNext(vm).first()
         val pick = assertIs<VibeRequest.Pick>(seen.single())
         assertEquals(first, pick.vibe.name)
+    }
+
+    // ==================== Saved AI vibes ====================
+
+    @Test
+    fun pickSavedVibeGoesThroughTheNavigator() = runTest {
+        val ghost = SavedVibe("Ghost Signal", 1L, mkMinimalVibe("Ghost Signal"))
+        val (vm, session) = makeViewModelAndSession(saved = SavedVibeLibrary.InMemory(listOf(ghost)))
+        val seen = mutableListOf<VibeRequest>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { session.vibeRequests.collect { seen += it } }
+        vm.pickSavedVibe(ghost)
+        assertEquals(listOf<VibeRequest>(VibeRequest.Pick(ghost.vibe)), seen)
+    }
+
+    @Test
+    fun savedVibesNeverJoinTheRotation() = runTest {
+        val ghost = SavedVibe("Ghost Signal", 1L, mkMinimalVibe("Ghost Signal"))
+        val (vm, _) = makeViewModelAndSession(
+            vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B")),
+            saved = SavedVibeLibrary.InMemory(listOf(ghost)),
+        )
+        assertEquals(listOf(ghost), vm.savedVibesFlow.value)
+        assertEquals(listOf("A", "B"), vm.vibeNames.sorted())
+        assertEquals(listOf("A", "B"), vm.rotationFlow.value.order.sorted())
+        assertEquals(listOf("A", "B"), vm.playlistFlow.value.rotation.playing.sorted())
+    }
+
+    @Test
+    fun deleteSavedVibeLeavesThePlayingVibe() = runTest {
+        val ghost = SavedVibe("Ghost Signal", 1L, mkMinimalVibe("Ghost Signal"))
+        val (vm, _) = makeViewModelAndSession(saved = SavedVibeLibrary.InMemory(listOf(ghost)))
+        vm.actions.setVibe(ghost.vibe)
+        advanceUntilIdle()
+        vm.deleteSavedVibe("ghost signal")
+        advanceUntilIdle()
+        assertEquals(emptyList(), vm.savedVibesFlow.value)
+        assertEquals("Ghost Signal", vm.vibeFlow.value.name)
     }
 }
 

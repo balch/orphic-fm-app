@@ -54,6 +54,8 @@ data class CatalogEntry(
  * ── Future hooks (deliberately not built yet) ──────────────────────────────────────────────
  *
  * SAVED VIBES (user- or AI-created, persisted on device):
+ * - BUILT for AI vibes, deliberately NOT merged here: `SavedVibeLibrary` lists them under the
+ *   catalog in the pickers, pickable only, never in the rotation. The notes below predate that.
  * - This catalog is the natural MERGE POINT: today [curate] sees only the DI set of built-in
  *   providers; a future `VibeRepository` would join `savedVibes: List<Vibe>` (each wrapped in
  *   a trivial VibeProvider) ahead of or behind the built-ins here, so the picker/AI see one
