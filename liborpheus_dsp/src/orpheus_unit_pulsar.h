@@ -1358,6 +1358,15 @@ struct PulsarState {
 
     // Chord progression state
     PulsarChordState chord_state;
+    // Next-chord hint (VIZ_PULSAR_NEXT_CHORD). chord_clock counts track 0's chord advances;
+    // a change is named by the advance it lands on. While a track is live-armed, a change
+    // whose chord hangs on the roll holds its last-beat inputs and that advance rolls with them.
+    int64_t chord_clock = 0;
+    int64_t next_chord_target = -1;
+    int next_chord_latched = -2;          // -2 = not latched; else what the last beat shows
+    bool chord_freeze_held = false;
+    float chord_freeze_complexity = 0.0f, chord_freeze_mood = 0.0f;
+    bool next_chord_publish_off = false;  // tests only: skip the hint entirely
 
     // Elastic tempo: slow random walk
     float tempo_drift;           // current tempo offset (-0.15 to +0.15)

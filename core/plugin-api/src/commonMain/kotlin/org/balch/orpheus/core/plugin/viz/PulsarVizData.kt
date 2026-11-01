@@ -27,6 +27,8 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param activePatches Per-track DX patch index (0..31) sounding now, walk included; -1 off DX.
  * @param trackNotes Per-track sounding MIDI pitch, glide included, rounded to the semitone; -1 while the gate is low.
  * @param chordRootDegree Scale degree (0..6) of the current chord's root; -1 when none.
+ * @param nextChordRootDegree Scale degree (0..6) of the chord a beat or so ahead; -1 when none.
+ * @param beatsToChordChange Beats until that change, in 1/16-beat steps; -1 when no next chord.
  */
 data class PulsarVizData(
     val stepGates: Array<BooleanArray> = Array(NUM_TRACKS) { BooleanArray(MAX_STEPS) },
@@ -40,6 +42,8 @@ data class PulsarVizData(
     val activePatches: IntArray = IntArray(NUM_TRACKS) { -1 },
     val trackNotes: FloatArray = FloatArray(NUM_TRACKS) { -1f },
     val chordRootDegree: Int = -1,
+    val nextChordRootDegree: Int = -1,
+    val beatsToChordChange: Float = -1f,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -55,6 +59,8 @@ data class PulsarVizData(
         if (!activePatches.contentEquals(other.activePatches)) return false
         if (!trackNotes.contentEquals(other.trackNotes)) return false
         if (chordRootDegree != other.chordRootDegree) return false
+        if (nextChordRootDegree != other.nextChordRootDegree) return false
+        if (beatsToChordChange != other.beatsToChordChange) return false
         return true
     }
 
@@ -70,6 +76,8 @@ data class PulsarVizData(
         result = 31 * result + activePatches.contentHashCode()
         result = 31 * result + trackNotes.contentHashCode()
         result = 31 * result + chordRootDegree
+        result = 31 * result + nextChordRootDegree
+        result = 31 * result + beatsToChordChange.hashCode()
         return result
     }
 }

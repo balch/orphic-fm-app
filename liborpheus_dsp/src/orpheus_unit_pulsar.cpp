@@ -835,6 +835,18 @@ static void restart_progression_for_section(PulsarState* state,
     }
 }
 
+// The degree restart_progression_for_section opens `sec` on.
+static int section_first_chord_degree(const SectionParam& sec, OrpheusEngine* engine) {
+    if (sec.custom_progression_length > 0) return sec.custom_progression[0];
+    int len = 0;
+    if (engine->pulsar_custom_progression_active.load(std::memory_order_relaxed) > 0)
+        len = engine->pulsar_custom_progression_length.load(std::memory_order_relaxed);
+    const int first = engine->pulsar_custom_progression[0].load(std::memory_order_relaxed);
+    const int style = static_cast<int>(
+        engine->pulsar_genre_progression_style.load(std::memory_order_relaxed));
+    return first_chord_degree(style, len > 0 ? &first : nullptr, len);
+}
+
 // Copy the vibe-level tension atomics into state->tension. Used on initial
 // vibe load and on section entry when the current section has no tension
 // override (so prior overrides do not leak forward).
@@ -3017,6 +3029,110 @@ static void apply_live_input(PulsarTrackState& ts, const OrpheusEngine* engine, 
     }
 }
 
+static bool any_track_live_armed(const PulsarState* state) {
+    for (int t = 0; t < kNumPulsarTracks; t++)
+        if (state->tracks[t].live_armed) return true;
+    return false;
+}
+
+// Steps until track 0's loop next wraps to step 0, the boundary sections flip on;
+// -1 when its window cannot say (a resync, a half-lick window, an inverted run-on).
+static int steps_to_loop_wrap(const PulsarTrackState& ts, HalfLickMode mode) {
+    if (ts.resync_pending || ts.wrap_len <= 0 || ts.wrap_start != 0) return -1;
+    const PulsarLoopWindow win = pulsar_effective_loop_window(ts, mode);
+    if (win.start != 0) return -1;
+    if (ts.wrap_mode == HalfLickMode::JAM_INVERTED && win.len > ts.wrap_len) return -1;
+    return std::max(1, ts.wrap_len - ts.playhead);
+}
+
+// The section the next wrap flips into, as advance_section picks it after the wrap pulls
+// the conductor's requests. -1 = the wrap does not flip; -2 = it flips somewhere unknown.
+static int section_at_next_wrap(const PulsarState* state, const OrpheusEngine* engine) {
+    const ArrangementParams& arr = state->arrangement;
+    const SectionState& ss = state->section_state;
+    if (!arr.active || arr.section_count <= 1 || ss.bars_remaining > 1) return -1;
+    const int n = arr.section_count;
+    int next = (ss.next_section_planned >= 0 && ss.next_section_planned < n)
+        ? ss.next_section_planned : -2;
+    const int outro_req = engine->pulsar_arrangement_outro_request.load(std::memory_order_relaxed);
+    const bool outro = outro_req > 0 || (outro_req == 0 && ss.outro_triggered);
+    if (outro && arr.outro_index >= 0 && arr.outro_index < n) next = arr.outro_index;
+    const int sec_req = engine->pulsar_arrangement_section_request.load(std::memory_order_relaxed);
+    const int request = (sec_req > 0 && sec_req - 1 < n) ? sec_req - 1 : ss.pending_section_request;
+    if (request >= 0 && request < n) next = request;
+    return next;
+}
+
+// Whether the chord the next change lands on depends on the mutation roll: only a
+// single-chord progression, whose wrap can rewrite the chord it lands on.
+static bool chord_change_rolls(const PulsarChordState& cs) {
+    return cs.progression_length == 1;
+}
+
+// Writes the next chord change and the beats until it to VIZ_PULSAR_NEXT_CHORD and
+// VIZ_PULSAR_CHORD_BEATS_LEFT; step_frac is how far the current step has run. Peeks on
+// copies only. Armed, a roll-dependent change holds its last-beat inputs for its roll.
+static void publish_next_chord(PulsarState* state, OrpheusEngine* engine,
+                               float complexity, float mood, double step_frac) {
+    if (state->next_chord_publish_off) return;
+    const PulsarChordState& cs = state->chord_state;
+    int steps = 0;
+    int next = peek_next_chord(cs, complexity, mood, &steps);
+    bool section_flip = false;
+    if (next >= 0) {
+        if (section_jump_pending(engine, state->arrangement)) {
+            next = -1;  // a jump is a cut: it lands on the next bar line with no pre-roll
+        } else {
+            const int target_section = section_at_next_wrap(state, engine);
+            if (target_section != -1) {
+                const int wrap = steps_to_loop_wrap(state->tracks[0], state->tension.half_lick);
+                if (wrap < 0 || target_section < 0) {
+                    next = -1;
+                } else if (wrap <= steps) {
+                    steps = wrap;
+                    next = section_first_chord_degree(
+                        state->arrangement.sections[target_section], engine);
+                    section_flip = true;
+                }
+            }
+        }
+    }
+
+    const int64_t target = state->chord_clock + steps;
+    if (target != state->next_chord_target) {
+        state->next_chord_target = target;
+        state->next_chord_latched = -2;
+        state->chord_freeze_held = false;
+    }
+
+    const float steps_per_beat = static_cast<float>(cs.steps_per_bar) / 4.0f;
+    float beats = 0.0f;
+    if (next >= 0 && steps_per_beat > 0.0f) {
+        const float frac = static_cast<float>(std::clamp(step_frac, 0.0, 1.0));
+        beats = std::max(0.0f, (static_cast<float>(steps) - frac) / steps_per_beat);
+    } else {
+        next = -1;
+    }
+    // Armed, a change whose chord hangs on the roll holds the inputs it has in its last beat.
+    if (!any_track_live_armed(state) || next < 0 || section_flip || !chord_change_rolls(cs)) {
+        state->chord_freeze_held = false;
+    } else if (state->chord_freeze_held) {
+        next = peek_next_chord(cs, state->chord_freeze_complexity, state->chord_freeze_mood, &steps);
+    } else if (beats <= 1.0f) {
+        state->chord_freeze_held = true;
+        state->chord_freeze_complexity = complexity;
+        state->chord_freeze_mood = mood;
+    }
+    // Inside the last beat the hint must hold: a later answer for the same change is a guess.
+    if (beats <= 1.0f) {
+        if (state->next_chord_latched == -2) state->next_chord_latched = next;
+        else if (state->next_chord_latched != next) state->next_chord_latched = -1;
+        next = state->next_chord_latched;
+    }
+    engine->viz_rings[VIZ_PULSAR_NEXT_CHORD].write(static_cast<float>(next));
+    engine->viz_rings[VIZ_PULSAR_CHORD_BEATS_LEFT].write(beats);
+}
+
 // Copies the tracks' steps and playheads to pulsar_viz for the step grid. Audio thread only.
 static void publish_pulsar_viz(const PulsarState* state, OrpheusEngine* engine) {
     auto& viz = engine->pulsar_viz;
@@ -3205,6 +3321,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
         kraken_clear(state, engine);
         engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(kKrakenHome));
+        engine->viz_rings[VIZ_PULSAR_NEXT_CHORD].write(-1.0f);
+        engine->viz_rings[VIZ_PULSAR_CHORD_BEATS_LEFT].write(0.0f);
         // Nothing sounds while paused or muted, so the mixer falls back to the picked patch.
         for (int t = 0; t < kNumPulsarTracks; t++) {
             engine->pulsar_track_active_patch[t].store(-1, std::memory_order_relaxed);
@@ -4108,8 +4226,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Advance chord progression on track 0 step boundaries. The load
             // boundary is not an elapsed 16th, so ticking it here would put the
             // chord grid permanently one step ahead of the drum grid.
+            // While a track is live-armed, a roll-dependent change the hint named rolls with the
+            // inputs it was peeked with (publish_next_chord), so the hint is the chord that plays.
             if (t == 0 && !is_load_boundary) {
-                advance_chord(state->chord_state, complexity, mood);
+                const bool frozen = state->chord_freeze_held
+                    && state->next_chord_target == state->chord_clock + 1
+                    && any_track_live_armed(state)
+                    && chord_change_rolls(state->chord_state);
+                advance_chord(state->chord_state,
+                              frozen ? state->chord_freeze_complexity : complexity,
+                              frozen ? state->chord_freeze_mood : mood);
+                state->chord_clock++;
             }
 
             // Detect loop wrap (playhead wrapped to 0) — trigger mutation.
@@ -7270,6 +7397,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Write visualization data ──
     publish_pulsar_viz(state, engine);
     engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(state->kraken_effective));
+    {
+        const double step_len = step_is_odd ? (samples_per_step - swing_shift)
+                                            : (samples_per_step + swing_shift);
+        publish_next_chord(state, engine, complexity, mood,
+                           step_len > 0.0 ? state->clock_accumulator / step_len : 0.0);
+    }
 
     #undef PULSAR_PICK
 }

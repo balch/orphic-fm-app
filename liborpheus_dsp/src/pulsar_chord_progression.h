@@ -231,13 +231,18 @@ inline void maybe_mutate_progression(PulsarChordState& cs, float complexity, flo
 
 // ── Advance chord state by one step ───────────────────────────────────
 
-inline void advance_chord(PulsarChordState& cs, float complexity, float mood) {
-    cs.chord_step_counter++;
-    int chord_len = cs.steps_per_chord;
+// Steps the current chord lasts: its share of the bar when chords_per_bar is set.
+inline int current_chord_length(const PulsarChordState& cs) {
     if (cs.chords_per_bar > 0 && cs.steps_per_bar >= cs.chords_per_bar) {
         const int n = cs.chords_per_bar, bar = cs.steps_per_bar, j = cs.chord_in_bar;
-        chord_len = ((j + 1) * bar + n - 1) / n - (j * bar + n - 1) / n;
+        return ((j + 1) * bar + n - 1) / n - (j * bar + n - 1) / n;
     }
+    return cs.steps_per_chord;
+}
+
+inline void advance_chord(PulsarChordState& cs, float complexity, float mood) {
+    cs.chord_step_counter++;
+    const int chord_len = current_chord_length(cs);
     if (cs.chord_step_counter >= chord_len) {
         cs.chord_step_counter = 0;
         if (cs.chords_per_bar > 0) cs.chord_in_bar = (cs.chord_in_bar + 1) % cs.chords_per_bar;
@@ -255,4 +260,30 @@ inline void advance_chord(PulsarChordState& cs, float complexity, float mood) {
             }
         }
     }
+}
+
+// ── Peek at the next chord change ─────────────────────────────────────
+
+// The degree advance_chord lands on at the next change, and in *steps_left the advances
+// until then. Works on a copy, so the live chord_seed is never drawn. -1 = no progression.
+inline int peek_next_chord(const PulsarChordState& cs, float complexity, float mood,
+                           int* steps_left) {
+    if (cs.progression_length <= 0) {
+        *steps_left = 0;
+        return -1;
+    }
+    // Only the counter moves between now and the change, so jump it to the last step.
+    PulsarChordState copy = cs;
+    const int len = current_chord_length(copy);
+    *steps_left = std::max(1, len - copy.chord_step_counter);
+    copy.chord_step_counter = std::max(copy.chord_step_counter, len - 1);
+    advance_chord(copy, complexity, mood);
+    return copy.progression[copy.chord_index];
+}
+
+// The degree init_chord_progression puts first: custom_degrees[0] clamped, else the style's.
+inline int first_chord_degree(int style, const int* custom_degrees, int custom_length) {
+    if (custom_degrees != nullptr && custom_length > 0)
+        return std::clamp(custom_degrees[0], 0, 6);
+    return kProgressionTemplates[std::clamp(style, 0, kNumProgressionStyles - 1)].chords[0].degree;
 }

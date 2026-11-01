@@ -622,6 +622,7 @@ bool run_pulsar_engine_swap_tests();
 bool run_pulsar_slot_lock_tests();
 bool run_pulsar_audition_gain_tests();
 bool run_pulsar_live_input_tests();
+bool run_pulsar_chord_peek_tests();
 bool run_pulsar_grain_fx_tests();
 bool run_pulsar_lick_growth_tests();
 bool run_pulsar_complexity_calm_tests();

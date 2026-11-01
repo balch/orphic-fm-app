@@ -383,6 +383,8 @@ class SynthEngineMonitor(
             val posBuf = IntArray(1)
             var lastVoidGain = 1f
             var lastKrakenShift = -1
+            var lastNextChord = -1
+            var lastBeatsToChange = -1f
             // Previous-tick snapshots for change gating: emitting PulsarVizData
             // allocates ~16 arrays; at 60fps that is ~1000 allocs/sec even when
             // the step grid is static. Compare raw bridge buffers first and
@@ -398,6 +400,8 @@ class SynthEngineMonitor(
             val prevTrackLevels = FloatArray(PULSAR_NUM_TRACKS)
             var prevVoidGain = -1f
             var prevKrakenShift = -1
+            var prevNextChord = -1
+            var prevBeatsToChange = -1f
             var everEmitted = false
             while (isActive) {
                 nativeBridge.nativeGetPulsarViz(
@@ -433,6 +437,16 @@ class SynthEngineMonitor(
                 val krakenCount = nativeBridge.nativeGetViz(VIZ_PULSAR_KRAKEN, pulsarVizBuf, posBuf)
                 pulsarReadPos[VIZ_PULSAR_KRAKEN] = posBuf[0]
                 if (krakenCount > 0) lastKrakenShift = pulsarVizBuf[krakenCount - 1].roundToInt()
+                posBuf[0] = pulsarReadPos[VIZ_PULSAR_NEXT_CHORD]
+                val nextChordCount = nativeBridge.nativeGetViz(VIZ_PULSAR_NEXT_CHORD, pulsarVizBuf, posBuf)
+                pulsarReadPos[VIZ_PULSAR_NEXT_CHORD] = posBuf[0]
+                if (nextChordCount > 0) lastNextChord = pulsarVizBuf[nextChordCount - 1].roundToInt()
+                posBuf[0] = pulsarReadPos[VIZ_PULSAR_CHORD_BEATS_LEFT]
+                val beatsLeftCount = nativeBridge.nativeGetViz(VIZ_PULSAR_CHORD_BEATS_LEFT, pulsarVizBuf, posBuf)
+                pulsarReadPos[VIZ_PULSAR_CHORD_BEATS_LEFT] = posBuf[0]
+                // Quantised to 1/16 beat so the fall toward the change does not re-emit every poll.
+                if (beatsLeftCount > 0) lastBeatsToChange = (pulsarVizBuf[beatsLeftCount - 1] * 16f).roundToInt() / 16f
+                val beatsToChange = if (lastNextChord < 0) -1f else lastBeatsToChange
 
                 val changed = !everEmitted ||
                     lastVoidGain != prevVoidGain ||
@@ -445,7 +459,9 @@ class SynthEngineMonitor(
                     !pulsarActiveEngines.contentEquals(prevActiveEngines) ||
                     !pulsarActivePatches.contentEquals(prevActivePatches) ||
                     !pulsarTrackNotes.contentEquals(prevTrackNotes) ||
-                    chordRoot != prevChordRoot
+                    chordRoot != prevChordRoot ||
+                    lastNextChord != prevNextChord ||
+                    beatsToChange != prevBeatsToChange
 
                 if (changed) {
                     _pulsarVizFlow.value = PulsarVizData(
@@ -460,6 +476,8 @@ class SynthEngineMonitor(
                         activePatches = pulsarActivePatches.copyOf(),
                         trackNotes = pulsarTrackNotes.copyOf(),
                         chordRootDegree = chordRoot,
+                        nextChordRootDegree = lastNextChord,
+                        beatsToChordChange = beatsToChange,
                     )
                     pulsarGates.copyInto(prevGates)
                     pulsarVelocities.copyInto(prevVelocities)
@@ -469,6 +487,8 @@ class SynthEngineMonitor(
                     pulsarActivePatches.copyInto(prevActivePatches)
                     pulsarTrackNotes.copyInto(prevTrackNotes)
                     prevChordRoot = chordRoot
+                    prevNextChord = lastNextChord
+                    prevBeatsToChange = beatsToChange
                     trackLevels.copyInto(prevTrackLevels)
                     prevVoidGain = lastVoidGain
                     prevKrakenShift = lastKrakenShift
@@ -773,7 +793,9 @@ class SynthEngineMonitor(
         private const val VIZ_BEAT_PHASE = 37
         private const val VIZ_PULSAR_VOID_GAIN = 38  // Void Anomaly live gain (1.0 = idle)
         private const val VIZ_PULSAR_KRAKEN = 39  // Kraken shift in effect (-1 = home)
-        private const val VIZ_CHANNEL_COUNT = 40  // 29 + 8 pulsar tracks + beat_phase + void_gain + kraken
+        private const val VIZ_PULSAR_NEXT_CHORD = 40  // Next chord's root degree (-1 = none)
+        private const val VIZ_PULSAR_CHORD_BEATS_LEFT = 41  // Beats until that chord starts
+        private const val VIZ_CHANNEL_COUNT = 42  // 29 + 8 pulsar tracks + beat, void, kraken, next chord, beats left
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

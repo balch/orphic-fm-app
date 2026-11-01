@@ -62,5 +62,7 @@ enum VizChannel {
     VIZ_BEAT_PHASE = 37,
     VIZ_PULSAR_VOID_GAIN = 38,  // Void Anomaly's live per-block gain (1.0 = idle/no duck)
     VIZ_PULSAR_KRAKEN = 39,     // Kraken shift in effect: target index, -1 = home
+    VIZ_PULSAR_NEXT_CHORD = 40,        // degree of the next chord change, -1 = none or unknown
+    VIZ_PULSAR_CHORD_BEATS_LEFT = 41,  // beats until that change lands
     VIZ_CHANNEL_COUNT
 };

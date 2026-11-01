@@ -127,6 +127,50 @@ class SynthEngineMonitorEmissionGateTest {
     }
 
     @Test
+    fun `pulsar viz carries the next chord and quantises the beats to change`() = runTest {
+        val provider = TestDispatcherProvider(StandardTestDispatcher(testScheduler))
+        val scope = AppCoroutineScope(provider)
+        val bridge = ScriptedBridge()
+        val monitor = SynthEngineMonitor(bridge, provider, scope)
+        try {
+            val emissions = mutableListOf<PulsarVizData>()
+            backgroundScope.launch { monitor.pulsarVizFlow.collect { emissions.add(it) } }
+            monitor.startMonitoring()
+            runCurrent()
+            tick()
+            val settled = emissions.size
+            assertEquals(-1, emissions.last().nextChordRootDegree, "no next chord reads -1")
+            assertEquals(-1f, emissions.last().beatsToChordChange, "no next chord reads -1 beats")
+
+            bridge.vizValues[40] = 4f
+            bridge.vizValues[41] = 1.0f
+            tick()
+            assertEquals(settled + 1, emissions.size, "a next chord must emit")
+            assertEquals(4, emissions.last().nextChordRootDegree)
+            assertEquals(1.0f, emissions.last().beatsToChordChange)
+
+            // A fall under 1/16 beat must not re-emit at poll rate.
+            bridge.vizValues[41] = 1.02f
+            tick()
+            assertEquals(settled + 1, emissions.size, "a sub-1/16 beat change must not re-emit")
+            bridge.vizValues[41] = 0.5f
+            tick()
+            assertEquals(settled + 2, emissions.size, "half a beat on emits")
+            assertEquals(0.5f, emissions.last().beatsToChordChange)
+
+            // No next chord: beats reads -1 whatever the ring says.
+            bridge.vizValues[40] = -1f
+            bridge.vizValues[41] = 0.25f
+            tick()
+            assertEquals(-1, emissions.last().nextChordRootDegree)
+            assertEquals(-1f, emissions.last().beatsToChordChange)
+        } finally {
+            scope.cancel()
+            runCurrent()
+        }
+    }
+
+    @Test
     fun `turntable viz seeds sized silent buffer once and gates steady silence`() = runTest {
         val provider = TestDispatcherProvider(StandardTestDispatcher(testScheduler))
         val scope = AppCoroutineScope(provider)
@@ -240,6 +284,9 @@ class SynthEngineMonitorEmissionGateTest {
         var trackNote4 = -1f
         var chordRoot = -1
 
+        /** Latest value per viz ring channel; a channel left out reports no new samples. */
+        val vizValues = mutableMapOf<Int, Float>()
+
         /** Size of the buffer the monitor polls turntable viz into (129). */
         var turntableBufSize = 0
             private set
@@ -284,7 +331,11 @@ class SynthEngineMonitorEmissionGateTest {
 
         // Poll surface the monitor exercises — kept inert.
         override fun nativeGetMonitor(out: FloatArray) {}
-        override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
+        override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int {
+            val v = vizValues[channel] ?: return 0
+            outBuf[0] = v
+            return 1
+        }
         override fun nativeGetSpectrum(bands: FloatArray): Int = 0
         override fun nativeGetScope(out: FloatArray, windowMs: Float): Int = -1
 

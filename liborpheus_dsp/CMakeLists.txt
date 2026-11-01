@@ -421,6 +421,7 @@ if(BUILD_TESTS)
         test/test_pulsar_slot_lock.cpp
         test/test_pulsar_audition_gain.cpp
         test/test_pulsar_live_input.cpp
+        test/test_pulsar_chord_peek.cpp
         test/test_pulsar_grain_fx.cpp
         test/test_pulsar_lick_growth.cpp
         test/test_pulsar_complexity_calm.cpp
