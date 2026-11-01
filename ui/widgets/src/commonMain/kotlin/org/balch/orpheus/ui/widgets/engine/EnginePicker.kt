@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,9 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -50,15 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import org.balch.orpheus.core.audio.EngineCatalog
 import org.balch.orpheus.core.audio.EngineCategory
 import org.balch.orpheus.core.audio.EngineChoice
@@ -66,12 +55,8 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.viz.KeepPanelsAwake
-import org.balch.orpheus.ui.viz.LocalPanelIdleFade
-import org.balch.orpheus.ui.widgets.OrpheusSlideUpSheet
+import org.balch.orpheus.ui.widgets.popover.AnchoredPopoverOrSheet
 
-/** Below this window width the picker is a bottom-sheet list instead of a tile popover. */
-private val NarrowWindow = 600.dp
 private val PopoverWidth = 460.dp
 private val PopoverHeight = 420.dp
 private const val DEFAULT_TAG = "engine-picker"
@@ -182,7 +167,8 @@ fun EnginePicker(
 
 /**
  * The open picker. Window size, input mode, TV and recents are read here, outside the popup, so a
- * closed pill does not recompose on a resize or another pill's pick.
+ * closed pill does not recompose on a resize or another pill's pick. Wide windows get tiles in a
+ * popover, narrow ones a list sheet ([AnchoredPopoverOrSheet]).
  */
 @Composable
 private fun EnginePickerOverlay(
@@ -196,12 +182,6 @@ private fun EnginePickerOverlay(
     val recents = LocalEngineRecents.current
     val recentKeys by recents.keys.collectAsState()
 
-    // Layout comes from the window, decided here: BoxWithConstraints crashes inside a popup.
-    val density = LocalDensity.current
-    val window = LocalWindowInfo.current.containerSize
-    val windowWidth = with(density) { window.width.toDp() }
-    val windowHeight = with(density) { window.height.toDp() }
-    val narrow = window.width > 0 && windowWidth < NarrowWindow
     val initialFocus = when {
         LocalTelevisionHardware.current -> PickerFocus.Current
         LocalInputModeManager.current.inputMode == InputMode.Touch -> PickerFocus.None
@@ -221,66 +201,20 @@ private fun EnginePickerOverlay(
     }
     LaunchedEffect(recentKeys) { state.recentKeys = recentKeys }
 
-    // The sheet and the popover are their own windows, so they would not fade with the panel that opened them.
-    KeepPanelsAwake(LocalPanelIdleFade.current)
-    if (narrow) {
-        OrpheusSlideUpSheet(onDismiss = controller::close, skipPartiallyExpanded = true) {
-            EnginePickerPanel(
-                state = state,
-                layout = PickerLayout.Rows,
-                tag = tag,
-                initialFocus = initialFocus,
-                onPick = pick,
-                onDismiss = controller::close,
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f),
-            )
-        }
-    } else {
-        val gap = with(density) { 4.dp.roundToPx() }
-        val margin = with(density) { 8.dp.roundToPx() }
-        val position = remember(gap, margin) { PillPopoverPosition(gap, margin) }
-        val width = if (window.width > 0) minOf(PopoverWidth, windowWidth - 24.dp) else PopoverWidth
-        val height = if (window.height > 0) {
-            minOf(PopoverHeight, windowHeight - 24.dp).coerceAtLeast(200.dp)
-        } else {
-            PopoverHeight
-        }
-        Popup(
-            popupPositionProvider = position,
-            onDismissRequest = controller::close,
-            properties = PopupProperties(focusable = true),
-        ) {
-            EnginePickerPanel(
-                state = state,
-                layout = PickerLayout.Tiles,
-                tag = tag,
-                initialFocus = initialFocus,
-                onPick = pick,
-                onDismiss = controller::close,
-                modifier = Modifier.width(width).height(height),
-            )
-        }
-    }
-}
-
-/** Under the pill and left-aligned with it; above it when there is no room below; kept in the window. */
-private class PillPopoverPosition(private val gap: Int, private val margin: Int) : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset {
-        val maxX = (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)
-        val x = anchorBounds.left.coerceIn(margin, maxX)
-        val below = anchorBounds.bottom + gap
-        val above = anchorBounds.top - gap - popupContentSize.height
-        val y = when {
-            below + popupContentSize.height <= windowSize.height - margin -> below
-            above >= margin -> above
-            else -> (windowSize.height - popupContentSize.height - margin).coerceAtLeast(0)
-        }
-        return IntOffset(x, y)
+    AnchoredPopoverOrSheet(
+        onDismiss = controller::close,
+        popoverWidth = PopoverWidth,
+        popoverHeight = PopoverHeight,
+    ) { sheet, sizeModifier ->
+        EnginePickerPanel(
+            state = state,
+            layout = if (sheet) PickerLayout.Rows else PickerLayout.Tiles,
+            tag = tag,
+            initialFocus = initialFocus,
+            onPick = pick,
+            onDismiss = controller::close,
+            modifier = sizeModifier,
+        )
     }
 }
 
