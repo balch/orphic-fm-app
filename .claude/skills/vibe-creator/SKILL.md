@@ -361,7 +361,7 @@ Then level-match: with the balance settled, add `-16 - LUFS` to the vibe's curre
 - **"customProgression degrees must be 0..6"**: use 0 (I) through 6 (VII). Do not use negative numbers or values >= 7.
 - **Vibe does not show up in the picker**: verify the `@Inject` + `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())` annotations are both present and the class implements `VibeProvider`, and that its `VibeNames` constant is listed in `VibeCatalog.kt` (a `WIP` entry shows only on debug builds and `-Pcatalog=wip` desktop runs). Also rebuild — Metro DI code generation requires a recompile.
 - **Vibe shows no album badge or chip, or is missing from Android Auto**: it is not in `VibeCatalog.kt` (STEALTH takes every cataloged vibe no other album lists). A vibe that should be on RIF, 0-2-1 or Anomalies instead sits on STEALTH until it is listed in `AlbumCatalog.kt`.
-- **Bass wanders off-key**: `chordFollow = ROOT_ONLY` on the bass track snaps it to the chord root. Most driving grooves want this.
+- **Bass wanders off-key**: `chordFollow = ROOT_ONLY` on the bass track snaps it to the chord root. Most driving grooves want this. It also drops the notes of any lick on that track, so a bass that should sing the hook's notes wants `FOLLOW`. `chromaticStyle = ChromaticStyle.SLIDE` gives either kind approach slides.
 - **Pads sound random / nothing locks in**: set `barStrategy = REPEAT` or `MUTATE` on at least the rhythm and bass tracks; reserve `INDEPENDENT` for genuine texture layers.
 - **Lead does not follow the key**: verify the track's `role` is `TrackRole.Melodic` (not `Percussive`) and that `noteRangeLow/High` overlap with the scale notes.
 

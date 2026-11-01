@@ -300,9 +300,9 @@ consecutive sections: the verse's first half on slot 1, its second half on slot 
   then. RANDOM, the default, can fill a rest and jump to any degree. The mode covers every lick
   channel. Use CHORD_TONES for any line that sings.
 - lickOctave (-1 centres the line on the genre's noteRangeLow..noteRangeHigh, 0-8 holds it in one
-  octave) is the LEAD channel's, bassLineOctave the bass channel's. A FOLLOW or ROOT_ONLY track
-  then folds each note into the octave above its own noteRangeLow; a FIXED track plays it as
-  rendered (Register, under Lyric line). lickDegreeOffset on a track's role shifts every
+  octave) is the LEAD channel's, bassLineOctave the bass channel's. A FOLLOW track then folds
+  each note into the octave above its own noteRangeLow; a FIXED track plays it as rendered
+  (Register, under Lyric line); a ROOT_ONLY track plays only the chord root, so the line is lost. lickDegreeOffset on a track's role shifts every
   degree that track plays, so one line sounds in two places: Orphic Lore's lead plays the bass's
   line 14 degrees (two octaves) up.
 
@@ -330,8 +330,8 @@ anomaly is at most 8.
   CHORD_TONES, so the words stay put.
 - Register: high (68-79) or top (78-91), above the drones and clear of the bass (section B).
   lickOctave -1 centres the line on the genre's noteRangeLow..noteRangeHigh, not the track's (the
-  cast's genre 36-60 puts the root near 48). A FOLLOW or ROOT_ONLY track then folds each note into
-  the octave above its own noteRangeLow; a FIXED track does not. So on a FOLLOW singer (the cast's
+  cast's genre 36-60 puts the root near 48). A FOLLOW track then folds each note into the octave
+  above its own noteRangeLow; a FIXED track does not. So on a FOLLOW singer (the cast's
   kind) raise noteRangeLow and noteRangeHigh on both slots to lift the line (e.g. 68-79; the cast
   may put a singer lower, SPK always in 58-69). A FIXED singer picks its register with lickOctave
   0-8 (bassLineOctave on BASS) or lickDegreeOffset: the Sirens sing bassLineOctave 2 plus 23
@@ -616,8 +616,10 @@ still runs but its peak-time events (octave shift, chromatic passing, spurts) ar
 innerBars >= 8 if you want those moments. volume (0..1) = how much tension affects track gains;
 timing (0..1) = how much it tightens or loosens step timing. tonal.octaveShift and tonal.keyShift
 let tension briefly push the melody up an octave or shift key at the peak. tonal.chromaticPassing
-moves a random note a semitone up or down (chance = value x tension), not toward the next chord,
-and skips ROOT_ONLY tracks, which play only the root.
+moves a random note a semitone up or down (chance = value x tension), not toward the next chord.
+Each track's chromaticStyle sets how that sounds: NUDGE holds the note a semitone off for the whole
+step, SLIDE starts it a semitone off and glides onto the true note (a bassist's slide), and AUTO,
+the default, slides on ROOT_ONLY tracks and nudges on the rest.
 
 tonal.halfLick is an enum, NOT a boolean. "OFF" = the lick plays its full length. "JAM" = loop only
 the lick's first bar so the opening figure repeats while its tone evolves, then re-lock to bar 1 on
@@ -805,11 +807,12 @@ The highest-value part: translate a described feel into concrete parameter choic
 - Clean / polished: VA or PD on the bass, CHD or VA on the comp, with the moodHarmonics window mid
   (0.4-0.6) and moodTimbre low (0.2-0.4), or pinned there.
 - Round bass the MOOD knob still wahs: on PD, timbre is distortion amount (squared), so the stock
-  MELODIC moodTimbre (0.4-0.8) twangs. Give the bass its own window, moodTimbre about (0.12, 0.50),
-  and lock moodHarmonics on one step, since PD harmonics is a stepped modulator ratio and goes
-  clangy between steps: 0.235 unison (roundest), 0.477 octave, 0.50 octave with a slight shimmer,
-  0.648 octave and a fifth (nasal twang). Set evolutionWeight 0 so tension doesn't replace the
-  timbre on random steps. Don't pin it: a pin takes the knob away from MOOD. Rust Belt uses 0.50.
+  MELODIC moodTimbre (0.4-0.8) twangs and (0.12, 0.50) goes muddy. Give the bass its own window,
+  moodTimbre about (0.20, 0.60), and lock moodHarmonics on one step, since PD harmonics is a
+  stepped modulator ratio and goes clangy between steps: 0.235 unison (roundest), 0.477 octave, 0.50 octave with a slight shimmer,
+  0.648 octave and a fifth (nasal twang). evolutionWeight 0 keeps tension off the timbre; a
+  fraction blends some note-to-note wah back (Rust Belt 0.6, with no movement the bass reads as one
+  flat note). Don't pin it: a pin takes the knob away from MOOD. Rust Belt holds harmonics at 0.50.
 - Rare void / breakdown that drops to near-silence and swells back: add a `{"type":"void", ...}`
   entry to `anomalies` with probability 0.04, floorLevel ~0.05, ghostIntensity ~0.5 for a ghost of
   the arrangement flickering through (needs an arrangement). See section 9.
@@ -1025,6 +1028,8 @@ When the mix tools are available:
 - A `band` must list at least one member (rejected otherwise), and at least two of them should NOT
   be alwaysActive or the handoff has nowhere to go.
 - Bass should use chordFollow = ROOT_ONLY to stay in key (don't let it chase chord tones out of key).
+  ROOT_ONLY plays only the chord root and drops the notes of any lick on that track, so a bass
+  that should sing the hook's notes uses FOLLOW instead.
 - Use FIXED chordFollow sparingly on melodic/chordal tracks — it pins a track off the chord progression; most tracks want FOLLOW.
 - No more than one Chordal track may leave arpMode at AUTO on a non-CHD engine (see section 10) —
   the rest must say NEVER, or the vibe stacks identical arpeggios.
@@ -1059,6 +1064,8 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
 - evolution: optional drift of the pattern, a rhythmic part and a pitch part (Contour for melodic
   tracks, Voicing for chordal ones). evolutionWeight (default -1, automatic) sets how much the
   tension cycle moves the track.
+- chromaticStyle: AUTO (default), NUDGE or SLIDE, how tonal.chromaticPassing plays on the track
+  (section 6). SLIDE on a bass that carries a riff gives approach slides without wrong held notes.
 - soloBehavior and duckingProfile: how the track behaves while another band member solos.
 - Tracks 3 and 4 get a lift at mid energy instead of the notch. Track 4 is the only slot with no
   ducking.
@@ -1102,8 +1109,8 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
   window, the line back to back, and leaves the end silent; for a breath after each phrase, end it
   with a rest step.
 - lickOctave: -1 (automatic, the middle of the genre's noteRangeLow..noteRangeHigh) or 0-8 to hold
-  the lick in one octave. A FOLLOW or ROOT_ONLY track then folds each note into the octave above
-  its own noteRangeLow; a FIXED track does not.
+  the lick in one octave. A FOLLOW track then folds each note into the octave above its own
+  noteRangeLow; a FIXED track does not, and a ROOT_ONLY track drops the lick's notes for the root.
 - With lickRotation, keep a static lick as well: without an arrangement the pool falls back to one
   pick at load.
 
