@@ -197,16 +197,21 @@ static bool test_pulsar_mist_reentry_drops_stale_grains() {
     MIST_SET(grain_rate, kKeys, 0.9f);
     trigger_vibe_load(engine);
     for (int i = 0; i < 200; i++) unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
-    const int before = engine->pulsar_state->mist[kKeys].grains.CountActiveGrains();
 
-    engine->pulsar_track_engine_edm[kKeys].store(8, std::memory_order_relaxed);    // VA
-    engine->pulsar_track_engine_space[kKeys].store(8, std::memory_order_relaxed);
+    // A written engine id waits for the track's next note-on (16 steps at most), so each
+    // swap runs until it lands. The landing block already renders the new engine.
+    auto swap_to = [&](int id) {
+        engine->pulsar_track_engine_edm[kKeys].store(id, std::memory_order_relaxed);
+        engine->pulsar_track_engine_space[kKeys].store(id, std::memory_order_relaxed);
+        for (int i = 0; i < 200 && engine->pulsar_track_active_engine[kKeys].load() != id; i++)
+            unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+    };
+    swap_to(8);   // VA
+    const int before = engine->pulsar_state->mist[kKeys].grains.CountActiveGrains();
     for (int i = 0; i < 20; i++) unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
     const int frozen = engine->pulsar_state->mist[kKeys].grains.CountActiveGrains();
 
-    engine->pulsar_track_engine_edm[kKeys].store(kMistEngineId, std::memory_order_relaxed);
-    engine->pulsar_track_engine_space[kKeys].store(kMistEngineId, std::memory_order_relaxed);
-    unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+    swap_to(kMistEngineId);
     const int after = engine->pulsar_state->mist[kKeys].grains.CountActiveGrains();
 
     printf("  active grains: %d before leaving, %d frozen, %d one block after return\n",

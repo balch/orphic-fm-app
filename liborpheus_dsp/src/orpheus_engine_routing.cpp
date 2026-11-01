@@ -756,13 +756,17 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (std::strcmp(param, "engine_edm") == 0) {
                 int v = static_cast<int>(value);
                 engine->pulsar_track_engine_edm[t].store(v, std::memory_order_relaxed);
-                // Seed the active-engine mirror so the very first audio block
-                // after a vibe load doesn't read a stale 0 (which would route
-                // pulsar_delay's per-track feedback/send through the wrong slot
-                // for one block). unit_process_pulsar republishes this every
-                // block thereafter.
-                engine->pulsar_track_active_engine[t].store(v, std::memory_order_relaxed);
-                engine->pulsar_track_active_space_slot[t].store(0, std::memory_order_relaxed);
+                // Seed the active-engine mirror only while unit_process_pulsar is not
+                // publishing it (stopped or mix-gated, the same test as its early return),
+                // so a readout never sits on a stale 0. While it plays, a written id waits
+                // for the track's next note, and the mirror must keep showing the live one.
+                const bool pulsar_publishing =
+                    engine->pulsar_playing.load(std::memory_order_relaxed) != 0
+                    && engine->pulsar_mix.load(std::memory_order_relaxed) > 0.001f;
+                if (!pulsar_publishing) {
+                    engine->pulsar_track_active_engine[t].store(v, std::memory_order_relaxed);
+                    engine->pulsar_track_active_space_slot[t].store(0, std::memory_order_relaxed);
+                }
             }
             else if (std::strcmp(param, "engine_space") == 0)
                 engine->pulsar_track_engine_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
