@@ -328,6 +328,25 @@ static bool test_boost_scales_armed_track_only() {
     return ok;
 }
 
+static bool test_density_out_mutes_only_unarmed_tracks() {
+    printf("\n=== Test: a section's density 0 mutes the sequencer, never the live player ===\n");
+    Rig r(true);
+    r.run(kSettle);
+    // The flag a `density = 0` section sets on entry, on the armed track and an unarmed one.
+    r.e->pulsar_state->tracks[kTrack].section_density_out = true;
+    r.e->pulsar_state->tracks[kOther].section_density_out = true;
+    r.strike(71.0f, 1);
+    float live = 0.0f, other = 0.0f;
+    for (int b = 0; b < kBarBlocks; b++) {
+        live = std::max(live, r.block());
+        for (int i = 0; i < kFrames; i++) other = std::max(other, std::fabs(r.taps->track_l[kOther][i]));
+    }
+    const bool ok = live > 0.01f && other < 1e-4f;
+    printf("  live peak %.4f, unarmed track %d peak %.6f\n", live, kOther, other);
+    printf("Density out: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_handoff_skips_armed_track() {
     printf("\n=== Test: a solo handoff never lands on an armed track ===\n");
     BandSoloConfigParam config{};
@@ -485,6 +504,7 @@ bool run_pulsar_live_input_tests() {
     tally(test_engine_swap_waits_for_live_strike());
     tally(test_disarm_returns_to_sequencer());
     tally(test_boost_scales_armed_track_only());
+    tally(test_density_out_mutes_only_unarmed_tracks());
     tally(test_handoff_skips_armed_track());
     tally(test_track_note_readback_follows_live_note());
     tally(test_track_note_readback_includes_floor_fold());

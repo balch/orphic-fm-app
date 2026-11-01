@@ -4131,9 +4131,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             track_volume *= engine->pulsar_track_live_boost[t].load(std::memory_order_relaxed);
 
         // Track mute: zero volume but keep sequencer running. section_density_out is the
-        // active section's `density = 0` override — same treatment, cleared on exit.
+        // active section's `density = 0` override — same treatment, cleared on exit. It mutes
+        // the sequencer's notes, so a Lick Lab player is heard through it.
         bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0
-                           || ts.section_density_out;
+                           || (ts.section_density_out && !ts.live_armed);
         if (track_muted) track_volume = 0.0f;
         // Debug audition gain: a ~5 ms per-block one-pole, snapping onto its target. While it
         // moves, the buffer is ramped per sample below; a steady gain folds into the volume
