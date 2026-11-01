@@ -13,7 +13,11 @@ class LiveTrackInput(private val controller: SynthController) {
     fun disarm(track: Int) {
         int(PulsarSymbol.TRACK_0_LIVE_GATE, track, 0)
         int(PulsarSymbol.TRACK_0_LIVE_ACTIVE, track, 0)
+        float(PulsarSymbol.TRACK_0_LIVE_BOOST, track, 1f)
     }
+
+    /** Gain 1..4 on the whole live track, sends included. Live only: disarm puts it back to 1. */
+    fun boost(track: Int, gain: Float) = float(PulsarSymbol.TRACK_0_LIVE_BOOST, track, gain)
 
     /**
      * Velocity and glide land before the note, and the note before the strike, so nothing sounds stale.

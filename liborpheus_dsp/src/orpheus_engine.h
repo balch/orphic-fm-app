@@ -1301,6 +1301,8 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_track_live_strike[8] = {};
     std::atomic<float> pulsar_track_live_velocity[8] = {};
     std::atomic<float> pulsar_track_live_glide[8] = {};
+    // Gain on the whole armed track (dry and sends), 1..4. Live only; defaults to 1.0.
+    std::atomic<float> pulsar_track_live_boost[8] = {};
 
     // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
     // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the

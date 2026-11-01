@@ -1,5 +1,6 @@
 #include "orpheus_engine.h"
 #include "orpheus_graph.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -970,6 +971,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_live_velocity[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "live_glide") == 0)
                 engine->pulsar_track_live_glide[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "live_boost") == 0)
+                engine->pulsar_track_live_boost[t].store(std::clamp(value, 1.0f, 4.0f), std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_rate") == 0)
                 engine->pulsar_track_mod_lfo_rate[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_rate_space") == 0)

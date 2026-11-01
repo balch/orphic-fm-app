@@ -137,7 +137,10 @@ class LickLabViewModelTest {
         writes.clear()
         r.vm.actions.arm(4)
         assertEquals(
-            listOf("track_3_live_gate" to 0f, "track_3_live_active" to 0f, "track_4_live_active" to 1f),
+            listOf(
+                "track_3_live_gate" to 0f, "track_3_live_active" to 0f, "track_3_live_boost" to 1f,
+                "track_4_live_active" to 1f,
+            ),
             writes,
         )
         assertEquals(4, r.vm.stateFlow.value.armedTrack)
@@ -199,7 +202,7 @@ class LickLabViewModelTest {
         writes.clear()
         r.pulsar.applyVibe(r.pulsar.vibeList[1])
         runCurrent()
-        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f), writes)
+        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f), writes)
         assertNull(r.vm.stateFlow.value.armedTrack)
         assertNull(r.vm.stateFlow.value.heldMidi)
         val take = r.vm.stateFlow.value.takes.single()
@@ -230,7 +233,7 @@ class LickLabViewModelTest {
         r.vm.actions.keyDown(Key.A)
         writes.clear()
         r.vm.actions.toggleShown()
-        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f), writes)
+        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f), writes)
         assertNull(r.vm.stateFlow.value.armedTrack)
         writes.clear()
         r.vm.actions.keyDown(Key.S)

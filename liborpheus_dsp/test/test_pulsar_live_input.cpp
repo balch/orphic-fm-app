@@ -87,13 +87,20 @@ static bool test_ports_route() {
         set("live_strike", 7.0f + t);
         set("live_velocity", 0.25f);
         set("live_glide", 0.4f);
+        set("live_boost", 2.5f);
         ok &= e->pulsar_track_live_active[t].load() == 1
            && e->pulsar_track_live_note[t].load() == 60.5f + t
            && e->pulsar_track_live_gate[t].load() == 1
            && e->pulsar_track_live_strike[t].load() == 7 + t
            && e->pulsar_track_live_velocity[t].load() == 0.25f
-           && e->pulsar_track_live_glide[t].load() == 0.4f;
+           && e->pulsar_track_live_glide[t].load() == 0.4f
+           && e->pulsar_track_live_boost[t].load() == 2.5f;
     }
+    // The boost is clamped to 1..4.
+    orpheus_engine_set_port(e, kPulsar, "track_0_live_boost", 0.2f);
+    ok &= e->pulsar_track_live_boost[0].load() == 1.0f;
+    orpheus_engine_set_port(e, kPulsar, "track_0_live_boost", 9.0f);
+    ok &= e->pulsar_track_live_boost[0].load() == 4.0f;
     orpheus_engine_destroy(e);
     printf("Routing: %s\n", ok ? "PASS" : "FAIL");
     return ok;
@@ -287,6 +294,40 @@ static bool test_disarm_returns_to_sequencer() {
     return ok;
 }
 
+static bool test_boost_scales_armed_track_only() {
+    printf("\n=== Test: boost lifts the armed track about 4 dB; an unarmed track is untouched ===\n");
+    auto armed_peak = [](float boost) {
+        Rig r(true);
+        r.e->pulsar_track_live_boost[kTrack].store(boost, std::memory_order_relaxed);
+        r.run(kSettle);
+        r.strike(71.0f, 1);
+        float peak = 0.0f;
+        for (int b = 0; b < 20; b++) peak = std::max(peak, r.block());
+        return peak;
+    };
+    auto seq_peak = [](float boost) {
+        Rig r(false);
+        r.e->pulsar_track_live_boost[kTrack].store(boost, std::memory_order_relaxed);
+        float peak = 0.0f;
+        for (int b = 0; b < 4 * kBarBlocks; b++) {
+            const float p = r.block();
+            if (b >= kSettle) peak = std::max(peak, p);
+        }
+        return peak;
+    };
+    const float unity = armed_peak(1.0f);
+    const float boosted = armed_peak(1.585f);
+    const float db = 20.0f * std::log10(boosted / std::max(unity, 1e-9f));
+    const float seq_ref = seq_peak(1.0f);
+    const float seq_boosted = seq_peak(1.585f);
+    const bool ok = unity > 0.01f && std::fabs(db - 4.0f) < 0.5f
+                 && seq_ref > 0.01f && seq_boosted == seq_ref;
+    printf("  armed %.4f -> %.4f (%.2f dB), unarmed %.4f -> %.4f\n",
+           unity, boosted, db, seq_ref, seq_boosted);
+    printf("Boost: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_handoff_skips_armed_track() {
     printf("\n=== Test: a solo handoff never lands on an armed track ===\n");
     BandSoloConfigParam config{};
@@ -443,6 +484,7 @@ bool run_pulsar_live_input_tests() {
     tally(test_strike_a_block_before_gate_strikes_once());
     tally(test_engine_swap_waits_for_live_strike());
     tally(test_disarm_returns_to_sequencer());
+    tally(test_boost_scales_armed_track_only());
     tally(test_handoff_skips_armed_track());
     tally(test_track_note_readback_follows_live_note());
     tally(test_track_note_readback_includes_floor_fold());

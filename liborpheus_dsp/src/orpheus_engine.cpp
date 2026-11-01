@@ -55,6 +55,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     for (int t = 0; t < 8; t++) {
         engine->pulsar_track_live_note[t].store(60.0f, std::memory_order_relaxed);
         engine->pulsar_track_live_velocity[t].store(0.8f, std::memory_order_relaxed);
+        engine->pulsar_track_live_boost[t].store(1.0f, std::memory_order_relaxed);
     }
 
     // Vibrato rate mirrors OrpheusEngine.kt; depth stays 0 (off).

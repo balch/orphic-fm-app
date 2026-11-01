@@ -4126,6 +4126,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         else /* t == 5,6,7 */  track_volume *= pulsar_fader_to_gain(fx_gain);
         // The vibe's level trim: on every track, so the post-fader sends move with the dry mix.
         track_volume *= engine->pulsar_vibe_gain.load(std::memory_order_relaxed);
+        // The Lick Lab's boost lifts the live track's whole output, sends included.
+        if (ts.live_armed)
+            track_volume *= engine->pulsar_track_live_boost[t].load(std::memory_order_relaxed);
 
         // Track mute: zero volume but keep sequencer running. section_density_out is the
         // active section's `density = 0` override — same treatment, cleared on exit.
