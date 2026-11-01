@@ -240,7 +240,17 @@ private fun ChatHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Box(Modifier.weight(1f)) { SettingsChip(state.selectedModel.displayName, onSettings) }
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            SettingsChip(state.selectedModel.displayName, onSettings)
+            sessionCostLabel(state.sessionCostByModel, state.selectedModel.llmModel.id)?.let { label ->
+                Text(
+                    label,
+                    style = chatStyle(LegibleText.SECONDARY, ChatInk.dim),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         if (showMixerToggle) MixerSwitch(on = state.sheetMode == AiSheetMode.MIXER, onChange = onMixer)
         ChatButton("+ New", onNew)
         if (onCollapse != null) {

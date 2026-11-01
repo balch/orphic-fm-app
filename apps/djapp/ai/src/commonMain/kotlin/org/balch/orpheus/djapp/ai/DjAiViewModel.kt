@@ -41,6 +41,7 @@ import org.balch.orpheus.djapp.ai.ideas.vibeSummary
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.djapp.ai.songref.SongPasteStore
+import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
@@ -275,6 +276,7 @@ class DjAiViewModel(
     private val collab: MixCollab,
     private val collabEvents: CollabEvents,
     private val sharedTextInbox: SharedTextInbox,
+    private val costTotals: AiCostTotals,
     ideasGenerator: IdeasGenerator,
     // Lazy providers, as in MixReadTool: the feature and the AppScope controller would close a DI cycle.
     private val pulsarFeatureProvider: () -> PulsarFeature,
@@ -334,6 +336,10 @@ class DjAiViewModel(
         // CollabEvents has no replay, so it is collected here for the feature's life, never from a composable.
         scope.launch(dispatcherProvider.default) {
             collabEvents.events.collect { chat.onCollabEvent(it) }
+        }
+
+        scope.launch(dispatcherProvider.default) {
+            costTotals.sessionByModel.collect { byModel -> _uiState.update { it.copy(sessionCostByModel = byModel) } }
         }
 
         scope.launch(dispatcherProvider.default) {

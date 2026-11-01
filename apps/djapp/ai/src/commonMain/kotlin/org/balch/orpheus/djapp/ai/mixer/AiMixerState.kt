@@ -62,6 +62,8 @@ data class MixerCapture(
 @Immutable
 data class AiMixerUiState(
     val vibeName: String = "",
+    /** Estimated USD the in-app AI has spent on this vibe, across runs; null before it spends anything. */
+    val aiCostUsd: Double? = null,
     val sections: List<String> = emptyList(),
     val section: Int = -1,
     val loopSection: Int? = null,

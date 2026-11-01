@@ -1,13 +1,5 @@
 package org.balch.orpheus.djapp.ai.mixer
 
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +27,7 @@ import org.balch.orpheus.djapp.ai.tools.FakePulsar
 import org.balch.orpheus.djapp.ai.tools.OneDispatcher
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
 import org.balch.orpheus.djapp.ai.tools.vibe
+import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
@@ -43,6 +36,14 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.models.Vibe
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AiMixerViewModelTest {
@@ -95,6 +96,7 @@ class AiMixerViewModelTest {
             collab = collab,
             scope = FeatureCoroutineScope(),
             dispatchers = OneDispatcher(testDispatcher),
+            costTotals = AiCostTotals(),
         )
         backgroundScope.launch { vm.stateFlow.collect {} }
         runCurrent()

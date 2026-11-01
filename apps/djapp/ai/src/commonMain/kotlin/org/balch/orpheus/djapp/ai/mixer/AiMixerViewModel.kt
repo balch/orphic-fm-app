@@ -36,6 +36,7 @@ import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.tools.MixCaptureTool
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
+import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
@@ -71,6 +72,7 @@ class AiMixerViewModel(
     private val collab: MixCollab,
     private val scope: FeatureCoroutineScope,
     private val dispatchers: DispatcherProvider,
+    private val costTotals: AiCostTotals,
 ) : AiMixerFeature {
     private val log = logging("AiMixerViewModel")
     private val local = MutableStateFlow(Local())
@@ -118,7 +120,7 @@ class AiMixerViewModel(
                     loadedAtMs = o.hist.loadedAtMs,
                     beforeApply = o.hist.beforeApply,
                 )
-            },
+            }.combine(costTotals.songs) { s, songs -> s.copy(aiCostUsd = songs[s.vibeName]) },
         )
     }
         .flowOn(dispatchers.default)

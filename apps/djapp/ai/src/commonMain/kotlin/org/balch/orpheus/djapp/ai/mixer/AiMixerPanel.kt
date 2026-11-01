@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
+import org.balch.orpheus.djapp.ai.chat.usd
 import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
@@ -297,7 +298,7 @@ private fun WideHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Title(state.vibeName, Modifier.weight(1f))
+            Title(state.vibeName, state.aiCostUsd, Modifier.weight(1f))
             if (oneRow) BusReadout(meters)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MixerButton(changesLabel(state.historyChangeCount), onChanges, Modifier.testTag(HISTORY_TAG))
@@ -362,26 +363,27 @@ internal fun KnobsAndChips(
 }
 
 @Composable
-internal fun Header(vibeName: String, meters: State<MeterSnapshot>, stacked: Boolean) {
+internal fun Header(vibeName: String, aiCostUsd: Double?, meters: State<MeterSnapshot>, stacked: Boolean) {
     // Narrow windows put the bus readout on its own line so the vibe name keeps its room.
     // No close button: Back/Esc, the scrim and the tab bar all close the sheet.
     if (stacked) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Title(vibeName, Modifier.fillMaxWidth())
+            Title(vibeName, aiCostUsd, Modifier.fillMaxWidth())
             BusReadout(meters, textAlign = TextAlign.Start, nativeSize = 12f)
         }
         return
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Title(vibeName, Modifier.weight(1f))
+        Title(vibeName, aiCostUsd, Modifier.weight(1f))
         BusReadout(meters)
     }
 }
 
 @Composable
-internal fun Title(vibeName: String, modifier: Modifier) {
+internal fun Title(vibeName: String, aiCostUsd: Double?, modifier: Modifier) {
     Column(modifier) {
-        Text("MIXER", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim, FontWeight.SemiBold), maxLines = 1)
+        // The AI's spend on this vibe rides the small label, so the vibe name keeps its width.
+        Text("MIXER" + (aiCostUsd?.let { " · AI ${usd(it)}" } ?: ""), style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim, FontWeight.SemiBold), maxLines = 1)
         Text(
             vibeName.ifEmpty { "No vibe" },
             style = mixText(legible(LegibleText.TITLE), MixerInk.text, FontWeight.Bold),
