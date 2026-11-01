@@ -317,6 +317,37 @@ class MixBenchController(
     }
 
     /**
+     * Installs [layers] as the bench layers (history replay). Only knobs whose whole-vibe macro changed move;
+     * the rest stay where the user left them. Returns false, changing nothing, while a vibe load is not yet followed.
+     */
+    suspend fun applyLayers(layers: BenchLayers): Boolean = lock.withLock {
+        if (loadInFlight()) return@withLock false
+        val old = _layers.value
+        _layers.value = layers
+        val changed = old.diff(layers).keys
+        for (f in changed) {
+            when (f) {
+                is LayerField.VibeLevel -> owned += f.track
+                is LayerField.SectionLevel -> owned += f.track
+                else -> {}
+            }
+        }
+        pushGains()
+        val sends = changed.any {
+            it is LayerField.VibePan || it is LayerField.VibeReverb || it is LayerField.VibeDelay ||
+                it is LayerField.SectionReverb || it is LayerField.SectionDelay
+        }
+        if (sends || overlayOwned) pushOverlay()
+        if (running) {
+            for (f in changed) {
+                if (f is LayerField.VibeMacro) setKnob(f.macro, layers.vibe.macros[f.macro] ?: f.macro.vibeDefault(vibe))
+            }
+        }
+        applySectionMacros(force = true)
+        true
+    }
+
+    /**
      * The TRACKS view's reset: clears every vibe and section level, mute and solo, and hands every track's
      * audition gain back to the app. Pans, sends, macros and the overlay stay.
      */

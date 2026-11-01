@@ -716,6 +716,37 @@ class MixBenchControllerTest {
         assertEquals(0.4f, row.new, 1e-5f)
     }
 
+    @Test
+    fun applyLayersInstallsLevelsPansAndSends() = runTest {
+        val c = started()
+        val l = BenchLayers().with(LayerField.VibeLevel(3), -6f).with(LayerField.VibePan(5), 0.4f)
+        assertTrue(c.applyLayers(l))
+        assertEquals(l, c.layers.value)
+        assertEquals(dbToGain(-6f), gain(3), 1e-5f)
+        assertEquals(0.4f, feature.overlay!!.pan(5, 0f), 1e-5f)
+    }
+
+    @Test
+    fun applyLayersMovesOnlyChangedKnobs() = runTest {
+        val c = started()
+        val energy = BenchLayers().with(LayerField.VibeMacro(Macro.ENERGY), 0.8f)
+        assertTrue(c.applyLayers(energy))
+        assertEquals(0.8f, feature.macroKnob(Macro.ENERGY))
+        feature.actions.setMood(0.2f)
+        assertTrue(c.applyLayers(BenchLayers()))
+        assertEquals(Macro.ENERGY.vibeDefault(vibe), feature.macroKnob(Macro.ENERGY))
+        assertEquals(0.2f, feature.macroKnob(Macro.MOOD))
+    }
+
+    @Test
+    fun applyLayersDuringLoadReturnsFalse() = runTest {
+        val c = started()
+        feature.applyVibe(vibe)
+        val l = BenchLayers().with(LayerField.VibeLevel(3), -6f)
+        assertFalse(c.applyLayers(l))
+        assertEquals(BenchLayers(), c.layers.value)
+    }
+
     private val sendVibe = vibe.copy(
         tracks = vibe.tracks.mapIndexed { t, tr ->
             if (t != 3) tr
