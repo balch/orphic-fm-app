@@ -471,7 +471,7 @@ private fun fixtureVibeInfoModel(): VibeInfoUiModel = VibeInfoUiModel(
         VibeInfoSection(name = "Outro",  isNowPlaying = false, isQueued = false, canQueue = true),
     ),
     tracks = listOf(
-        VibeInfoTrack(label = "KICK",    role = "Drums/Perc",   instrument = "Kick 808",      isPlaying = true),
+        VibeInfoTrack(label = "KICK",    role = "Drums/Perc",   instrument = "Analog Kick",      isPlaying = true),
         VibeInfoTrack(label = "PERC",    role = "Drums/Perc",   instrument = "Snare Crack",   isPlaying = true),
         VibeInfoTrack(label = "HIHAT",   role = "Drums/Perc",   instrument = "Open HH",       isPlaying = false),
         VibeInfoTrack(label = "BASS",    role = "Lead/Melodic", instrument = "Subtractive",   isPlaying = true),

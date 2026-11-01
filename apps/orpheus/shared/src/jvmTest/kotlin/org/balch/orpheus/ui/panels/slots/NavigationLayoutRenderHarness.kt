@@ -72,7 +72,7 @@ class NavigationLayoutRenderHarness {
     private val panels: Map<PanelId, FeaturePanel> = listOf(
         fakePanel(PanelId.PULSAR, "Pulsar", OrpheusColors.cosmicPurple),
         fakePanel(PanelId.BEATS, "Beats", OrpheusColors.neonOrange),
-        fakePanel(PanelId.DRUMS, "808", OrpheusColors.neonMagenta),
+        fakePanel(PanelId.DRUMS, "DRUMS", OrpheusColors.neonMagenta),
         fakePanel(PanelId.BASS, "Bass", OrpheusColors.electricBlue),
         fakePanel(PanelId.LFO, "Duo LFO", OrpheusColors.synthGreen),
         fakePanel(PanelId.TIDES, "Waves", OrpheusColors.neonCyan),

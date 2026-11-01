@@ -13,7 +13,7 @@ data class DrumPatch(
     val fmDepth: Float = 0.0f,
     val drive: Float = 0.0f,
     val pan: Float? = null, // Optional static pan
-    val drumType: Int? = null, // 0=BD808, 1=SD808, 2=HH808
+    val drumType: Int? = null, // 0=ANALOG_BD, 1=ANALOG_SD, 2=ANALOG_HH
     val p4: Float = 0.5f,     // extra param (snappy/attackFM)
     val p5: Float = 0.5f      // extra param (selfFM)
 )
@@ -25,7 +25,7 @@ data class DrumPatch(
 object DrumDefs {
     
     val LIBRARY = mapOf(
-        // === KICKS (all use BD 808 engine, type=0) ===
+        // === KICKS (all use BD analog engine, type=0) ===
         // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=attackFM, p5=selfFM
         "bd" to DrumPatch(
             frequency = 0.19f,    // ~55Hz, standard kick
@@ -51,7 +51,7 @@ object DrumDefs {
             p4 = 0.7f,            // Heavy attack FM
             p5 = 0.5f
         ),
-        "bd808" to DrumPatch(
+        "bdanalog" to DrumPatch(
             frequency = 0.19f,
             envelopeSpeed = 0.5f,
             sharpness = 0.5f,
@@ -60,7 +60,7 @@ object DrumDefs {
             p5 = 0.5f
         ),
 
-        // === SNARES (all use SD 808 engine, type=1) ===
+        // === SNARES (all use SD analog engine, type=1) ===
         // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=snappy
         "sn" to DrumPatch(
             frequency = 0.2f,     // Standard snare pitch
@@ -97,7 +97,7 @@ object DrumDefs {
             drumType = 1,
             p4 = 0.8f
         ),
-        "sn808" to DrumPatch(
+        "snanalog" to DrumPatch(
             frequency = 0.2f,
             envelopeSpeed = 0.5f,
             sharpness = 0.5f,
@@ -105,7 +105,7 @@ object DrumDefs {
             p4 = 0.5f
         ),
 
-        // === HATS (all use HH 808 engine, type=2) ===
+        // === HATS (all use HH analog engine, type=2) ===
         // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=noisiness
         "hh" to DrumPatch(
             frequency = 0.14f,    // Closed hat pitch
@@ -149,7 +149,7 @@ object DrumDefs {
             drumType = 2,
             p4 = 0.05f
         ),
-        "hh808" to DrumPatch(
+        "hhanalog" to DrumPatch(
             frequency = 0.14f,
             envelopeSpeed = 0.5f,
             sharpness = 0.5f,
@@ -186,7 +186,7 @@ object DrumDefs {
     
     /**
      * Trigger a drum sound using the specialized Plaits drum engines.
-     * All drums route through the 808 engines (BD=0, SD=1, HH=2).
+     * All drums route through the analog engines (BD=0, SD=1, HH=2).
      */
     fun apply(synthEngine: SynthEngine, voiceIndex: Int, patch: DrumPatch) {
         val type = patch.drumType ?: return

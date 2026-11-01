@@ -308,7 +308,7 @@ The Topographic Pattern Generator is based on Mutable Instruments Grids. It prov
 - ✓ Part 0 triggers bass drum sound
 - ✓ Part 1 triggers snare drum sound
 - ✓ Part 2 triggers hi-hat sound
-- ✓ Sounds match 808 engine outputs
+- ✓ Sounds match analog engine outputs
 
 **Pass/Fail:** ____
 
@@ -404,20 +404,20 @@ Test pattern at these X/Y positions:
 
 ## Integration Tests
 
-### INT-1: Pattern + 808 Drums
+### INT-1: Pattern + DRUMS
 
-**Objective:** Verify pattern controls 808 drum engines
+**Objective:** Verify pattern controls analog drum engines
 
 **Procedure:**
 
 1. Open Pattern panel
-2. Ensure 808 engines are active
+2. Ensure analog engines are active
 3. Start pattern
-4. Adjust 808 TUNE, TONE, DECAY while pattern plays
+4. Adjust Analog TUNE, TONE, DECAY while pattern plays
 
 **Expected Results:**
 
-- ✓ Pattern triggers 808 engines correctly
+- ✓ Pattern triggers analog engines correctly
 - ✓ Sound changes affect pattern playback
 - ✓ Real-time parameter changes work
 

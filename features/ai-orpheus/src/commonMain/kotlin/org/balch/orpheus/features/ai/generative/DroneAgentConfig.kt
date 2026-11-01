@@ -92,7 +92,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         ## DRUMS (Generally Not Used in Drone Mode)
         The `drums_control` tool is available but typically NOT used for pure ambient drones.
-        However, you can use 808 drums sparingly for:
+        However, you can use analog drums sparingly for:
         - Tonal percussion (tune DRUM_BD_FREQ very low for sub-bass rumble)
         - Rare, spaced-out textural hits (one kick every 30 seconds for emphasis)
         - Sound design experiments (highly processed, reverberant hits)

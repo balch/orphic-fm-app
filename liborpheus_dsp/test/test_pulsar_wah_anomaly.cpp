@@ -32,7 +32,7 @@
 //    "wah declared" run and a "wah undeclared" run generate identical notes.
 //  * Both RNGs are pinned per the project's anti-flake convention: pulsar_seed (the
 //    pattern RNG, which load_vibe re-stirs from the wall clock when 0) and the global
-//    stmlib::Random (the 808 hat/snare noise). stmlib::Random is global, so runs are
+//    stmlib::Random (the analog hat/snare noise). stmlib::Random is global, so runs are
 //    executed to completion one after another, never interleaved.
 //  * pulsar_energy is pinned to 1.0. max_drift = (1 - energy) * 0.05, so at energy 1
 //    the tempo drift is exactly 0 and samples_per_step is exactly sample_rate /

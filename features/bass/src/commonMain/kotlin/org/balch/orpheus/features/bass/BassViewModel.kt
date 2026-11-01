@@ -96,7 +96,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
         - **0 = VCF Acid** (default): Saw/square + sub oscillator → dual SVF low-pass with resonance. Classic 303-style acid bass. CUTOFF sweeps the filter, RESO adds squelch.
         - **1 = Phase Dist**: CZ-101-style phase distortion. Aggressive, gritty digital bass. CUTOFF controls harmonic brightness.
         - **2 = FM**: 2-operator FM with feedback. Classic DX-style electric bass and plucky tones. CUTOFF controls modulator index.
-        - **3 = Bass Drum**: Enveloped 808+909 kick synthesis. Has its own built-in envelope (ENV knob controls internal decay instead). Great for hybrid kick-bass.
+        - **3 = Bass Drum**: Enveloped analog kick synthesis. Has its own built-in envelope (ENV knob controls internal decay instead). Great for hybrid kick-bass.
 
         ## Sequencer
         The bass has a built-in step sequencer that starts with a driving pattern (all gates ON, root on downbeats, random scale notes on off-beats, accents on 1 and 3).

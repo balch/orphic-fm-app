@@ -104,7 +104,7 @@ Input gain for each signal. Adjust to balance or emphasize one source.
 
 ### Carrier/Modulator Source (enum)
 - **0 (SYNTH)**: Use synthesizer voices
-- **1 (DRUMS)**: Use 808 drum units
+- **1 (DRUMS)**: Use analog drum units
 - **2 (REPL)**: Use REPL (looper/sample playback)
 
 ### Mix (0.0 - 1.0)

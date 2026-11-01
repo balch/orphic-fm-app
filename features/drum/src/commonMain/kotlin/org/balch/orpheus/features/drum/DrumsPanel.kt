@@ -60,7 +60,7 @@ fun DrumsPanel(
     val actions = drumFeature.actions
 
     CollapsibleColumnPanel(
-        title = "808",
+        title = "DRUMS",
         color = OrpheusColors.ninersRed,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

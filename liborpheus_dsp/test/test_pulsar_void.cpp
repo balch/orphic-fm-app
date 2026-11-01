@@ -386,7 +386,7 @@ static bool test_void_dips_and_recovers() {
 // vibes (see test_void_manual_ignored_when_undeclared below). Seeds are pinned per
 // the project's anti-flake convention (test_pulsar_signal_quality.cpp's make_engine):
 // pulsar_seed pins the pattern RNG (load_vibe re-stirs from the wall clock when
-// seed==0), and stmlib::Random::Seed pins the 808 hat/snare noise RNG that the mixed
+// seed==0), and stmlib::Random::Seed pins the analog hat/snare noise RNG that the mixed
 // RMS measurement is sensitive to.
 static bool test_void_manual_trigger_fires_with_zero_probability() {
     printf("\n=== Test: manual anomaly trigger fires even at probability 0 (declared) ===\n");

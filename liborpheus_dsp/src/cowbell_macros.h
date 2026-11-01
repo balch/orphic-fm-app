@@ -8,7 +8,7 @@
 #include <cstdint>
 
 // Makeup after the resonator, whose limiter keeps it quiet: a default tap then sits by the
-// 808 hat at the Orpheus master. Applied with LEVEL.
+// analog hat at the Orpheus master. Applied with LEVEL.
 constexpr float kCowbellOutputGain = 4.0f;
 
 struct CowbellParams {

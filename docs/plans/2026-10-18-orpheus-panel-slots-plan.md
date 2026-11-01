@@ -117,7 +117,7 @@
   - `enum class PanelGroup(val title: String) { Rhythm("RHYTHM"), Mod("MOD"), Fx("FX"), Tools("TOOLS") }`
   - `@Immutable data class PanelNavEntry(val id: PanelId, val shortLabel: String, val group: PanelGroup, val wide: Boolean = false)`
   - `val PanelNavEntries: List<PanelNavEntry>`: a literal list in this exact order:
-    - **Rhythm:** pulsar "PULSE" (wide), beats "BEATS" (wide), drums "808", bass "BASS", dj "DJ", speech "TALK"
+    - **Rhythm:** pulsar "PULSE" (wide), beats "BEATS" (wide), drums "DRUMS", bass "BASS", dj "DJ", speech "TALK"
     - **Mod:** lfo "LFO", tides "Waves", evo "EVO", flux "FLUX", flux_triggers "TRIGG"
     - **Fx:** distortion "VOL", delay "DELAY", reverb "VERB", horn "HORN", resonator "REZO", grains "GRAIN", warps "BLEND", looper "LOOP"
     - **Tools:** presets "PATCH", midi "MIDI", viz "VIZ", code "CODE", ai "AI", vibe_create "VIBE", mediapipe "ASL", timer "Timer", record "REC"

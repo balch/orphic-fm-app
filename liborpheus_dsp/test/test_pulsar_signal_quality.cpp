@@ -43,7 +43,7 @@ static constexpr float kDiscThresholdMix = 1.4f;         // mixed stereo output 
 static constexpr float kDiscThresholdMelodic = 0.5f;     // melodic/effect tracks (should be smooth)
 static constexpr float kDiscThresholdPercussive = 0.98f;  // percussion tracks (sharp attacks OK)
 static constexpr float kDiscThresholdChord = 0.95f;       // Chord engine: organ-style phase snaps
-// HH (engine 23) is the 808 "metallic" hat: six NON-bandlimited square
+// HH (engine 23) is the analog "metallic" hat: six NON-bandlimited square
 // oscillators (2*f0 * ratios up to 2.5x) summed in 0.33 steps, run through a
 // RESONANT band-pass (Q = 3+3*tone) then a high-pass. Its natural attack
 // transient is a full-scale sign-flip — a single-sample jump up to ~1.44
@@ -54,7 +54,7 @@ static constexpr float kDiscThresholdChord = 0.95f;       // Chord engine: organ
 // for the sine-based BD (~0.91) and noise-based SD (~0.59) but too strict for
 // the hat. 1.7 admits the verified transient with RNG headroom while still
 // flagging an abnormal near-full-scale (~2.0) glitch.
-static constexpr float kDiscThresholdHat = 1.7f;          // HH: 808 metallic-square attack transient
+static constexpr float kDiscThresholdHat = 1.7f;          // HH: analog metallic-square attack transient
 
 // Classification for per-track threshold selection
 static float threshold_for_engine(int engine_id) {
@@ -151,7 +151,7 @@ static GraphUnit make_unit() {
 //      (orpheus_unit_pulsar.cpp) — so which steps fire, and which loud hits
 //      coincide, changed every run. A non-zero seed makes the pattern
 //      byte-reproducible.
-//   2. The global stmlib metallic-noise RNG. The 808 hi-hat / snare draw their
+//   2. The global stmlib metallic-noise RNG. The analog hi-hat / snare draw their
 //      clocked noise from stmlib::Random (drums/hi_hat.h), a process-global
 //      state that carries across tests. Pinning it makes each render's noise
 //      byte-stable. Pattern generation does NOT touch this RNG (verified), so

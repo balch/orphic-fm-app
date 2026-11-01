@@ -25,7 +25,7 @@ val PanelNavEntries: List<PanelNavEntry> = listOf(
     // Rhythm
     PanelNavEntry(id = PanelId.PULSAR, shortLabel = "PULSE", group = PanelGroup.Rhythm, wide = true),
     PanelNavEntry(id = PanelId.BEATS, shortLabel = "BEATS", group = PanelGroup.Rhythm, wide = true),
-    PanelNavEntry(id = PanelId.DRUMS, shortLabel = "808", group = PanelGroup.Rhythm),
+    PanelNavEntry(id = PanelId.DRUMS, shortLabel = "DRUMS", group = PanelGroup.Rhythm),
     PanelNavEntry(id = PanelId.COWBELL, shortLabel = "BELL", group = PanelGroup.Rhythm),
     PanelNavEntry(id = PanelId.BASS, shortLabel = "BASS", group = PanelGroup.Rhythm),
     PanelNavEntry(id = PanelId.DJ, shortLabel = "DJ", group = PanelGroup.Rhythm),

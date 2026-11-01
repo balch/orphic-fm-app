@@ -55,10 +55,10 @@ interface SynthEngine : AudioHostSuspender {
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) // 0=Fast, 1=Slow (continuous)
     fun setDuoSharpness(duoIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per duo
 
-    // specialized Drum Synthesis (808)
-    /** Trigger a specialized 808-style drum. Parameters are normalized 0..1. */
+    // specialized Drum Synthesis (analog)
+    /** Trigger a specialized analog-style drum. Parameters are normalized 0..1. */
     fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
-    /** Set specialized 808-style drum parameters. Parameters are normalized 0..1. */
+    /** Set specialized analog-style drum parameters. Parameters are normalized 0..1. */
     fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
     fun triggerDrum(type: Int, accent: Float)
 

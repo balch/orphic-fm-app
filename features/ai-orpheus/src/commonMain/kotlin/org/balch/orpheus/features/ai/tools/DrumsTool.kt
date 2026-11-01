@@ -23,7 +23,7 @@ data class DrumsControlArgs(
     @property:LLMDescription("""
         Control ID for the drum parameter to adjust. Valid controls include:
 
-        808 DRUMS (Analog synthesis):
+        ANALOG DRUMS (Analog synthesis):
         - DRUM_BD_FREQ, DRUM_BD_TONE, DRUM_BD_DECAY, DRUM_BD_AFM, DRUM_BD_SFM, DRUM_BD_TRIGGER
         - DRUM_SD_FREQ, DRUM_SD_TONE, DRUM_SD_DECAY, DRUM_SD_SNAPPY, DRUM_SD_TRIGGER
         - DRUM_HH_FREQ, DRUM_HH_TONE, DRUM_HH_DECAY, DRUM_HH_NOISY, DRUM_HH_TRIGGER
@@ -67,8 +67,8 @@ data class DrumsControlResult(val success: Boolean, val message: String)
  *
  * ## Two Drum Systems:
  *
- * ### 808 DRUMS (Analog-style drum synthesis)
- * Individual 808-style drum synth voices with manual triggers:
+ * ### ANALOG DRUMS (Analog-style drum synthesis)
+ * Individual analog-style drum synth voices with manual triggers:
  *
  * **Bass Drum (BD):**
  * - DRUM_BD_FREQ: Base frequency (0.0-1.0, lower = deeper)
@@ -138,7 +138,7 @@ data class DrumsControlResult(val success: Boolean, val message: String)
  * 5. Add BEATS_SWING for groove (try 0.3-0.5 for classic swing)
  * 6. Add BEATS_RANDOMNESS for variation (0.1-0.3 for subtle humanization)
  *
- * **TUNING 808 DRUMS:**
+ * **TUNING ANALOG DRUMS:**
  * - Kick: Low FREQ (0.2-0.4), medium TONE (0.3-0.5), adjust DECAY for punch
  * - Snare: Medium FREQ (0.4-0.6), high SNAPPY (0.6-0.8) for crack
  * - Hi-hat: High FREQ (0.6-0.8), vary TONE for open/closed sound
@@ -169,7 +169,7 @@ class DrumsTool(
             description = """
         Control drum synthesis and drum beat patterns.
 
-        808 DRUMS - Manual triggering of three analog-style drum voices:
+        ANALOG DRUMS - Manual triggering of three analog-style drum voices:
         Bass Drum: DRUM_BD_FREQ, DRUM_BD_TONE, DRUM_BD_DECAY, DRUM_BD_AFM, DRUM_BD_SFM, DRUM_BD_TRIGGER
         Snare Drum: DRUM_SD_FREQ, DRUM_SD_TONE, DRUM_SD_DECAY, DRUM_SD_SNAPPY, DRUM_SD_TRIGGER
         Hi-Hat: DRUM_HH_FREQ, DRUM_HH_TONE, DRUM_HH_DECAY, DRUM_HH_NOISY, DRUM_HH_TRIGGER
@@ -203,20 +203,20 @@ class DrumsTool(
      * Returns null for special controls (triggers, run) or unknown IDs.
      */
     private fun resolvePortSymbol(id: String): PortSymbol? = when (id) {
-        // 808 Bass Drum controls
+        // Analog Bass Drum controls
         "DRUM_BD_FREQ" -> DrumSymbol.BD_FREQ
         "DRUM_BD_TONE" -> DrumSymbol.BD_TONE
         "DRUM_BD_DECAY" -> DrumSymbol.BD_DECAY
         "DRUM_BD_AFM", "DRUM_BD_ATTACK_FM" -> DrumSymbol.BD_P4
         "DRUM_BD_SFM", "DRUM_BD_SELF_FM" -> DrumSymbol.BD_P5
 
-        // 808 Snare Drum controls
+        // Analog Snare Drum controls
         "DRUM_SD_FREQ" -> DrumSymbol.SD_FREQ
         "DRUM_SD_TONE" -> DrumSymbol.SD_TONE
         "DRUM_SD_DECAY" -> DrumSymbol.SD_DECAY
         "DRUM_SD_SNAPPY", "DRUM_SD_SNAPPINESS" -> DrumSymbol.SD_P4
 
-        // 808 Hi-Hat controls
+        // Analog Hi-Hat controls
         "DRUM_HH_FREQ" -> DrumSymbol.HH_FREQ
         "DRUM_HH_TONE" -> DrumSymbol.HH_TONE
         "DRUM_HH_DECAY" -> DrumSymbol.HH_DECAY

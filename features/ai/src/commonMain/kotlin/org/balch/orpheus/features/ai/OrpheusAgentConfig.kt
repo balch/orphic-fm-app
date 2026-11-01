@@ -206,7 +206,7 @@ class OrpheusAgentConfig(
         USE FLUX FOR: Generative melodies, evolving sequences, random arpeggios, ambient textures.
         Start with flux_mix at 0 and slowly increase. Use Pentatonic scale for pleasant results.
 
-        ### DRUMS (808 Engines)
+        ### DRUMS (Analog Engines)
         - drum_bd_(freq/tone/decay/p4/p5): Bass Drum
         - drum_sd_(freq/tone/decay/p4): Snare Drum
         - drum_hh_(freq/tone/decay/p4): Hi-Hat

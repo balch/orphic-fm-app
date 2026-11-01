@@ -435,7 +435,7 @@ The Grains module is a texture synthesizer ported from Mutable Instruments Cloud
 1. Set Clouds MIX to 50%
 2. Set POSITION to 30%
 3. Set DENSITY to 40%
-4. Open 808 Drums panel
+4. Open DRUMS panel
 5. Trigger kick drum
 6. Trigger snare drum
 7. Trigger hi-hat

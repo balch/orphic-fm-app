@@ -63,7 +63,7 @@ Dynamics processor. Key DSP mode: LorenzGenerator — Lorenz chaotic attractor i
 - **Engine 0 (VCF)**: Saw/square + sub + dual SVF LP. Best acid bass. Harmonics=resonance, Timbre=cutoff, Morph=waveshape. outGain=0.55f
 - **Engine 1 (PD)**: CZ-style phase distortion. Punchy harmonics. outGain=0.38f
 - **Engine 10 (FM)**: 2-op FM. Plucky/gritty. outGain=0.45f
-- **Engine 21 (BassDrum)**: 808+909 kick with overdrive. already_enveloped=true. outGain=1.0f
+- **Engine 21 (BassDrum)**: analog kick with overdrive. already_enveloped=true. outGain=1.0f
 
 ## Modules NOT Yet Ported (bass-relevant)
 - **Peaks MultistageEnvelope** — AD/ADSR with 3 shapes (linear/exp/quartic). Simple, fast to port.

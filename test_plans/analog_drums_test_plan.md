@@ -1,8 +1,8 @@
-# 808 Drum Engines Test Plan
+# Analog Drum Engines Test Plan
 
 ## Overview
 
-The 808 Drum Engines module provides specialized drum synthesis ported from Mutable Instruments Plaits. It includes three distinct engines for classic analog-style drum sounds: Bass Drum (BD), Snare Drum (SD), and Hi-Hat (HH).
+The Analog Drum Engines module provides specialized drum synthesis ported from Mutable Instruments Plaits. It includes three distinct engines for classic analog-style drum sounds: Bass Drum (BD), Snare Drum (SD), and Hi-Hat (HH).
 
 ## Architecture
 
@@ -29,7 +29,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 
 ### Test 1: Bass Drum Basic Sound
 
-**Objective:** Verify bass drum produces classic 808 kick character
+**Objective:** Verify bass drum produces classic analog kick character
 
 **Procedure:**
 
@@ -65,7 +65,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 **Expected Results:**
 
 - ✓ 0%: Very low sub-bass (~40Hz feel)
-- ✓ 50%: Standard 808 kick range (~55Hz)
+- ✓ 50%: Standard analog kick range (~55Hz)
 - ✓ 100%: Higher, tom-like pitch
 - ✓ Smooth pitch sweep with no stepping
 
@@ -89,7 +89,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 |-------|-------------------|
 | 0% | Very short, tight thump |
 | 25% | Punchy, quick release |
-| 50% | Standard 808 decay |
+| 50% | Standard analog decay |
 | 75% | Long, sustained boom |
 | 100% | Very long, drone-like tail |
 
@@ -143,7 +143,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 
 ### Test 6: Snare Drum Basic Sound
 
-**Objective:** Verify snare produces classic 808 snare character
+**Objective:** Verify snare produces classic analog snare character
 
 **Procedure:**
 
@@ -372,7 +372,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 - ✓ Panel expands/collapses correctly
 - ✓ All controls accessible
 - ✓ Matches compact panel functionality
-- ✓ Title shows "808 Engines" when expanded
+- ✓ Title shows "DRUMS" when expanded
 
 **Pass/Fail:** ____
 
@@ -406,7 +406,7 @@ The 808 Drum Engines module provides specialized drum synthesis ported from Muta
 
 **Procedure:**
 
-1. Run: `d1 $ s "bd808 sn808 hh808 hh808"`
+1. Run: `d1 $ s "bdanalog snanalog hhanalog hhanalog"`
 2. Verify pattern plays correctly
 
 **Expected Results:**

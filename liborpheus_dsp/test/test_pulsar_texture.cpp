@@ -85,7 +85,7 @@ static bool test_evo_timbre_sweep_respects_the_authored_window() {
         *out_hi = hi;
     };
 
-    // Rendering advances the process-global stmlib RNG that the 808 voices draw from, and later
+    // Rendering advances the process-global stmlib RNG that the analog voices draw from, and later
     // suites inherit whatever state they are handed — master_fader_pulsar fails downstream
     // otherwise. Re-seed per arm too, so no arm starts from the previous one's state.
     const uint32_t saved_rng = stmlib::Random::state();

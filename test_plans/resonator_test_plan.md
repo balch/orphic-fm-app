@@ -276,7 +276,7 @@ both a post-processor for synth voices and an excitation source for drums.
 
 1. Enable Resonator (Modal mode)
 2. Set MIX to 50%
-3. Open 808 Drums panel
+3. Open DRUMS panel
 
 **Procedure:**
 

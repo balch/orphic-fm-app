@@ -97,7 +97,7 @@ static OrpheusEngine* make_pulsar_engine() {
     // baseline_peak ~0.895, far above the 0.05 floor (and all three tests in
     // this suite pass with margin under it).
     engine->pulsar_seed.store(0xC0FFEE, std::memory_order_relaxed);
-    // Pin the process-global stmlib RNG too — the 808 voices draw from it, so
+    // Pin the process-global stmlib RNG too — the analog voices draw from it, so
     // pulsar_seed alone leaves baseline_peak suite-order dependent (measured
     // 0.8126 solo vs 0.7519 in a full run). Restored in the suite entry point.
     stmlib::Random::Seed(0xC0FFEEu);

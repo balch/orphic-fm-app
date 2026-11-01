@@ -162,7 +162,7 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
             override val title = "Drums"
 
             override val markdown = """
-                808-style analog drum synthesizer with three voices (Bass Drum, Snare, Hi-Hat). Each voice has frequency, tone, and decay controls plus engine-specific parameters.
+                analog-style drum synthesizer with three voices (Bass Drum, Snare, Hi-Hat). Each voice has frequency, tone, and decay controls plus engine-specific parameters.
 
                 ## Voices
                 - **Bass Drum (BD)**: Deep, punchy kicks. FREQ controls fundamental pitch, TONE shapes body, DECAY sets tail length. P4/P5 are engine-specific parameters.

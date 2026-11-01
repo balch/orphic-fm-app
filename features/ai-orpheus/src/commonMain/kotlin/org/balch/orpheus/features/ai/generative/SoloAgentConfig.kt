@@ -198,14 +198,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ### DRUMS
         Use the `drums_control` tool to add rhythmic foundation and percussive texture.
         
-        **808 DRUMS - Analog-Style Synthesis:**
+        **ANALOG DRUMS - Analog-Style Synthesis:**
         Three independently tunable drum voices you can trigger manually:
         - Bass Drum (BD): DRUM_BD_FREQ (0.2-0.4 for kick), DRUM_BD_TONE, DRUM_BD_DECAY, DRUM_BD_AFM, DRUM_BD_SFM
         - Snare Drum (SD): DRUM_SD_FREQ (0.4-0.6), DRUM_SD_TONE, DRUM_SD_DECAY, DRUM_SD_SNAPPY
         - Hi-Hat (HH): DRUM_HH_FREQ (0.6-0.8), DRUM_HH_TONE, DRUM_HH_DECAY, DRUM_HH_NOISY
         - Triggers: DRUM_BD_TRIGGER, DRUM_SD_TRIGGER, DRUM_HH_TRIGGER (1.0=trigger, 0.0=release)
         
-        Use 808 drums for:
+        Use analog drums for:
         - Manual, rhythmic punctuation in ambient pieces
         - Sound design (tune them low/high for tonal percussion)
         - One-shot hits to accent emotional moments
@@ -245,10 +245,10 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ✗ Don't start beats on turn 1 - establish melody/harmony first!
         
         **DRUM INTEGRATION TIPS:**
-        - Tune 808 drums to match your key (BD can be tonal bass!)
+        - Tune analog drums to match your key (BD can be tonal bass!)
         - Lower beats_density when using REPL melodies (0.2-0.4) to avoid clutter
         - Use beats_x/beats_y morphing to keep patterns evolving
-        - Combine 808 triggers with BEATS sequencer for layered percussion
+        - Combine analog triggers with BEATS sequencer for layered percussion
         - Increase beats_randomness during chaotic/breakdown sections
         - Set beats_swing to 0.4-0.5 for funky, human feel
         
