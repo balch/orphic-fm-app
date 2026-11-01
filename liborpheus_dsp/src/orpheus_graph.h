@@ -101,6 +101,7 @@ static constexpr int kMaxUnits = 600;
 static constexpr int kMaxConnections = 1200;
 static constexpr int kMaxInputPorts = 10;
 static constexpr int kMaxOutputPorts = 3;
+static constexpr int kMaxSourcesPerPort = 8;
 static constexpr int kMaxPortMapEntries = 400;
 static constexpr int kMaxFrames = 512;
 
@@ -114,8 +115,8 @@ struct GraphPort {
     float smoothed;            // current smoothed value
     bool  is_smoothed;         // whether this port applies smoothing
     int   num_sources;         // how many outputs connected
-    // Source buffer pointers (up to 8 sources per input)
-    float* sources[8];
+    // Source buffer pointers; the loader rejects a graph that connects more
+    float* sources[kMaxSourcesPerPort];
 };
 
 // ── Unit state (union of all possible states) ───

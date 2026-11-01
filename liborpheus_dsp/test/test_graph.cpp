@@ -710,6 +710,84 @@ static bool test_engine0_release_timing() {
     return pass;
 }
 
+static std::vector<uint8_t> read_test_data(const char* relative) {
+    std::vector<uint8_t> bytes;
+    FILE* f = fopen(test_data_path(relative).c_str(), "rb");
+    if (!f) return bytes;
+    fseek(f, 0, SEEK_END);
+    bytes.resize((size_t)ftell(f));
+    fseek(f, 0, SEEK_SET);
+    if (fread(bytes.data(), 1, bytes.size(), f) != bytes.size()) bytes.clear();
+    fclose(f);
+    return bytes;
+}
+
+// Every connection in a checked-in graph must land: count the file's connections per
+// input port and compare with the loaded port's num_sources.
+static bool check_graph_keeps_every_connection(const char* relative) {
+    std::vector<uint8_t> d = read_test_data(relative);
+    if (d.size() < 12) {
+        printf("  FAIL: cannot read %s\n", relative);
+        return false;
+    }
+    auto u16 = [&](size_t p) { return (uint16_t)(d[p] | (d[p + 1] << 8)); };
+    int unit_count = u16(6), conn_count = u16(8);
+    size_t pos = 12;
+    for (int i = 0; i < unit_count; i++) pos += 6 + 6 * (size_t)u16(pos + 4);
+    std::vector<int> expected((size_t)unit_count * kMaxInputPorts, 0);
+    for (int c = 0; c < conn_count; c++, pos += 8)
+        expected[(size_t)u16(pos + 4) * kMaxInputPorts + u16(pos + 6)]++;
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    int result = orpheus_engine_load_patch(engine, d.data(), d.size());
+    bool pass = result == 0;
+    if (!pass) printf("  FAIL: %s load returned %d\n", relative, result);
+    OrpheusGraph* graph = engine->graph.load();
+    for (int u = 0; pass && u < unit_count; u++) {
+        for (int p = 0; p < kMaxInputPorts; p++) {
+            int want = expected[(size_t)u * kMaxInputPorts + p];
+            int got = graph->units[u].inputs[p].num_sources;
+            if (got != want) {
+                printf("  FAIL: %s unit %d (type %d) port %d kept %d of %d sources\n",
+                       relative, u, graph->units[u].type, p, got, want);
+                pass = false;
+            }
+        }
+    }
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
+static bool test_production_graphs_keep_every_connection() {
+    printf("\n=== Test: Graph — checked-in graphs keep every connection ===\n");
+    bool pass = check_graph_keeps_every_connection("/default_graph.odwg");
+    pass = check_graph_keeps_every_connection("/dj_graph.odwg") && pass;
+    printf("Graphs keep every connection test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// A port fed by more sources than it can hold must reject the graph, not drop the extras.
+static bool test_graph_load_rejects_port_overflow() {
+    printf("\n=== Test: Graph — loader rejects too many sources on one port ===\n");
+    const int sources = kMaxSourcesPerPort + 1;
+    const int units = sources + 1;
+    std::vector<uint8_t> d;
+    auto put16 = [&](int v) { d.push_back((uint8_t)(v & 0xFF)); d.push_back((uint8_t)(v >> 8)); };
+    d.insert(d.end(), {'O', 'D', 'W', 'G'});
+    put16(1); put16(units); put16(sources); put16(0);
+    for (int i = 0; i < units; i++) { put16(UNIT_ADD); put16(i); put16(0); }
+    for (int s = 0; s < sources; s++) { put16(s); put16(OPORT_OUT); put16(sources); put16(IPORT_INPUT_A); }
+
+    OrpheusGraph* graph = new OrpheusGraph();
+    std::memset(graph, 0, sizeof(OrpheusGraph));
+    int result = orpheus_graph_load(graph, d.data(), d.size(), 48000.0f);
+    delete graph;
+    bool pass = result != 0;
+    printf("  load returned %d %s\n", result, pass ? "OK" : "FAIL (extras dropped silently)");
+    printf("Loader port overflow test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_graph_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -721,5 +799,7 @@ bool run_graph_tests() {
     tally(test_bender_voice_volume_parity());
     tally(test_plaits_envspeed_varies_output());
     tally(test_engine0_release_timing());
+    tally(test_production_graphs_keep_every_connection());
+    tally(test_graph_load_rejects_port_overflow());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

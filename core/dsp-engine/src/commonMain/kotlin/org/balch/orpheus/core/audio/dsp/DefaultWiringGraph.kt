@@ -410,15 +410,20 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     pulsarUnit.outRight to master.inputB
     warp.out to master.inputA              // Warps direct to output
     warp.outRight to master.inputB
-    delay.out to master.inputA
-    delay.outRight to master.inputB
-    reverb.out to master.inputA
-    reverb.outRight to master.inputB
-    // Pulsar effects output → master bus
-    pulsarDelayUnit.out to master.inputA
-    pulsarDelayUnit.outRight to master.inputB
-    pulsarReverbUnit.out to master.inputA
-    pulsarReverbUnit.outRight to master.inputB
+
+    // Effect returns sum in their own bus: a port holds 8 sources, master would need 10
+    val fxReturnL = add("fxReturnL")
+    val fxReturnR = add("fxReturnR")
+    delay.out to fxReturnL.inputA
+    delay.outRight to fxReturnR.inputA
+    reverb.out to fxReturnL.inputA
+    reverb.outRight to fxReturnR.inputA
+    pulsarDelayUnit.out to fxReturnL.inputA
+    pulsarDelayUnit.outRight to fxReturnR.inputA
+    pulsarReverbUnit.out to fxReturnL.inputA
+    pulsarReverbUnit.outRight to fxReturnR.inputA
+    fxReturnL.out to master.inputA
+    fxReturnR.out to master.inputB
 
     // Port map for nativeSetPort routing
     portMap {

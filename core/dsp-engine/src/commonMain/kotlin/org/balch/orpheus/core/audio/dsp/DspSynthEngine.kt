@@ -517,7 +517,8 @@ class DspSynthEngine(
     private fun loadGraphAndSync() = synchronized(graphLoadLock) {
         syncNativeBridgeState() // Re-sync after C++ engine is (re)created
         nativeBridge.nativeLoadGraph(wiringGraphProvider.buildGraph()).also { result ->
-            log.info { "nativeLoadGraph result: $result" }
+            if (result == 0) log.info { "nativeLoadGraph result: $result" }
+            else log.error { "nativeLoadGraph rejected the wiring graph: error $result" }
         }
         // Re-sync port map values after graph load (graph load resets node defaults)
         syncFreshNative()

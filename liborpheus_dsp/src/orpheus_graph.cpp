@@ -3,13 +3,14 @@
 #include "orpheus_units_common.h"
 #include "orpheus_engine.h"
 #include "orpheus_turntable.h"
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <algorithm>
 
 // Forward declaration -- called from orpheus_graph_load
-static void orpheus_graph_sort(OrpheusGraph* graph);
+static int orpheus_graph_sort(OrpheusGraph* graph);
 
 // -- Little-endian read helpers ---------------------------
 static uint16_t read_u16(const uint8_t* p) {
@@ -144,10 +145,14 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
         GraphUnit* dst = &graph->units[dst_id];
         GraphPort* inp = &dst->inputs[dst_port];
 
-        if (inp->num_sources < 8) {
-            inp->sources[inp->num_sources] = src->output_buffers[src_port];
-            inp->num_sources++;
+        // Dropping a source would silence it with no trace; sum extras in an ADD unit instead
+        if (inp->num_sources >= kMaxSourcesPerPort) {
+            fprintf(stderr, "orpheus_graph_load: unit %d port %d has more than %d sources\n",
+                    dst_id, dst_port, kMaxSourcesPerPort);
+            return -12;
         }
+        inp->sources[inp->num_sources] = src->output_buffers[src_port];
+        inp->num_sources++;
     }
 
     // Parse port map
@@ -167,9 +172,7 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
     }
 
     // Topological sort via Tarjan SCC
-    orpheus_graph_sort(graph);
-
-    return 0;
+    return orpheus_graph_sort(graph);
 }
 
 // -- Tarjan SCC + Topological Sort ------------------------
@@ -183,7 +186,9 @@ static int tarjan_timer;
 static int tarjan_scc_id[kMaxUnits];
 static int tarjan_scc_count;
 
-static int adj[kMaxUnits][8];
+// Downstream edges per unit; the sort rejects a graph that needs more
+static constexpr int kMaxFanOut = 8;
+static int adj[kMaxUnits][kMaxFanOut];
 static int adj_count[kMaxUnits];
 
 static void tarjan_dfs(int u) {
@@ -212,7 +217,7 @@ static void tarjan_dfs(int u) {
     }
 }
 
-static void orpheus_graph_sort(OrpheusGraph* graph) {
+static int orpheus_graph_sort(OrpheusGraph* graph) {
     int n = graph->unit_count;
 
     // Build adjacency from connections
@@ -225,8 +230,12 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
                     for (int op = 0; op < kMaxOutputPorts; op++) {
                         if (graph->units[src].output_buffers[op] ==
                             inp->sources[s]) {
-                            if (adj_count[src] < 8)
-                                adj[src][adj_count[src]++] = u;
+                            if (adj_count[src] >= kMaxFanOut) {
+                                fprintf(stderr, "orpheus_graph_load: unit %d feeds more than %d inputs\n",
+                                        src, kMaxFanOut);
+                                return -13;
+                            }
+                            adj[src][adj_count[src]++] = u;
                             goto next_source;
                         }
                     }
@@ -248,7 +257,7 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
 
     // Kahn's toposort on SCC DAG
     int scc_in_degree[kMaxUnits] = {};
-    int scc_adj[kMaxUnits][8] = {};
+    int scc_adj[kMaxUnits][kMaxFanOut] = {};
     int scc_adj_count[kMaxUnits] = {};
 
     for (int u = 0; u < n; u++) {
@@ -260,7 +269,12 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
                 for (int k = 0; k < scc_adj_count[su]; k++) {
                     if (scc_adj[su][k] == sv) { dup = true; break; }
                 }
-                if (!dup && scc_adj_count[su] < 8) {
+                if (!dup) {
+                    if (scc_adj_count[su] >= kMaxFanOut) {
+                        fprintf(stderr, "orpheus_graph_load: a feedback loop feeds more than %d units\n",
+                                kMaxFanOut);
+                        return -13;
+                    }
                     scc_adj[su][scc_adj_count[su]++] = sv;
                     scc_in_degree[sv]++;
                 }
@@ -301,6 +315,7 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
     for (int u = 0; u < n; u++) {
         if (graph->units[u].type == UNIT_BASS_VOICE) graph->has_bass_voice = true;
     }
+    return 0;
 }
 
 // -- Dump execution order for debugging ----
