@@ -20,7 +20,10 @@ private fun PresetChange.word(): String {
         field == PresetField.MIX_BASS -> if (up) "Bright Bass" else "Deep Bass"
         field == PresetField.MIX_PERC || field == PresetField.MIX_KEYS || field == PresetField.MIX_FX ->
             "${if (up) "Bright" else "Quiet"} ${field.label.titleCase()}"
-        else -> "${if (up) "More" else "Less"} ${field.label.titleCase()}"
+        field == PresetField.BELL_MORE -> "${if (up) "More" else "Less"} Cowbell"
+        field in BELL_SWITCHES -> "New Bell"
+        field.module == PresetModule.BELL -> "${if (up) "More" else "Less"} Bell ${field.label.titleCase()}"
+        else ->"${if (up) "More" else "Less"} ${field.label.titleCase()}"
     }
 }
 
@@ -31,6 +34,10 @@ private fun String.titleCase(): String =
 
 private const val BPM_SPAN = 40f
 
+private val BELL_SWITCHES = setOf(
+    PresetField.BELL_ENGINE, PresetField.BELL_OCTAVE, PresetField.BELL_GRID, PresetField.BELL_MODE, PresetField.BELL_FILL,
+)
+
 // Fields that jump between values (switches, note and scale indexes) count as a full move.
 private fun PresetChange.size(): Float = when {
     field == PresetField.PULSAR_BPM -> abs(to - from) / BPM_SPAN
@@ -38,6 +45,7 @@ private fun PresetChange.size(): Float = when {
         field == PresetField.PULSAR_SCALE ||
         field == PresetField.PULSAR_ENVELOPE ||
         field == PresetField.HORN_BRAKE ||
+        field in BELL_SWITCHES ||
         field.key.endsWith(".mute") ||
         field.key.endsWith(".solo") -> 1f
     else -> abs(to - from)

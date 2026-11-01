@@ -8,8 +8,10 @@ import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DjSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
@@ -103,6 +105,17 @@ class VibePresetPortsTest {
             PresetField.PULSAR_ROOT.key to 7f,
             PresetField.PULSAR_SCALE.key to 3f,
             PresetField.PULSAR_BPM.key to 128f,
+            PresetField.BELL_LEVEL.key to 0.61f,
+            PresetField.BELL_MORE.key to 0.25f,
+            PresetField.BELL_METAL.key to 0.84f,
+            PresetField.BELL_RING.key to 0.35f,
+            PresetField.BELL_INTENSITY.key to 0.7f,
+            PresetField.BELL_ENGINE.key to -1f,
+            PresetField.BELL_OCTAVE.key to -2f,
+            PresetField.BELL_GRID.key to 1f,
+            PresetField.BELL_GRID_STRENGTH.key to 0.55f,
+            PresetField.BELL_MODE.key to 2f,
+            PresetField.BELL_FILL.key to 3f,
         ) + tracksOf(tuning)
 
         p.write(values)
@@ -138,6 +151,25 @@ class VibePresetPortsTest {
         assertEquals(IntValue(5), portOf(PulsarSymbol.ROOT_NOTE.controlId))
         assertEquals(IntValue(1), portOf(PulsarSymbol.SCALE.controlId))
         assertEquals(IntValue(2), portOf(PulsarSymbol.ENVELOPE_MODE.controlId))
+    }
+
+    @Test
+    fun bellSwitchesWriteTheirPortTypes() {
+        ports().write(
+            mapOf(
+                PresetField.BELL_ENGINE.key to -1f,
+                PresetField.BELL_OCTAVE.key to 1f,
+                PresetField.BELL_GRID.key to 0f,
+                PresetField.BELL_MODE.key to 1f,
+                PresetField.BELL_FILL.key to 2f,
+            ),
+        )
+
+        assertEquals(IntValue(-1), portOf(CowbellSymbol.ENGINE.controlId))
+        assertEquals(IntValue(1), portOf(CowbellSymbol.OCTAVE.controlId))
+        assertEquals(BoolValue(false), portOf(CowbellSymbol.GRID.controlId))
+        assertEquals(IntValue(1), portOf(CowbellSymbol.MODE.controlId))
+        assertEquals(IntValue(2), portOf(CowbellSymbol.FILL.controlId))
     }
 
     @Test

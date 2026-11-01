@@ -18,12 +18,15 @@ import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.BaseAppPreferencesRepository
 import org.balch.orpheus.core.preferences.VibePreset
 import org.balch.orpheus.core.preferences.VibePresetSlot
+import org.balch.orpheus.features.cowbell.CowbellFeature
+import org.balch.orpheus.features.cowbell.CowbellViewModel
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.VibeAppliedListener
@@ -59,6 +62,7 @@ class VibePresetsViewModelTest {
     // Integer ports hold ints in the engine; the controller's 0.5 fallback would round on write-back.
     private val portValues = listOf(
         HornSymbol.BRAKE, PulsarSymbol.ROOT_NOTE, PulsarSymbol.SCALE, PulsarSymbol.ENVELOPE_MODE,
+        CowbellSymbol.ENGINE, CowbellSymbol.OCTAVE, CowbellSymbol.MODE, CowbellSymbol.FILL,
     ).associateTo(mutableMapOf<String, PortValue>()) { it.controlId.key to IntValue(0) }
 
     private val synth = SynthController().apply {
@@ -143,11 +147,19 @@ class VibePresetsViewModelTest {
         override val unconfined = Dispatchers.Main
     }
 
+    private class FakeCowbell(
+        base: CowbellFeature = CowbellViewModel.previewFeature(),
+    ) : CowbellFeature by base {
+        override val stateRestored = MutableStateFlow(false)
+    }
+
     private val pulsar = FakePulsar()
+    private val cowbell = FakeCowbell()
     private val sink = Sink()
 
     private fun vm(prefs: MemoryPrefs, available: Boolean = true) = VibePresetsViewModel(
         pulsar = pulsar,
+        cowbell = cowbell,
         synthController = synth,
         trackGainSink = sink,
         appPreferencesRepository = prefs,
@@ -568,6 +580,170 @@ class VibePresetsViewModelTest {
 
         assertTrue(pulsar.listeners.isEmpty())
         assertFalse(vm.stateFlow.value.available)
+    }
+
+    private val ringId = CowbellSymbol.RING.controlId
+    private val metalId = CowbellSymbol.METAL.controlId
+
+    private val bellRing = VibePresetSlot(
+        presets = listOf(VibePreset(1, "Long Ring", 10L, mapOf(PresetField.BELL_RING.key to 0.9f))),
+        selectedId = 1,
+        nextId = 2,
+    )
+
+    @Test
+    fun untouchedBellStaysOutOfASave() = runTest(dispatcher) {
+        val prefs = prefsWith()
+        val vm = vm(prefs)
+        watch(vm)
+        setPort(ringId, 0.3f)
+        pulsar.fireApply(vibe("A"))
+        setPort(PulsarSymbol.BASS_GAIN.controlId, 0.2f)
+
+        vm.actions.openCapture()
+        vm.actions.saveCapture("Mine", null)
+
+        val saved = prefs.prefs.vibePresets.getValue("A").presets.single()
+        assertFalse(saved.values.hasBell(), saved.values.toString())
+        assertEquals(0.2f, saved.values[PresetField.MIX_BASS.key])
+    }
+
+    @Test
+    fun changedBellSavesTheWholeBell() = runTest(dispatcher) {
+        val prefs = prefsWith()
+        val vm = vm(prefs)
+        watch(vm)
+        setPort(ringId, 0.3f)
+        setPort(metalId, 0.8f)
+        pulsar.fireApply(vibe("A"))
+        setPort(ringId, 0.6f)
+
+        vm.actions.openCapture()
+        assertTrue("BELL: RING 30%→60%" in vm.stateFlow.value.draft!!.chips)
+        vm.actions.saveCapture("Mine", null)
+
+        val saved = prefs.prefs.vibePresets.getValue("A").presets.single()
+        assertEquals(0.6f, saved.values[PresetField.BELL_RING.key])
+        assertEquals(0.8f, saved.values[PresetField.BELL_METAL.key])
+        assertEquals(mapOf(PresetField.BELL_RING.key to 0.3f), saved.originals)
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun presetWithABellSetsItAndItCarriesToTheNextVibe() = runTest(dispatcher) {
+        val vm = vm(prefsWith("A" to bellRing))
+        watch(vm)
+        setPort(ringId, 0.3f)
+
+        pulsar.fireApply(vibe("A"))
+        assertEquals(0.9f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+
+        pulsar.fireApply(vibe("B"))
+        assertEquals(0.9f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun presetWithoutABellLeavesItAlone() = runTest(dispatcher) {
+        val vm = vm(prefsWith("A" to bassHalf))
+        watch(vm)
+        setPort(ringId, 0.3f)
+
+        pulsar.fireApply(vibe("A"))
+
+        assertEquals(0.5f, port(PulsarSymbol.BASS_GAIN.controlId))
+        assertEquals(0.3f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun bellTweakOnAPresetWithoutABellShowsAsAChangeAndSaves() = runTest(dispatcher) {
+        val prefs = prefsWith("A" to bassHalf)
+        val vm = vm(prefs)
+        watch(vm)
+        setPort(ringId, 0.3f)
+        pulsar.fireApply(vibe("A"))
+
+        setPort(ringId, 0.6f)
+        assertTrue(vm.stateFlow.value.changed)
+
+        vm.actions.openCapture()
+        vm.actions.saveCapture("With Bell", null)
+
+        val saved = prefs.prefs.vibePresets.getValue("A").presets.last()
+        assertEquals(0.6f, saved.values[PresetField.BELL_RING.key])
+    }
+
+    @Test
+    fun originalDotLeavesTheBellAndClearsTheChange() = runTest(dispatcher) {
+        val vm = vm(prefsWith("A" to bellRing))
+        watch(vm)
+        setPort(ringId, 0.3f)
+        pulsar.fireApply(vibe("A"))
+        setPort(ringId, 0.6f)
+        assertTrue(vm.stateFlow.value.changed)
+
+        vm.actions.loadOriginal()
+
+        assertEquals(0.6f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun dotWithoutABellLeavesTheBellAndClearsTheChange() = runTest(dispatcher) {
+        val vm = vm(prefsWith("A" to bassHalf.copy(selectedId = null)))
+        watch(vm)
+        pulsar.fireApply(vibe("A"))
+        setPort(ringId, 0.6f)
+
+        vm.actions.select(1)
+
+        assertEquals(0.6f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun resaveOverAPresetWithABellKeepsIt() = runTest(dispatcher) {
+        val prefs = prefsWith("A" to bellRing)
+        val vm = vm(prefs)
+        watch(vm)
+        pulsar.fireApply(vibe("A"))
+        setPort(PulsarSymbol.BASS_GAIN.controlId, 0.2f)
+
+        vm.actions.openCapture()
+        vm.actions.saveCapture("Again", 1)
+
+        val saved = prefs.prefs.vibePresets.getValue("A").presets.single()
+        assertEquals(0.9f, saved.values[PresetField.BELL_RING.key])
+    }
+
+    @Test
+    fun lateBellRestoreIsNotAUserChange() = runTest(dispatcher) {
+        val prefs = prefsWith()
+        val vm = vm(prefs)
+        watch(vm)
+        pulsar.fireApply(vibe("A"))
+
+        setPort(ringId, 0.3f)
+        cowbell.stateRestored.value = true
+
+        assertFalse(vm.stateFlow.value.changed)
+        vm.actions.openCapture()
+        assertTrue(vm.stateFlow.value.draft!!.chips.isEmpty())
+    }
+
+    @Test
+    fun lateBellRestoreDoesNotBeatThePresetsBell() = runTest(dispatcher) {
+        val vm = vm(prefsWith("A" to bellRing))
+        watch(vm)
+        pulsar.fireApply(vibe("A"))
+
+        setPort(ringId, 0.3f)
+        cowbell.stateRestored.value = true
+
+        assertEquals(0.9f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
     }
 
     private companion object {

@@ -4,6 +4,7 @@ enum class PresetModule(val label: String) {
     MIX("MIX"),
     HORN("HORN"),
     PULSAR("PULSAR"),
+    BELL("BELL"),
 }
 
 /**
@@ -12,6 +13,8 @@ enum class PresetModule(val label: String) {
  *
  * The DJ panel is left out: it carries across vibe changes for live transitions. Stored
  * `dj.*` keys from older presets no longer match a field, so they are ignored.
+ *
+ * The cowbell is optional: a preset holds its `bell.*` keys only when the user changed the bell.
  */
 enum class PresetField(val key: String, val module: PresetModule, val label: String) {
     MIX_PERC("mix.perc", PresetModule.MIX, "PERC"),
@@ -60,6 +63,18 @@ enum class PresetField(val key: String, val module: PresetModule, val label: Str
     PULSAR_ENVELOPE("pulsar.envelope", PresetModule.PULSAR, "ENV"),
     PULSAR_ROOT("pulsar.root", PresetModule.PULSAR, "ROOT"),
     PULSAR_SCALE("pulsar.scale", PresetModule.PULSAR, "SCALE"),
+
+    BELL_LEVEL("bell.level", PresetModule.BELL, "LEVEL"),
+    BELL_MORE("bell.more", PresetModule.BELL, "MORE"),
+    BELL_METAL("bell.metal", PresetModule.BELL, "BODY"),
+    BELL_RING("bell.ring", PresetModule.BELL, "RING"),
+    BELL_INTENSITY("bell.intensity", PresetModule.BELL, "INTENSITY"),
+    BELL_ENGINE("bell.engine", PresetModule.BELL, "ENGINE"),
+    BELL_OCTAVE("bell.octave", PresetModule.BELL, "OCTAVE"),
+    BELL_GRID("bell.grid", PresetModule.BELL, "GRID"),
+    BELL_GRID_STRENGTH("bell.gridStrength", PresetModule.BELL, "STRENGTH"),
+    BELL_MODE("bell.mode", PresetModule.BELL, "MODE"),
+    BELL_FILL("bell.fill", PresetModule.BELL, "FILL"),
     ;
 
     companion object {
@@ -68,3 +83,11 @@ enum class PresetField(val key: String, val module: PresetModule, val label: Str
         fun byKey(key: String): PresetField? = byKey[key]
     }
 }
+
+private const val BELL_PREFIX = "bell."
+
+fun Map<String, Float>.bellOnly(): Map<String, Float> = filterKeys { it.startsWith(BELL_PREFIX) }
+
+fun Map<String, Float>.withoutBell(): Map<String, Float> = filterKeys { !it.startsWith(BELL_PREFIX) }
+
+fun Map<String, Float>.hasBell(): Boolean = keys.any { it.startsWith(BELL_PREFIX) }

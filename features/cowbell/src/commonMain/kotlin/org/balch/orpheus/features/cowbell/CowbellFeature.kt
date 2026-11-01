@@ -157,6 +157,9 @@ interface CowbellFeature : SynthFeature<CowbellUiState, CowbellPanelActions> {
 
     fun setMorphStyle(style: BellMorphStyle) {}
 
+    /** Turns true once saved knobs land on the ports. Stays false when there was nothing to restore. */
+    val stateRestored: StateFlow<Boolean> get() = DefaultStateRestored
+
     /**
      * The DJ cowbell panel is shown: keeps the bell audible through a paused vibe. Counted, so two
      * callers do not clear it while one remains. Orpheus never arms it: its pause is the master mute.
@@ -168,6 +171,7 @@ interface CowbellFeature : SynthFeature<CowbellUiState, CowbellPanelActions> {
 
     companion object {
         internal val DefaultMorphStyle: StateFlow<BellMorphStyle> = MutableStateFlow(BellMorphStyle.SHARDS)
+        internal val DefaultStateRestored: StateFlow<Boolean> = MutableStateFlow(false)
 
         internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
             override val panelId = PanelId.COWBELL
@@ -265,6 +269,8 @@ class CowbellViewModel(
     // A look, not a sound: presets, MIDI and the AI never carry it.
     private val morph = MutableStateFlow(BellMorphStyle.SHARDS)
     override val morphStyle: StateFlow<BellMorphStyle> = morph.asStateFlow()
+    private val restored = MutableStateFlow(false)
+    override val stateRestored: StateFlow<Boolean> = restored.asStateFlow()
     private val prefsScope: CoroutineScope = scope
     private val io = dispatcherProvider.io
 
@@ -363,6 +369,7 @@ class CowbellViewModel(
         modeFlow.value = IntValue(saved.mode.ordinal)
         fillFlow.value = IntValue(saved.fill.ordinal)
         setMotion(saved.motion)
+        restored.value = true
     }
 
     // The hold keeps a paused app's audio host running, or Android parks it and nothing renders.

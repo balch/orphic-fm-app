@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.merge
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
@@ -55,11 +57,26 @@ class VibePresetPorts(
     private val scale = flow(PulsarSymbol.SCALE.controlId)
     private val envelope = flow(PulsarSymbol.ENVELOPE_MODE.controlId)
 
+    private val bellLevel = flow(CowbellSymbol.LEVEL.controlId)
+    private val bellMore = flow(CowbellSymbol.MORE.controlId)
+    private val bellMetal = flow(CowbellSymbol.METAL.controlId)
+    private val bellRing = flow(CowbellSymbol.RING.controlId)
+    private val bellIntensity = flow(CowbellSymbol.INTENSITY.controlId)
+    private val bellEngine = flow(CowbellSymbol.ENGINE.controlId)
+    private val bellOctave = flow(CowbellSymbol.OCTAVE.controlId)
+    private val bellGrid = flow(CowbellSymbol.GRID.controlId)
+    private val bellGridStrength = flow(CowbellSymbol.GRID_STRENGTH.controlId)
+    private val bellMode = flow(CowbellSymbol.MODE.controlId)
+    private val bellFill = flow(CowbellSymbol.FILL.controlId)
+
     private fun floatPort(flow: MutableStateFlow<PortValue>): (Float) -> Unit =
         { flow.value = FloatValue(it) }
 
     private fun intPort(flow: MutableStateFlow<PortValue>): (Float) -> Unit =
         { flow.value = IntValue(it.roundToInt()) }
+
+    private fun boolPort(flow: MutableStateFlow<PortValue>): (Float) -> Unit =
+        { flow.value = BoolValue(it >= 0.5f) }
 
     private class Binding(val read: () -> Float, val write: (Float) -> Unit)
 
@@ -92,6 +109,17 @@ class VibePresetPorts(
         PresetField.PULSAR_ENVELOPE to port(envelope, intPort(envelope)),
         PresetField.PULSAR_ROOT to port(root, intPort(root)),
         PresetField.PULSAR_SCALE to port(scale, intPort(scale)),
+        PresetField.BELL_LEVEL to port(bellLevel, floatPort(bellLevel)),
+        PresetField.BELL_MORE to port(bellMore, floatPort(bellMore)),
+        PresetField.BELL_METAL to port(bellMetal, floatPort(bellMetal)),
+        PresetField.BELL_RING to port(bellRing, floatPort(bellRing)),
+        PresetField.BELL_INTENSITY to port(bellIntensity, floatPort(bellIntensity)),
+        PresetField.BELL_ENGINE to port(bellEngine, intPort(bellEngine)),
+        PresetField.BELL_OCTAVE to port(bellOctave, intPort(bellOctave)),
+        PresetField.BELL_GRID to port(bellGrid, boolPort(bellGrid)),
+        PresetField.BELL_GRID_STRENGTH to port(bellGridStrength, floatPort(bellGridStrength)),
+        PresetField.BELL_MODE to port(bellMode, intPort(bellMode)),
+        PresetField.BELL_FILL to port(bellFill, intPort(bellFill)),
     )
 
     private val trackKeys: Set<String> = PresetField.entries
@@ -108,6 +136,8 @@ class VibePresetPorts(
             perc, bass, keys, fx, drive,
             hornSpeed, hornRatio, hornDepth, hornMix, hornBrake,
             energy, complexity, mood, space, deep, root, scale, envelope,
+            bellLevel, bellMore, bellMetal, bellRing, bellIntensity, bellEngine, bellOctave,
+            bellGrid, bellGridStrength, bellMode, bellFill,
             pulsar.stateFlow.map { it.bpm }.distinctUntilChanged(),
         ) + if (captureTracks) listOf(tracks.state) else emptyList()
     ).map { source -> source.map { } }.merge()

@@ -62,5 +62,8 @@ class PresetNamingTest {
         assertEquals("Muted T3", name(PresetField.TRACKS_3_MUTE, 0f, 1f))
         assertEquals("Solo T2", name(PresetField.TRACKS_2_SOLO, 0f, 1f))
         assertEquals("D Key", name(PresetField.PULSAR_ROOT, 0f, 2f))
+        assertEquals("More Cowbell", name(PresetField.BELL_MORE, 0f, 0.5f))
+        assertEquals("Less Bell Ring", name(PresetField.BELL_RING, 0.6f, 0.2f))
+        assertEquals("New Bell", name(PresetField.BELL_ENGINE, -1f, 4f))
     }
 }

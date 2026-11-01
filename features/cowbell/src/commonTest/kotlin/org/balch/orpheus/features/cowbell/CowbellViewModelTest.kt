@@ -701,9 +701,23 @@ class CowbellViewModelTest {
     @Test
     fun orpheusSavesButLeavesTheRestoreToItsPresets() = runTest(testDispatcher) {
         prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(engine = 5)))
-        makeViewModel(restoreStrategy = RestoreStrategy.PRESET)
+        val vm = makeViewModel(restoreStrategy = RestoreStrategy.PRESET)
         advanceUntilIdle()
         assertEquals(IntValue(-1), knobPorts["engine"])
+        assertFalse(vm.stateRestored.value)
+    }
+
+    @Test
+    fun stateRestoredTurnsTrueOnlyAfterSavedKnobsLand() = runTest(testDispatcher) {
+        val untouched = makeViewModel()
+        advanceUntilIdle()
+        assertFalse(untouched.stateRestored.value)
+
+        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(engine = 5)))
+        val vm = makeViewModel()
+        advanceUntilIdle()
+        assertEquals(IntValue(5), knobPorts["engine"])
+        assertTrue(vm.stateRestored.value)
     }
 }
 

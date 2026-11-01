@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -26,8 +27,10 @@ import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.core.preferences.VibePreset
 import org.balch.orpheus.core.preferences.VibePresetSlot
 import org.balch.orpheus.djapp.DjBuildKonfig
+import org.balch.orpheus.features.cowbell.CowbellFeature
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.mixer.TrackGainSink
 import org.balch.orpheus.features.pulsar.mixer.TrackTuning
@@ -46,6 +49,7 @@ import kotlin.time.Clock
 @ContributesBinding(FeatureScope::class, binding = binding<VibePresetsFeature>())
 class VibePresetsViewModel(
     private val pulsar: PulsarFeature,
+    cowbell: CowbellFeature,
     synthController: SynthController,
     trackGainSink: TrackGainSink,
     private val appPreferencesRepository: AppPreferencesRepository,
@@ -68,6 +72,12 @@ class VibePresetsViewModel(
     private val book = MutableStateFlow<Map<String, VibePresetSlot>>(emptyMap())
     private val barShown = MutableStateFlow(false)
     private val baseline = MutableStateFlow<Map<String, Float>?>(null)
+
+    /**
+     * What the bell is compared against: its load-time values, moved on by each loaded dot and save.
+     * Kept apart from [baseline] because the original never writes the bell: it carries across vibes.
+     */
+    private val bellReference = MutableStateFlow<Map<String, Float>>(emptyMap())
     private val draft = MutableStateFlow<CaptureDraft?>(null)
     private val tuning = MutableStateFlow(TrackTuning())
 
@@ -125,9 +135,10 @@ class VibePresetsViewModel(
             combine(
                 combine(book, barShown, pulsar.vibeFlow, baseline, draft, ::Inputs),
                 tuning,
+                bellReference,
                 // A trigger only: it also fires for section tempo moves, so changed comes from a compare.
                 ports.changes.onStart { emit(Unit) },
-            ) { inputs, tuning, _ -> project(inputs, tuning) }
+            ) { inputs, tuning, bell, _ -> project(inputs, tuning, bell) }
                 .stateIn(scope, SynthFeature.sharingStrategy, VibePresetsUiState())
         }
 
@@ -145,14 +156,19 @@ class VibePresetsViewModel(
                 if (book.value != prefs.vibePresets) persistBook()
                 applyAfterLateLoad()
             }
+            scope.launch {
+                cowbell.stateRestored.first { it }
+                onBellRestored()
+            }
         }
     }
 
-    private fun project(inputs: Inputs, tuning: TrackTuning): VibePresetsUiState {
+    private fun project(inputs: Inputs, tuning: TrackTuning, bell: Map<String, Float>): VibePresetsUiState {
         val slot = inputs.book[inputs.vibe.name] ?: VibePresetSlot()
         val selected = slot.selected
         val reference = selected?.values ?: inputs.baseline
-        val changed = reference != null && changesBetween(reference, ports.read(tuning)).isNotEmpty()
+        val changed = reference != null &&
+            changesBetween(reference.withoutBell() + bell, ports.read(tuning)).isNotEmpty()
         return VibePresetsUiState(
             available = true,
             barShown = inputs.barShown,
@@ -175,9 +191,7 @@ class VibePresetsViewModel(
             listenedLoad = load
             if (vibe.name != draftVibe) draft.value = null
             val preset = book.value[vibe.name]?.selected ?: return@synchronized false
-            ports.write(preset.values)
-            presetOverBaseline = true
-            appliedLoad = load
+            applyPreset(preset, load)
             true
         }
     }.getOrElse { e ->
@@ -197,27 +211,52 @@ class VibePresetsViewModel(
         val vibe = pulsar.vibeFlow.value.name
         val preset = book.value[vibe]?.selected ?: return@synchronized
         if (!listenerRan) takeBaseline(vibe)
+        applyPreset(preset, load)
+    }
+
+    // The vibe load's write. A preset with no bell leaves a bell tweak still showing as a change.
+    private fun applyPreset(preset: VibePreset, load: Int) {
         ports.write(preset.values)
+        if (preset.values.hasBell()) syncBellReference()
         presetOverBaseline = true
         appliedLoad = load
+    }
+
+    /**
+     * The saved bell restores in the background, so it can land after the first vibe load. That
+     * would overwrite a preset's bell and read as a user change, so settle both once it lands.
+     */
+    private fun onBellRestored(): Unit = synchronized(applyLock) {
+        val vibe = baselineVibe ?: return@synchronized
+        book.value[vibe]?.selected?.values?.bellOnly()?.let(ports::write)
+        syncBellReference()
     }
 
     private fun takeBaseline(vibe: String) {
         // The horn starts off on each new vibe, so it is off in the original; a selected preset
         // applied after this turns it back on. A same-vibe re-apply keeps a live horn.
         if (vibe != baselineVibe) ports.write(HORN_OFF)
-        baseline.value = ports.read(TrackTuning())
+        baseline.value = ports.read(TrackTuning()).withoutBell()
+        syncBellReference()
         baselineVibe = vibe
         presetOverBaseline = false
     }
 
+    private fun syncBellReference() {
+        bellReference.value = ports.read(TrackTuning()).bellOnly()
+    }
+
     private fun current(): Map<String, Float> = ports.read(tuning.value)
+
+    /** The values a capture is measured against: the vibe's original, and the bell's own reference. */
+    private fun captureBase(current: Map<String, Float>): Map<String, Float> =
+        (baseline.value ?: current).withoutBell() + bellReference.value
 
     private fun onOpenCapture() {
         val vibe = pulsar.vibeFlow.value.name
         val slot = book.value[vibe] ?: VibePresetSlot()
         val current = current()
-        val changes = changesBetween(baseline.value ?: current, current)
+        val changes = changesBetween(captureBase(current), current)
         draftVibe = vibe
         draft.value = CaptureDraft(
             suggestedName = suggestPresetName(changes, slot.presets.map { it.name }.toSet()),
@@ -231,7 +270,7 @@ class VibePresetsViewModel(
     private fun onSaveCapture(name: String, replaceId: Int?) {
         val vibe = pulsar.vibeFlow.value.name
         val current = current()
-        val base = baseline.value ?: current
+        val base = captureBase(current)
         val changes = changesBetween(base, current)
         val changedKeys = changes.map { it.field.key }.toSet()
         val suggested = draft.value?.suggestedName
@@ -239,6 +278,9 @@ class VibePresetsViewModel(
         // A full book needs a preset the user picked to replace; never drop one silently.
         val before = book.value[vibe] ?: VibePresetSlot()
         if (before.isFull && before.replaceFor() == null) return
+        // The whole bell or none of it: a bell the user never set stays out, so it carries as last set.
+        val keepBell = changes.any { it.field.module == PresetModule.BELL } ||
+            before.selected?.values?.hasBell() == true
         updateSlot(vibe) { slot ->
             val replace = slot.replaceFor()
             if (slot.isFull && replace == null) return@updateSlot slot
@@ -247,11 +289,12 @@ class VibePresetsViewModel(
                     suggested ?: suggestPresetName(changes, slot.presets.map { it.name }.toSet())
                 },
                 atMs = clock.nowMs(),
-                values = current,
+                values = if (keepBell) current else current.withoutBell(),
                 originals = base.filterKeys { it in changedKeys },
                 replaceId = replace,
             )
         }
+        syncBellReference()
         draft.value = null
     }
 
@@ -260,6 +303,7 @@ class VibePresetsViewModel(
         val preset = book.value[vibe]?.presets?.firstOrNull { it.id == id } ?: return
         synchronized(applyLock) {
             ports.write(preset.values)
+            syncBellReference()
             presetOverBaseline = true
         }
         updateSlot(vibe) { it.select(id) }
@@ -268,6 +312,7 @@ class VibePresetsViewModel(
     private fun onLoadOriginal() {
         synchronized(applyLock) {
             baseline.value?.let(ports::write)
+            syncBellReference()
             presetOverBaseline = false
         }
         updateSlot(pulsar.vibeFlow.value.name) { it.select(null) }
