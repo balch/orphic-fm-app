@@ -114,7 +114,7 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
     """.trimIndent()
 
             override val portControlKeys = mapOf(
-                ResonatorSymbol.MODE.controlId.key to "Resonance model: Bar (modal), Sitar (sympathetic), String (plucked)",
+                ResonatorSymbol.MODE.controlId.key to "Resonance model (integer): 0=Bar (modal), 1=Sitar (sympathetic), 2=String (plucked)",
                 ResonatorSymbol.STRUCTURE.controlId.key to "Harmonic spread / inharmonicity",
                 ResonatorSymbol.BRIGHTNESS.controlId.key to "High-frequency content of the resonance",
                 ResonatorSymbol.DAMPING.controlId.key to "Resonance decay speed",

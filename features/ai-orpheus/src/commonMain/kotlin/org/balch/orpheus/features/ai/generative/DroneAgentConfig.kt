@@ -68,7 +68,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
 
         RESONATOR (Physical Modeling) - PERFECT FOR DRONES:
         Physical modeling for metallic, string-like, and bell textures:
-        - resonator_mode: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)
+        - resonator_mode (integer): 0=Modal (bell/chime), 1=Sympathetic (sitar), 2=String (sustained)
         - resonator_structure: Harmonic spread (0=focused, 1=wide/bell-like)
         - resonator_brightness: Tone color (0=dark/muted, 1=bright/shimmery)
         - resonator_damping: Decay time (0=infinite sustain, 1=quick fade)

@@ -174,7 +174,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         
         ### RESONATOR (Physical Modeling)
         Physical modeling resonator for metallic, string-like, and bell tones:
-        - resonator_mode: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar)
+        - resonator_mode (integer): 0=Modal (bell/plate), 1=Sympathetic (sitar), 2=String (Karplus-Strong)
         - resonator_structure: Harmonic spread/inharmonicity (0=focused, 1=wide/bell-like)
         - resonator_brightness: High frequency content (0=dark/warm, 1=bright/shimmery)
         - resonator_damping: Decay time (0=long sustain, 1=quick decay)

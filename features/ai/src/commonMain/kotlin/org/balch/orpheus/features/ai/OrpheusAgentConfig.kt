@@ -225,7 +225,7 @@ class OrpheusAgentConfig(
 
         ### RESONATOR (Physical Modeling)
         Physical modeling resonator for metallic, string-like, and bell tones:
-        - resonator_mode: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar)
+        - resonator_mode (integer): 0=Modal (bell/plate), 1=Sympathetic (sitar), 2=String (Karplus-Strong)
         - resonator_structure: Harmonic spread/inharmonicity (0-1)
         - resonator_brightness: High frequency content (0=dark, 1=bright)
         - resonator_damping: Decay time (0=long sustain, 1=quick decay)

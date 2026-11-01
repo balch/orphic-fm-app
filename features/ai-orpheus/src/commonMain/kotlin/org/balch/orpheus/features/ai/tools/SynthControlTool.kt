@@ -16,6 +16,8 @@ import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
+import kotlin.math.roundToInt
 
 @Serializable
 data class SynthControlArgs(
@@ -28,6 +30,7 @@ data class SynthControlArgs(
         Special cases:
         - BENDER: -1=full down, 0=center, +1=full up
         - Engine selection (duo_engine keys): Integer engine ID (0, 5-17). NOT 0-1 range.
+        - resonator_mode: Integer 0=Modal (Bar), 1=Sympathetic (Sitar), 2=String. NOT 0-1 range.
         - Duo patch cables are edited with the duo_patch tool, not this one.
         - Tune keys: 0.0-1.0 where 0.5=A3 (220Hz). tuneValue = 0.5 + (semitones from A3 / 48.0)
     """)
@@ -36,6 +39,16 @@ data class SynthControlArgs(
 
 @Serializable
 data class SynthControlResult(val success: Boolean, val message: String)
+
+/**
+ * The int to send for a discrete control, or null for a 0-1 control that gets ramped.
+ * A ramped FloatValue would be truncated by `asInt()`, so these must bypass the ramp.
+ */
+internal fun integerControlValue(id: PluginControlId, value: Float): Int? = when {
+    id.symbol.startsWith("duo_engine") -> value.toInt()
+    id == ResonatorSymbol.MODE.controlId -> value.roundToInt().coerceIn(0, 2)
+    else -> null
+}
 
 /**
  * Tool for controlling synth parameters via the SynthController.
@@ -112,9 +125,9 @@ class SynthControlTool(
                         message = "Unknown control: ${args.controlId}. Use user_manual tool to find valid symbols."
                     )
 
-                // Integer controls (engine selection) — set immediately, no ramping
-                if (targetId.symbol.startsWith("duo_engine")) {
-                    val intValue = args.value.toInt()
+                // Integer controls (engine/mode selection) — set immediately, no ramping
+                val intValue = integerControlValue(targetId, args.value)
+                if (intValue != null) {
                     synthController.setPluginControl(
                         id = targetId,
                         value = PortValue.IntValue(intValue),
@@ -236,7 +249,7 @@ class SynthControlTool(
                 Control synth parameters by short key (e.g. reverb_amount, voice_vibrato).
                 Use user_manual tool for detailed docs.
 
-                Values: 0.0-1.0 (except BENDER: -1.0 to +1.0, engine IDs: integers).
+                Values: 0.0-1.0 (except BENDER: -1.0 to +1.0, engine IDs and resonator_mode: integers).
 
                 Available controls:
                 $sections
