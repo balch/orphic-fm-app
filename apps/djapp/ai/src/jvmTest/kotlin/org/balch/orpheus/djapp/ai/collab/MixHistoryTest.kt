@@ -1,6 +1,10 @@
 package org.balch.orpheus.djapp.ai.collab
 
 import kotlin.test.Test
+import org.balch.orpheus.djapp.ai.tools.vibe
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.Vibe
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -253,5 +257,131 @@ class MixHistoryTest {
             .record(EditOrigin.USER, MixControl.Level(1), null, null, "", "", BenchLayers().diff(first), 0L)
             .record(EditOrigin.USER, MixControl.Pan(3), null, null, "", "", first.diff(second), 10_000L)
         assertEquals(second, h.layers())
+    }
+
+    private val file: Vibe = vibe("File").let { v ->
+        v.copy(tracks = v.tracks.toMutableList().also { it[0] = it[0].copy(role = TrackRole.Melodic()) })
+    }
+
+    private fun num(v: Float) = JsonPrimitive(v)
+
+    private fun MixHistory.edit(edited: Vibe, at: Long = 0L, origin: EditOrigin = EditOrigin.AGENT) =
+        recordVibe(origin, file, edited, at)
+
+    @Test
+    fun vibeEditRecordsOneRowPerField() {
+        val h = MixHistory().edit(file.copy(bpm = 130f, seed = 7))
+        assertEquals(listOf("bpm", "seed"), h.vibeEdits.map { it.path })
+        val bpm = h.vibeEdits.first()
+        assertEquals(num(120f), bpm.before)
+        assertEquals(num(130f), bpm.after)
+        assertTrue(bpm.on)
+    }
+
+    @Test
+    fun secondEditFoldsSamePathKeepingIdAndBefore() {
+        val h = MixHistory().edit(file.copy(bpm = 130f), at = 1_000).edit(file.copy(bpm = 140f), at = 2_000, origin = EditOrigin.USER)
+        val row = h.vibeEdits.single()
+        assertEquals(1, row.id)
+        assertEquals(num(120f), row.before)
+        assertEquals(num(140f), row.after)
+        assertEquals(1_000L, row.atMs)
+        assertEquals(2_000L, row.updatedMs)
+        assertEquals(EditOrigin.USER, row.origin)
+    }
+
+    @Test
+    fun unchangedRowKeepsItsPlace() {
+        val h = MixHistory().edit(file.copy(bpm = 130f), at = 1_000).edit(file.copy(bpm = 130f, seed = 7), at = 2_000)
+        assertEquals(listOf("bpm", "seed"), h.vibeEdits.map { it.path })
+        assertEquals(1_000L, h.vibeEdits.first().updatedMs)
+    }
+
+    @Test
+    fun editBackToFileDropsRow() {
+        val h = MixHistory().edit(file.copy(bpm = 130f)).edit(file)
+        assertTrue(h.vibeEdits.isEmpty())
+    }
+
+    @Test
+    fun foldStopsAtPoint() {
+        val h = MixHistory().edit(file.copy(bpm = 130f)).capture(5_000, "Capture 1", "a.json")
+            .recordVibe(EditOrigin.AGENT, file, file.copy(bpm = 140f), 6_000)
+        assertEquals(2, h.vibeEdits.size)
+        assertEquals(num(130f), h.vibeEdits[0].after)
+        assertEquals(num(130f), h.vibeEdits[1].before)
+        assertEquals(num(140f), h.vibeEdits[1].after)
+    }
+
+    @Test
+    fun granularityFlipReplacesWholeRow() {
+        val whole = file.copy(tracks = file.tracks.toMutableList().also { it[0] = it[0].copy(role = TrackRole.Chordal()) })
+        val leaf = file.copy(
+            tracks = file.tracks.toMutableList().also { it[0] = it[0].copy(role = TrackRole.Melodic(lickDegreeOffset = 2)) },
+        )
+        val h = MixHistory().edit(whole)
+        assertEquals(listOf("tracks[0].role"), h.vibeEdits.map { it.path })
+        val flipped = h.edit(leaf)
+        assertEquals(listOf("tracks[0].role.lickDegreeOffset"), flipped.vibeEdits.map { it.path })
+    }
+
+    @Test
+    fun mixerPathsIgnored() {
+        val edited = file.copy(
+            energy = 0.9f,
+            tracks = file.tracks.toMutableList().also { it[1] = it[1].copy(pan = 0.5f) },
+        )
+        assertTrue(MixHistory().edit(edited).vibeEdits.isEmpty())
+        assertEquals(listOf("bpm"), MixHistory().edit(edited.copy(bpm = 130f)).vibeEdits.map { it.path })
+    }
+
+    @Test
+    fun effectiveAtPointReplaysRowsBeforeIt() {
+        val h = MixHistory().edit(file.copy(bpm = 130f)).mark(1_000).recordVibe(EditOrigin.AGENT, file, file.copy(bpm = 130f, seed = 7), 2_000)
+        val point = h.items.filterIsInstance<HistoryPoint>().single()
+        assertEquals(130f, h.effectiveAt(file, point.id).bpm)
+        assertEquals(0, h.effectiveAt(file, point.id).seed)
+        assertEquals(7, h.effective(file).seed)
+        assertEquals(file, h.effectiveAt(file, MixHistory.FILE))
+    }
+
+    @Test
+    fun toggleVibeRow() {
+        val h = MixHistory().edit(file.copy(bpm = 130f))
+        val off = h.toggle(h.vibeEdits.single().id)
+        assertFalse(off.vibeEdits.single().on)
+        assertEquals(120f, off.effective(file).bpm)
+        assertEquals(130f, off.toggle(off.vibeEdits.single().id).effective(file).bpm)
+    }
+
+    @Test
+    fun offRowsAreNeverFolded() {
+        val h = MixHistory().edit(file.copy(bpm = 130f))
+        val off = h.toggle(h.vibeEdits.single().id).edit(file.copy(bpm = 140f))
+        assertEquals(listOf(false, true), off.vibeEdits.map { it.on })
+        assertEquals(num(130f), off.vibeEdits[0].after)
+    }
+
+    @Test
+    fun keepOnlyDropsVibeRows() {
+        val h = MixHistory().edit(file.copy(bpm = 130f))
+        assertTrue(h.keepOnly(BenchLayers(), pinned = setOf(0)).vibeEdits.isEmpty())
+    }
+
+    @Test
+    fun uncapturedCountIncludesVibeRows() {
+        val h = MixHistory().rec(MixControl.Level(2), level2, null, -3f).edit(file.copy(bpm = 130f))
+        assertEquals(2, h.uncapturedCount)
+        assertEquals(1, h.uncaptured.size)
+        assertEquals(0, h.capture(1_000, "c", null).uncapturedCount)
+    }
+
+    @Test
+    fun serializesRoundTrip() {
+        val h = MixHistory().edit(file.copy(bpm = 130f)).mark(1_000)
+        val set = StoredChangeSet("File", "hash", h.items, h.nextId, h.pointCount)
+        val json = Json { allowStructuredMapKeys = true; encodeDefaults = true; ignoreUnknownKeys = true }
+        val text = json.encodeToString(StoredChangeSet.serializer(), set)
+        assertEquals(set, json.decodeFromString(StoredChangeSet.serializer(), text))
     }
 }

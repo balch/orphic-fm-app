@@ -13,7 +13,6 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.playback.PlaybackState
-import org.balch.orpheus.djapp.ai.collab.DjVibeApplyGuard
 import org.balch.orpheus.features.pulsar.PulsarFeature
 
 @LLMDescription("The vibe catalog.")
@@ -82,7 +81,6 @@ class VibeListTool(private val pulsarFeatureProvider: () -> PulsarFeature) : Too
 class VibeLoadTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val dispatchers: DispatcherProvider,
-    private val wipeGuard: DjVibeApplyGuard,
 ) : ToolProvider {
     override val tool: Tool<VibeLoadArgs, VibeLoadResult> by lazy {
         object : Tool<VibeLoadArgs, VibeLoadResult>(
@@ -98,14 +96,8 @@ class VibeLoadTool(
                 val pulsar = pulsarFeatureProvider()
                 val name = pulsar.vibeNames.firstOrNull { it.equals(args.name.trim(), ignoreCase = true) }
                     ?: badArg("no vibe named \"${args.name}\"; see vibe_list")
-                wipeGuard.beforeApply()
-                val loaded = runCatching { withContext(dispatchers.main) { pulsar.applyVibeByName(name) } }
-                    .onFailure { wipeGuard.applyFailed() }
-                    .getOrThrow()
-                if (!loaded) {
-                    wipeGuard.applyFailed()
-                    badArg("vibe \"$name\" did not load")
-                }
+                val loaded = withContext(dispatchers.main) { pulsar.applyVibeByName(name) }
+                if (!loaded) badArg("vibe \"$name\" did not load")
                 VibeLoadResult(true, "Loaded \"$name\".", name)
             }
         }

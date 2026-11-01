@@ -312,27 +312,6 @@ class VibeApplyToolTest {
         assertEquals(1, pulsar.applied.size)
     }
 
-    @Test
-    fun guardsHearOfTheApplyBeforeItLands() = runBlocking {
-        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
-        val heard = mutableListOf<String>()
-        val guard = object : VibeApplyGuard {
-            override suspend fun refusal(): String? = null
-            override suspend fun beforeApply() {
-                heard += "before, ${pulsar.applied.size} applied"
-            }
-            override fun applyFailed() {
-                heard += "failed"
-            }
-        }
-        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), setOf(guard), AgentErrorLog()).tool
-        assertTrue(tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe))).success)
-        assertEquals(listOf("before, 0 applied"), heard)
-        // A vibe that never decodes never reaches the guard's hooks.
-        assertFalse(tool.execute(VibeApplyArgs("{")).success)
-        assertEquals(listOf("before, 0 applied"), heard)
-    }
-
     /** Records applies; the rest of Pulsar stays at its stub defaults. */
     private class ApplyOnlyPulsar(first: Vibe) : PulsarFeature {
         val applied = mutableListOf<Vibe>()

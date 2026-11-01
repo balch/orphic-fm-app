@@ -4,7 +4,11 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.djapp.ai.tools.vibeEditedMessage
+import org.balch.orpheus.djapp.ai.tools.withNewVibePointer
 import org.balch.orpheus.features.ai.tools.VibeApplyGuard
+import org.balch.orpheus.features.ai.tools.VibeApplyResult
+import org.balch.orpheus.features.pulsar.models.Vibe
 
 /**
  * The agent's `mix_reset` asks the user first while it would clear controls they changed and they have not confirmed
@@ -19,10 +23,16 @@ class DjVibeApplyGuard(
 ) : VibeApplyGuard {
     override suspend fun refusal(): String? = null
 
-    // The History keeps what the apply replaces, so the user can roll the apply back.
-    override suspend fun beforeApply() = collabMixer.keepBeforeApply(collabMixer.toolOrigin())
-
-    override fun applyFailed() = collabMixer.dropBeforeApply()
+    // The playing vibe's own name is an edit of its file; editVibe strips mixer fields and names them.
+    override suspend fun applyAsEdit(vibe: Vibe): VibeApplyResult? {
+        val file = collabMixer.fileVibe() ?: return null
+        if (!file.name.equals(vibe.name, ignoreCase = true)) return null
+        return when (val r = collabMixer.editVibe(collabMixer.toolOrigin(), vibe)) {
+            is VibeEditResult.Applied -> VibeApplyResult(true, vibeEditedMessage(file.name, r.rows, r.ignoredMixerPaths), file.name)
+            is VibeEditResult.Refused -> VibeApplyResult(false, withNewVibePointer(r.reason, r.structure))
+            is VibeEditResult.Invalid -> VibeApplyResult(false, r.message)
+        }
+    }
 
     /** For `mix_reset`, which clears only the user's levels, pans and sends on unpinned strips. */
     suspend fun resetRefusal(): CollabResult.Refused? {

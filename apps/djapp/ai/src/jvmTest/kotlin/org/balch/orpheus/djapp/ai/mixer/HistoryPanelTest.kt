@@ -148,6 +148,27 @@ class HistoryPanelTest {
     }
 
     @Test
+    fun historyPanelRendersVibeRow() {
+        val on = VibeEditRow(5, "chorus · KICK morph", "0.20", "0.80", "Orpheus", on = true, captured = true, atMs = 50_000L)
+        val off = VibeEditRow(6, "bpm", "120", "96", "Claude Code", on = false, captured = false, atMs = 60_000L)
+        val state = base.copy(history = rows + on + off)
+        val calls = Calls()
+        scene(state, calls) {
+            assertTrue(hasText("chorus · KICK morph  0.20 → 0.80"))
+            assertTrue(hasText("captured"), "a captured vibe row carries the tag")
+            assertTrue(hasText("vibe · now"), "the age line names what the row edits")
+            assertTrue(hasText("vibe · now · off"), "an off row says so")
+            tap(byDescription("Turn off chorus · KICK morph"))
+            tap(byDescription("Turn on bpm"))
+            assertEquals(listOf("toggle 5", "toggle 6"), calls.log)
+            val tops = listOf("bpm", "chorus · KICK morph", "KICK reverb").map { byText(it).boundsInRoot.top }
+            assertEquals(tops.sorted(), tops, "vibe rows sit in the timeline, newest first")
+            tap(byTag(historyRollBackTag(3)))
+            assertTrue(hasText("Throw away 3 changes after this?"), "vibe rows count as changes after a point")
+        }
+    }
+
+    @Test
     fun tappingTheRowElsewhereDoesNothing() {
         val calls = Calls()
         scene(base, calls) {

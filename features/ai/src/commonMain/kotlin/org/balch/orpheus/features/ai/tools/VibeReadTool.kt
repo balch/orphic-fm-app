@@ -27,7 +27,7 @@ data class VibeReadArgs(
 data class VibeReadResult(
     @property:LLMDescription("True if a vibe was found and returned.")
     val success: Boolean,
-    @property:LLMDescription("The vibe as JSON. For 'current', edit it and pass it to pulsar_apply_vibe. Empty when success is false.")
+    @property:LLMDescription("The vibe as JSON. To tweak 'current', use pulsar_edit_vibe with only the changed paths when that tool is available; otherwise edit it and pass it to pulsar_apply_vibe. Empty when success is false.")
     val vibeJson: String,
     @property:LLMDescription("All shipped vibe names you can read for reference.")
     val availableNames: List<String>,
@@ -84,8 +84,9 @@ class VibeReadTool(
             name = "pulsar_get_vibe",
             description = """
                 Read a Pulsar beat-machine vibe as JSON.
-                Pass 'current' to tweak the vibe playing now: change only the fields you need and send
-                it to pulsar_apply_vibe.
+                Pass 'current' to tweak the vibe playing now. To tweak it, use pulsar_edit_vibe with only the
+                changed paths when that tool is available; otherwise change only the fields you need and
+                send the JSON to pulsar_apply_vibe.
                 Pass a shipped vibe's name for reference only: borrow ideas (how it builds a singer,
                 a groove, a section), never start from this vibe. Start new vibes with pulsar_cast_vibe.
                 For DX/DX2/DX3, 'harmonics' selects a 32-patch bank (set it deliberately); it is not a

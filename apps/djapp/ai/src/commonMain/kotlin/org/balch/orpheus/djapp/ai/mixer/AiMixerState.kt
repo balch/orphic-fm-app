@@ -4,11 +4,18 @@ import androidx.compose.runtime.Immutable
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.min
+import kotlin.math.round
 import kotlin.math.roundToLong
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.HistoryChange
 import org.balch.orpheus.djapp.ai.collab.HistoryItem
 import org.balch.orpheus.djapp.ai.collab.HistoryPoint
+import org.balch.orpheus.djapp.ai.collab.HistoryVibeEdit
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.collab.MixHistory
 import org.balch.orpheus.djapp.ai.collab.PointKind
@@ -86,8 +93,6 @@ data class AiMixerUiState(
     val onCount: Int = 0,
     /** When the vibe loaded, for the File row's age. */
     val loadedAtMs: Long = 0L,
-    /** The vibe an agent or MCP apply replaced, which the timeline can roll back to; null after any other load. */
-    val beforeApply: BeforeApplyRow? = null,
 ) {
     val sectionScope: Boolean get() = scope == Scope.SECTION && sectionScopeAvailable && section >= 0
 
@@ -95,15 +100,7 @@ data class AiMixerUiState(
     val changeCount: Int get() = changes.size
 
     /** The changes History lists, for the header button: one edit can write several file values. */
-    val historyChangeCount: Int get() = history.count { it is ChangeRow }
-}
-
-/** The timeline's row under File: the vibe the apply replaced, with [changes] mix edits of its own. */
-@Immutable
-data class BeforeApplyRow(val vibeName: String, val who: String, val changes: Int, val atMs: Long)
-
-fun beforeApplyRow(h: MixHistory): BeforeApplyRow? = h.beforeApply?.let {
-    BeforeApplyRow(it.vibe.name, it.origin.who(), it.history.onCount, it.atMs)
+    val historyChangeCount: Int get() = history.count { it.isChange }
 }
 
 /** One row of the History timeline. */
@@ -129,16 +126,35 @@ data class ChangeRow(
 @Immutable
 data class PointRow(val id: Int, val label: String, val atMs: Long, val capture: Boolean = false) : HistoryRow
 
+/** One edited vibe field on top of the file: [label] names it in words, [before] and [after] are short texts. */
+@Immutable
+data class VibeEditRow(
+    val id: Int,
+    val label: String,
+    val before: String,
+    val after: String,
+    val who: String,
+    val on: Boolean,
+    /** At or below the newest capture checkpoint, so it is saved in a capture file. */
+    val captured: Boolean,
+    val atMs: Long,
+) : HistoryRow
+
+/** A mix change or a vibe field edit: what the timeline counts as a change. */
+internal val HistoryRow.isChange: Boolean get() = this is ChangeRow || this is VibeEditRow
+
+private val HistoryRow.isOn: Boolean get() = (this as? ChangeRow)?.on ?: (this as? VibeEditRow)?.on ?: false
+
 /** The on changes above the newest capture row, or null when the timeline has no capture. */
 fun uncapturedOn(rows: List<HistoryRow>): Int? {
     val at = rows.indexOfLast { it is PointRow && it.capture }
     if (at < 0) return null
-    return rows.drop(at + 1).count { it is ChangeRow && it.on }
+    return rows.drop(at + 1).count { it.isOn }
 }
 
 /** The Now line after "Now": " · N uncaptured of M changes on" once a capture exists, else " · N of M changes on". */
 fun nowDetail(rows: List<HistoryRow>, onCount: Int): String {
-    val total = rows.count { it is ChangeRow }
+    val total = rows.count { it.isChange }
     val uncaptured = uncapturedOn(rows) ?: return " · $onCount of $total changes on"
     return " · $uncaptured uncaptured of $total changes on"
 }
@@ -165,7 +181,51 @@ fun historyRows(h: MixHistory, vibe: Vibe? = null, trackNames: (Int) -> String):
         val without = capture(vibe, h.toggle(c.id).layers())
         return now.filter { r -> without.none { it.sameField(r) && abs(it.new - r.new) <= 1e-4f } }
     }
-    return h.items.map { item -> historyRow(h, item, trackNames, ::writesOf) }
+    return h.items.map { item -> historyRow(h, item, vibe, trackNames, ::writesOf) }
+}
+
+private val TRACK_ENGINE = Regex("""tracks\[(\d+)]\.engine(Edm|Space)\.(.+)""")
+private val SECTION_OVERRIDE = Regex("""arrangement\.sections\[(\d+)]\.trackOverrides\.(\d+)\.(.+)""")
+
+private val TRACK_FIELD = Regex("""tracks\[(\d+)]\.(.+)""")
+private val SECTION_FIELD = Regex("""arrangement\.sections\[(\d+)]\.(.+)""")
+
+/** A vibe field path in words: "TEXT · EDM engine", "chorus · KICK morph", "bridge · compingStyle", else the last two segments. */
+internal fun vibePathLabel(path: String, vibe: Vibe?, trackNames: (Int) -> String): String {
+    TRACK_ENGINE.matchEntire(path)?.let { m ->
+        val (track, slot, field) = m.destructured
+        return "${trackNames(track.toInt())} · ${if (slot == "Edm") "EDM" else "Space"} ${if (field == "engineId") "engine" else field}"
+    }
+    SECTION_OVERRIDE.matchEntire(path)?.let { m ->
+        val (section, track, field) = m.destructured
+        val name = vibe?.arrangement?.sections?.getOrNull(section.toInt())?.name ?: "section $section"
+        return "$name · ${trackNames(track.toInt())} $field"
+    }
+    TRACK_FIELD.matchEntire(path)?.let { m ->
+        return "${trackNames(m.groupValues[1].toInt())} · ${m.groupValues[2]}"
+    }
+    SECTION_FIELD.matchEntire(path)?.let { m ->
+        val section = m.groupValues[1]
+        val name = vibe?.arrangement?.sections?.getOrNull(section.toInt())?.name ?: "section $section"
+        return "$name · ${m.groupValues[2]}"
+    }
+    return path.split('.').takeLast(2).joinToString(".")
+}
+
+/** A vibe field's value as the row shows it: numbers to 2 decimals (whole numbers as they are), enum names, counts for lists. */
+internal fun shortJson(e: JsonElement): String = when (e) {
+    JsonNull -> "(none)"
+    is JsonPrimitive -> {
+        val text = e.content
+        val n = if (e.isString) null else text.toDoubleOrNull()
+        when {
+            n == null -> text
+            n == round(n) && abs(n) < 1e15 -> n.toLong().toString()
+            else -> f2(n.toFloat())
+        }
+    }
+    is JsonArray -> "(${e.size} steps)"
+    is JsonObject -> "(changed)"
 }
 
 private fun CaptureRow.sameField(o: CaptureRow) =
@@ -174,6 +234,7 @@ private fun CaptureRow.sameField(o: CaptureRow) =
 private fun historyRow(
     h: MixHistory,
     item: HistoryItem,
+    vibe: Vibe?,
     trackNames: (Int) -> String,
     writesOf: (HistoryChange) -> List<CaptureRow>,
 ): HistoryRow =
@@ -192,6 +253,16 @@ private fun historyRow(
             captured = h.isCaptured(item.id),
         )
         is HistoryPoint -> PointRow(item.id, item.label, item.atMs, item.kind == PointKind.CAPTURE)
+        is HistoryVibeEdit -> VibeEditRow(
+            id = item.id,
+            label = vibePathLabel(item.path, vibe, trackNames),
+            before = shortJson(item.before),
+            after = shortJson(item.after),
+            who = item.origin.who(),
+            on = item.on,
+            captured = h.isCaptured(item.id),
+            atMs = item.atMs,
+        )
     }
 
 /** The header's changes button text. */

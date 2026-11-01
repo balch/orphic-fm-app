@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -118,18 +119,19 @@ internal fun HistoryTitle(state: AiMixerUiState, actions: AiMixerActions, modifi
 internal fun HistoryTimeline(state: AiMixerUiState, actions: AiMixerActions, nowMs: Long, modifier: Modifier = Modifier) {
     var rolling by remember { mutableStateOf<Int?>(null) }
     val rows = state.history
-    val changeCount = rows.count { it is ChangeRow }
+    val changeCount = rows.count { it.isChange }
     Column(modifier) {
         NowLine(nowDetail(rows, state.onCount))
         // Rows stay oldest-first in state, so a point's "after" is still the rows that follow it there.
         for (i in rows.indices.reversed()) {
             when (val row = rows[i]) {
                 is ChangeRow -> ChangeLine(row, nowMs, actions)
+                is VibeEditRow -> VibeEditLine(row, nowMs, actions)
                 is PointRow -> PointLine(
                     id = row.id,
                     label = row.label,
                     age = ageText(nowMs - row.atMs),
-                    changesAfter = rows.drop(i + 1).count { it is ChangeRow },
+                    changesAfter = rows.drop(i + 1).count { it.isChange },
                     hearing = state.hearing,
                     actions = actions,
                     rolling = rolling == row.id,
@@ -148,25 +150,9 @@ internal fun HistoryTimeline(state: AiMixerUiState, actions: AiMixerActions, now
             actions = actions,
             rolling = rolling == MixHistory.FILE,
             onRolling = { rolling = it },
-            last = state.beforeApply == null,
+            last = true,
             diamond = MixerInk.dim,
         )
-        state.beforeApply?.let { b ->
-            val edits = if (b.changes == 0) "" else " · ${if (b.changes == 1) "1 mix change" else "${b.changes} mix changes"}"
-            PointLine(
-                id = MixHistory.BEFORE_APPLY,
-                label = "Before ${b.who}'s apply: ${b.vibeName}",
-                age = ageText(nowMs - b.atMs) + edits,
-                changesAfter = changeCount,
-                hearing = state.hearing,
-                actions = actions,
-                rolling = rolling == MixHistory.BEFORE_APPLY,
-                onRolling = { rolling = it },
-                last = true,
-                diamond = MixerInk.dim,
-                confirm = "Go back to ${b.vibeName} and its mix? The song restarts.",
-            )
-        }
         CaptureWrites(state.changes)
     }
 }
@@ -189,34 +175,88 @@ private fun Gutter(first: Boolean, last: Boolean, modifier: Modifier = Modifier,
 
 @Composable
 private fun ChangeLine(row: ChangeRow, nowMs: Long, actions: AiMixerActions) {
-    val dim = !row.on
+    var open by remember(row.id) { mutableStateOf(false) }
+    EditLine(
+        id = row.id,
+        on = row.on,
+        who = row.who,
+        label = row.label,
+        before = row.before,
+        after = row.after,
+        ctx = row.where + " · " + ageText(nowMs - row.atMs) + if (row.on) "" else " · off",
+        captured = row.captured,
+        onToggle = { actions.toggleChange(row.id) },
+        notes = {
+            if (row.covered) {
+                Text("covered by a later change", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.changed), textAlign = TextAlign.End)
+            } else if (row.on) {
+                WritesToggle(row, open) { open = !open }
+            }
+        },
+    ) {
+        if (open && row.writes.isNotEmpty()) {
+            ChangesList(remember(row.writes) { changeLines(row.writes) }, Modifier.fillMaxWidth().padding(top = 6.dp))
+        }
+    }
+}
+
+/** A vibe field edit: the same row as a mix change, with no file values to list under it. */
+@Composable
+private fun VibeEditLine(row: VibeEditRow, nowMs: Long, actions: AiMixerActions) {
+    EditLine(
+        id = row.id,
+        on = row.on,
+        who = row.who,
+        label = row.label,
+        before = row.before,
+        after = row.after,
+        ctx = "vibe · " + ageText(nowMs - row.atMs) + if (row.on) "" else " · off",
+        captured = row.captured,
+        onToggle = { actions.toggleChange(row.id) },
+    )
+}
+
+/** One toggleable timeline row: the on/off node, then the who chip, the label with its before and after, and the notes. */
+@Composable
+private fun EditLine(
+    id: Int,
+    on: Boolean,
+    who: String,
+    label: String,
+    before: String,
+    after: String,
+    ctx: String,
+    captured: Boolean,
+    onToggle: () -> Unit,
+    notes: @Composable ColumnScope.() -> Unit = {},
+    below: @Composable ColumnScope.() -> Unit = {},
+) {
+    val dim = !on
     val strike = if (dim) TextDecoration.LineThrough else null
     val text = buildAnnotatedString {
-        append(row.label + "  ")
-        withStyle(SpanStyle(color = if (dim) MixerInk.dim else MixerInk.red)) { append(row.before) }
+        append("$label  ")
+        withStyle(SpanStyle(color = if (dim) MixerInk.dim else MixerInk.red)) { append(before) }
         append(" → ")
-        withStyle(SpanStyle(color = if (dim) MixerInk.dim else MixerInk.green)) { append(row.after) }
+        withStyle(SpanStyle(color = if (dim) MixerInk.dim else MixerInk.green)) { append(after) }
     }
-    val ctx = row.where + " · " + ageText(nowMs - row.atMs) + if (dim) " · off" else ""
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
         Gutter(first = false, last = false, Modifier.fillMaxHeight()) {
-            val verb = if (row.on) "Turn off" else "Turn on"
+            val verb = if (on) "Turn off" else "Turn on"
             Box(
                 Modifier
                     .size(NODE_TARGET)
-                    .testTag(historyNodeTag(row.id))
-                    .clickable(role = Role.Switch) { actions.toggleChange(row.id) }
-                    .semantics { contentDescription = "$verb ${row.label}" },
+                    .testTag(historyNodeTag(id))
+                    .clickable(role = Role.Switch, onClick = onToggle)
+                    .semantics { contentDescription = "$verb $label" },
                 contentAlignment = Alignment.Center,
             ) {
-                if (row.on) {
+                if (on) {
                     Box(Modifier.size(10.dp).clip(CircleShape).background(MixerInk.accent))
                 } else {
                     Box(Modifier.size(8.dp).clip(CircleShape).border(2.dp, MixerInk.dim, CircleShape))
                 }
             }
         }
-        var open by remember(row.id) { mutableStateOf(false) }
         Column(
             Modifier
                 .weight(1f)
@@ -227,7 +267,7 @@ private fun ChangeLine(row: ChangeRow, nowMs: Long, actions: AiMixerActions) {
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.Top) {
-                    WhoChip(row.who)
+                    WhoChip(who)
                     Text(
                         text,
                         style = mixText(legible(LegibleText.MIXER_MIN), if (dim) MixerInk.dim else MixerInk.text, mono = true)
@@ -237,17 +277,11 @@ private fun ChangeLine(row: ChangeRow, nowMs: Long, actions: AiMixerActions) {
                 }
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 150.dp * textScale())) {
                     Text(ctx, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), textAlign = TextAlign.End)
-                    if (row.covered) {
-                        Text("covered by a later change", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.changed), textAlign = TextAlign.End)
-                    } else if (row.on) {
-                        WritesToggle(row, open) { open = !open }
-                    }
-                    if (row.captured) Text("captured", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.accentSoft), textAlign = TextAlign.End)
+                    notes()
+                    if (captured) Text("captured", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.accentSoft), textAlign = TextAlign.End)
                 }
             }
-            if (open && row.writes.isNotEmpty()) {
-                ChangesList(remember(row.writes) { changeLines(row.writes) }, Modifier.fillMaxWidth().padding(top = 6.dp))
-            }
+            below()
         }
     }
 }
@@ -301,8 +335,6 @@ private fun PointLine(
     last: Boolean = false,
     diamond: Color,
     border: Color = if (id == MixHistory.FILE) MixerInk.line else MixerInk.changed,
-    /** The rollback question; null asks to throw away the [changesAfter] changes. A point with its own text has no hear. */
-    confirm: String? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
@@ -323,7 +355,7 @@ private fun PointLine(
             if (rolling) {
                 val n = if (changesAfter == 1) "1 change" else "$changesAfter changes"
                 Text(
-                    confirm ?: "Throw away $n after this?",
+                    "Throw away $n after this?",
                     style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.changed, FontWeight.SemiBold),
                     modifier = Modifier.weight(1f),
                 )
@@ -334,7 +366,7 @@ private fun PointLine(
                     Text(label, style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text, FontWeight.Bold))
                     if (age.isNotEmpty()) Text(age, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
                 }
-                if (confirm == null) HearButton(id, hearing == id, actions)
+                HearButton(id, hearing == id, actions)
                 HistoryButton("roll back here", { onRolling(id) }, Modifier.testTag(historyRollBackTag(id)), warn = true)
             }
         }

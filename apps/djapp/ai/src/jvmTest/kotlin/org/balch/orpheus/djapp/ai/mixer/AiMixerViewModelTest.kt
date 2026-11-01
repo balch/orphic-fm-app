@@ -23,6 +23,7 @@ import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.collab.MixMove
+import org.balch.orpheus.djapp.ai.collab.VibeEditResult
 import org.balch.orpheus.djapp.ai.tools.FakePulsar
 import org.balch.orpheus.djapp.ai.tools.OneDispatcher
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
@@ -34,6 +35,7 @@ import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.models.Vibe
 import kotlin.test.AfterTest
@@ -57,7 +59,7 @@ class AiMixerViewModelTest {
     }
 
     private class FakeCapture(private val rows: Int = 2) : MixCaptureService {
-        override suspend fun capture() = CaptureOutcome(
+        override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>) = CaptureOutcome(
             ok = true,
             message = "wrote it",
             file = "/tmp/capture.json",
@@ -78,21 +80,24 @@ class AiMixerViewModelTest {
         val vm: AiMixerViewModel,
         val collab: MixCollab,
         val tap: CountingTap,
+        val mixer: CollabMixer,
     )
 
     private suspend fun TestScope.rig(
         vibe: Vibe = vibe("Night Drive"),
         controllerScope: CoroutineScope = backgroundScope,
         capture: MixCaptureService = FakeCapture(),
+        others: List<Vibe> = emptyList(),
     ): Rig {
-        val pulsar = FakePulsar(listOf(vibe))
+        val pulsar = FakePulsar(listOf(vibe) + others)
         val tap = CountingTap()
         val controller = MixBenchController(pulsar, synth, tap, controllerScope).also { it.start() }
         val collab = MixCollab()
+        val mixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope, captureService = { capture })
         val vm = AiMixerViewModel(
             controllerProvider = { controller },
             pulsarFeature = pulsar,
-            collabMixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope, captureService = { capture }),
+            collabMixer = mixer,
             collab = collab,
             scope = FeatureCoroutineScope(),
             dispatchers = OneDispatcher(testDispatcher),
@@ -100,7 +105,7 @@ class AiMixerViewModelTest {
         )
         backgroundScope.launch { vm.stateFlow.collect {} }
         runCurrent()
-        return Rig(pulsar, controller, vm, collab, tap)
+        return Rig(pulsar, controller, vm, collab, tap, mixer)
     }
 
     @Test
@@ -209,7 +214,7 @@ class AiMixerViewModelTest {
         val c = r.vm.stateFlow.value.capture
         assertEquals(true, c?.ok)
         assertNull(c?.file)
-        assertEquals("No new mix changes since the last capture; nothing written.", c?.message)
+        assertEquals("No new mix or sound changes since the last capture; nothing written.", c?.message)
         assertTrue(r.vm.stateFlow.value.history.isEmpty())
     }
 
@@ -229,6 +234,49 @@ class AiMixerViewModelTest {
         r.vm.actions.capture()
         advanceUntilIdle()
         assertEquals("Captured", (r.vm.stateFlow.value.history.last() as PointRow).label)
+    }
+
+    @Test
+    fun historyHasNoBeforeApplyRowAfterAnAgentApply() = runTest(testDispatcher) {
+        val r = rig(others = listOf(vibe("Low Tide")))
+        r.vm.actions.setLevelDb(3, -6f)
+        advanceUntilIdle()
+        r.pulsar.applyVibe(r.pulsar.vibeList[1])
+        advanceUntilIdle()
+        assertEquals("Low Tide", r.vm.stateFlow.value.vibeName)
+        assertTrue(r.vm.stateFlow.value.history.isEmpty(), "a new vibe starts with File at the bottom")
+    }
+
+    @Test
+    fun toggleVibeRowCallsCollabMixer() = runTest(testDispatcher) {
+        val r = rig()
+        val night = r.pulsar.vibeFlow.value
+        assertTrue(r.mixer.editVibe(EditOrigin.AGENT, night.copy(bpm = 96f)) is VibeEditResult.Applied)
+        advanceUntilIdle()
+        val row = r.vm.stateFlow.value.history.single() as VibeEditRow
+        assertEquals("bpm", row.label)
+        assertEquals("Orpheus", row.who)
+        assertTrue(row.on)
+        assertEquals(96f, r.pulsar.vibeFlow.value.bpm)
+
+        r.vm.actions.toggleChange(row.id)
+        advanceUntilIdle()
+        assertFalse((r.vm.stateFlow.value.history.single() as VibeEditRow).on)
+        assertEquals(night.bpm, r.pulsar.vibeFlow.value.bpm)
+    }
+
+    @Test
+    fun refusedVibeRowToggleShowsNotice() = runTest(testDispatcher) {
+        val r = rig()
+        r.mixer.editVibe(EditOrigin.AGENT, r.pulsar.vibeFlow.value.copy(bpm = 96f))
+        advanceUntilIdle()
+        val row = r.vm.stateFlow.value.history.single() as VibeEditRow
+        // A load nobody followed yet makes the mixer refuse the toggle.
+        r.pulsar.vibeLoadCount.value++
+        r.vm.actions.toggleChange(row.id)
+        advanceUntilIdle()
+        assertEquals("That change can't be turned off on its own: roll back to a capture instead.", r.vm.stateFlow.value.notice)
+        assertTrue((r.vm.stateFlow.value.history.single() as VibeEditRow).on)
     }
 
     @Test

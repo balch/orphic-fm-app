@@ -107,7 +107,7 @@ class MixToolsTest {
         val jump = SectionJumpTool({ pulsar }, rig.mixer, rig.events)
         val loop = SectionLoopTool(rig.mixer, rig.events)
         val portSet = PortSetTool(registry, synth, rig.mixer, rig.events)
-        val load = VibeLoadTool({ pulsar }, OneDispatcher(dispatcher), rig.guard)
+        val load = VibeLoadTool({ pulsar }, OneDispatcher(dispatcher))
     }
 
     private fun TestScope.tools(c: MixBenchController) = Tools({ c }, backgroundScope, StandardTestDispatcher(testScheduler))

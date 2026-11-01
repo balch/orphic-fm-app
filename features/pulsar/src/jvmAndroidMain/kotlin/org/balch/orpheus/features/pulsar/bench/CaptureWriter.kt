@@ -45,6 +45,8 @@ data class CaptureFile(
     val capturedAt: String,
     val rows: List<CaptureRow>,
     val vibeJson: String = "",
+    // Field changes to the vibe other than the mix, for porting into its source; old captures lack the key.
+    val vibeRows: List<VibeFieldChange> = emptyList(),
 )
 
 /** A capture on disk: where it went and what it holds, so callers need not read it back. */
@@ -66,7 +68,13 @@ class CaptureWriter(private val captureDir: File, private val repoRoot: File?) {
      * [baselineHash] is the source hash when the vibe was loaded, null if unknown; stale means the file changed since.
      * An [aiVibe] has no source file, so its source fields stay null.
      */
-    fun write(vibe: Vibe, rows: List<CaptureRow>, baselineHash: String?, aiVibe: Boolean = false): WrittenCapture {
+    fun write(
+        vibe: Vibe,
+        rows: List<CaptureRow>,
+        baselineHash: String?,
+        aiVibe: Boolean = false,
+        vibeRows: List<VibeFieldChange> = emptyList(),
+    ): WrittenCapture {
         val src = if (aiVibe) null else vibesDir?.let { findVibeSource(it, vibe.name) }
         val currentHash = src?.let(::sha256)
         val slug = vibe.name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "vibe" }
@@ -82,6 +90,7 @@ class CaptureWriter(private val captureDir: File, private val repoRoot: File?) {
             capturedAt = now.toString(),
             rows = rows,
             vibeJson = vibeJson.encodeToString(Vibe.serializer(), vibe),
+            vibeRows = vibeRows,
         )
         captureDir.mkdirs()
         val stamp = now.format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))

@@ -53,7 +53,7 @@ private data class Local(val capture: MixerCapture? = null, val capturing: Boole
 private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist)
 
 /** The History timeline as the panel shows it. */
-private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long, val beforeApply: BeforeApplyRow?)
+private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long)
 
 /**
  * The mixer panel's state and edits over the shared [MixBenchController]. Every edit goes through [CollabMixer] as
@@ -103,7 +103,8 @@ class AiMixerViewModel(
             Bench(layers, sc, muted, soloed, loop)
         }
         val hist = combine(collabMixer.history, collabMixer.hearing, pulsarFeature.vibeFlow) { h, hearing, vibe ->
-            Hist(historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }, hearing, h.onCount, h.loadedAtMs, beforeApplyRow(h))
+            val rows = historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }
+            Hist(rows, hearing, h.onCount + h.vibeEdits.count { it.on }, h.loadedAtMs)
         }
         val overlay = combine(local, collab.pins, collab.agentTouched, hist, ::Overlay)
         emitAll(
@@ -118,7 +119,6 @@ class AiMixerViewModel(
                     hearing = o.hist.hearing,
                     onCount = o.hist.onCount,
                     loadedAtMs = o.hist.loadedAtMs,
-                    beforeApply = o.hist.beforeApply,
                 )
             }.combine(costTotals.songs) { s, songs -> s.copy(aiCostUsd = songs[s.vibeName]) },
         )
@@ -163,7 +163,12 @@ class AiMixerViewModel(
         dismissNotice = { local.update { it.copy(notice = null) } },
         togglePin = collab::togglePin,
         dismissCapture = { local.update { it.copy(capture = null) } },
-        toggleChange = { id -> queue { collabMixer.toggleChange(id) } },
+        toggleChange = { id ->
+            queue {
+                val isVibeRow = stateFlow.value.history.any { it is VibeEditRow && it.id == id }
+                if (!collabMixer.toggleChange(id) && isVibeRow) local.update { it.copy(notice = VIBE_ROW_REFUSED) }
+            }
+        },
         markPoint = { queue { collabMixer.markPoint() } },
         hear = { id -> queue { collabMixer.hear(id) } },
         endHear = { queue { collabMixer.endHear() } },
@@ -235,6 +240,8 @@ class AiMixerViewModel(
         private const val METER_POLL_MS = 50L
         private const val MIN_DB = -30f
         private const val MAX_DB = 3.5f
+        private const val VIBE_ROW_REFUSED =
+            "That change can't be turned off on its own: roll back to a capture instead."
         private const val ZERO_SEND = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope."
 
         fun previewFeature(
