@@ -1,5 +1,7 @@
 package org.balch.orpheus.features.ai
 
+import ai.koog.prompt.executor.clients.retry.RetryConfig
+import ai.koog.prompt.executor.clients.retry.RetryingLLMClient
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.GraphAIAgent.FeatureContext
 import ai.koog.agents.core.agent.config.AIAgentConfig
@@ -486,7 +488,9 @@ class OrpheusAgent(
             AiProvider.OpenAI -> OpenAILLMClient(apiKey, httpClientFactory = httpFactory)
             else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
         }
-        val executor = MultiLLMPromptExecutor(llmClient)
+        // Transient failures (429, 5xx, Anthropic's 529, timeouts) retry up to 3 times with backoff;
+        // anything else, and a stream that already started, fails the run as before.
+        val executor = MultiLLMPromptExecutor(RetryingLLMClient(llmClient, RetryConfig.PRODUCTION))
 
         val thinkingParams: LLMParams =
             if (config.model.supports(LLMCapability.Thinking)) {
