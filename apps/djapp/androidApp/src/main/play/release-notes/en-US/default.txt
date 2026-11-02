@@ -1,6 +1,8 @@
-More mixing, a new epic vibe, sharper visuals, and Bluetooth fixes
+Presets, sound enhancements, more mixing, a new epic vibe, and sharper visuals
 
-• More Mixers: track fader controls with solo and mute, great for live performance
-• New Vibe: Orphic Lore tells a classic Homer-inspired epic, with sweet singing sirens, granular synth effects and a storm for the ages
-• Upgraded Visuals: Orphoscope, Swirly, Mt Hood and the Pulsar grid are redrawn and optimized for smoother animation
-• Bluetooth DJ scratch fixes on 44.1 kHz devices
+• Presets: save your favorite mixes for each vibe
+• Sound Enhancements: richer, more detailed sound
+• More Mixers: track faders with solo and mute for live performance
+• New Vibe: Orphic Lore, a Homer-inspired epic with singing sirens and a storm for the ages
+• Upgraded Visuals: Orphoscope, Swirly, Mt Hood and the Pulsar grid redrawn for smoother animation
+• Bluetooth DJ scratch fixes at 44.1 kHz

@@ -1,8 +1,8 @@
-A cleaner UI with a Big Fat Vibe Picker
+Presets, sound enhancements, more mixing, a new epic vibe, sharper visuals, and Bluetooth fixes
 
-• Enjoy the big Play button with Vibe title above
-• Swipe for Prev/Next vibe
-• Progress rings the Play button and syncs with the music
-• Stay Asleep gets new faces and a snare that brackets the song
-• CPU and Battery Optimizations
-• New Playlist and Shuffle functionality
+• Presets: save your favorite mixes for each vibe and bring them back with a tap
+• Sound Enhancements: richer, more detailed sound across the vibes
+• More Mixers: track fader controls with solo and mute, great for live performance
+• New Vibe: Orphic Lore tells a classic Homer-inspired epic, with sweet singing sirens, granular synth effects and a storm for the ages
+• Upgraded Visuals: Orphoscope, Swirly, Mt Hood and the Pulsar grid are redrawn and optimized for smoother animation
+• Bluetooth DJ scratch fixes on 44.1 kHz devices
