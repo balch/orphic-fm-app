@@ -109,17 +109,34 @@ class DockStepTileTest {
 
     @Test
     fun eachTileIsOneLineWithItsArrowAtTheOuterEnd() {
-        val bar = Bar(nav)
+        // Names that fit their lane: a longer one scrolls, and its text node runs under the arrow.
+        val bar = Bar(nav.copy(previousName = "Dog", nextName = "Stay"))
         try {
             val previous = bar.tile("Previous vibe").bounds
             val next = bar.tile("Next vibe").bounds
-            val dog = bar.text("Dog House").bounds
-            val stay = bar.text("Stay Asleep").bounds
+            val dog = bar.text("Dog").bounds
+            val stay = bar.text("Stay").bounds
             assertTrue(dog.left >= bar.arrow("Previous vibe").bounds.right, "the ◀ arrow is not first")
             assertTrue(stay.right <= bar.arrow("Next vibe").bounds.left, "the ▶ arrow is not last")
             assertTrue(previous.left < 30f && next.right > 1250f, "the tiles are not at the bar's ends: $previous, $next")
             // No caption line any more.
             listOf("Previous", "Up next", "Restart").forEach { assertTrue(!bar.hasText(it), "a \"$it\" caption is still there") }
+        } finally {
+            bar.close()
+        }
+    }
+
+    // Equal toggles and the open slot keep the dome on the bar's centre, so no label may widen its toggle.
+    @Test
+    fun everyToggleKeepsTheSharedWidthWithItsLabelWhole() {
+        val bar = Bar(nav)
+        try {
+            listOf("DJ", "Mix", "Pulsar", "Horn", "Cowbell").forEach { label ->
+                val toggle = bar.toggle(label).bounds
+                assertEquals(TvBottomBarMinWidth.value, toggle.width, 0.5f, "the $label toggle's width")
+                val line = bar.text(label).bounds
+                assertTrue(line.left >= toggle.left && line.right <= toggle.right, "the $label label $line leaves its toggle $toggle")
+            }
         } finally {
             bar.close()
         }

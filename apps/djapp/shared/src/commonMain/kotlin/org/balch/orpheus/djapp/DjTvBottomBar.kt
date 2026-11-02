@@ -89,8 +89,8 @@ private val TvBottomBarLabelSize = 24.sp
  * big" read. Forcing width to match the height too (148dp squares) would widen the centre group's
  * four toggles by about 190dp, taken from the ◀/▶ step tiles either side of it.
  *
- * Wide enough for "Pulsar", the longest label, so all four toggles share this width and the dome
- * between them stays on the bar's centre.
+ * Wide enough for "Cowbell", the longest label, inside [TvBottomBarItemSideInset], so all the toggles
+ * and the open slot share this width and the dome between them stays on the bar's centre.
  *
  * The height is kept from when Timer's running countdown made the tallest item three lines, so
  * the dock above does not reflow.
@@ -103,6 +103,9 @@ internal val TvBottomBarItemGap = 8.dp
 
 /** The item's inset around its content. */
 private val TvBottomBarItemPadding = 14.dp
+
+/** A toggle's inset beside its label, narrower than [TvBottomBarItemPadding] so a long label can't widen it. */
+private val TvBottomBarItemSideInset = 4.dp
 
 /** The bar's room above its items. */
 private val TvBottomBarTopPadding = 10.dp
@@ -196,7 +199,7 @@ internal fun tvBarMaxSlots(barWidth: Dp, canvasScale: Float = 1f): Int {
     return minOf(TvBarMaxSlots, maxEvenSlots(centre * (NavColumnWidth / TvBottomBarColumn)))
 }
 
-/** The OG dock's bar: DJ, Mix, Pulsar, Horn, as it has always been. */
+/** The OG dock's bar at its widest: the open slot, DJ, Mix, Pulsar, Horn, Cowbell. */
 internal val OgTvNavBar: NavBar = navBar(OgNavOrder, navDrops(DjLayout.LargeScreen), TvBarMaxSlots)
 
 /**
@@ -574,7 +577,7 @@ private fun TvBottomBarItem(
                     indication = LocalIndication.current,
                     onClick = onClick,
                 )
-                .padding(TvBottomBarItemPadding),
+                .padding(horizontal = TvBottomBarItemSideInset, vertical = TvBottomBarItemPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
             // Top-packed, deliberately: every item's icon and label sit at the same height across the row.
             verticalArrangement = Arrangement.spacedBy(TvBottomBarIconLabelGap),

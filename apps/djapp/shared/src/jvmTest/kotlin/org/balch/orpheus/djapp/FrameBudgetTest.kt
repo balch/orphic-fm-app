@@ -210,7 +210,9 @@ class FrameBudgetTest {
     private fun domeScene(pulsar: PulsarFeature, scopes: ScopeCounter, widthDp: Int = 1280, feed: ScopeFeed? = null) =
         scene(widthDp, 200, density = 1f, scopes = scopes, feed = feed) {
             DjTvBottomBar(
-                nav = OgTvNavBar, isDocked = { false }, onToggle = {},
+                // The slots the app gives this width, so a narrow bar keeps its tiles' names.
+                nav = navBar(OgNavOrder, navDrops(DjLayout.LargeScreen), tvBarMaxSlots(widthDp.dp)),
+                isDocked = { false }, onToggle = {},
                 pulsarFeature = pulsar, onTogglePlayback = {},
                 domeRingSize = TvDockDomeRingSize,
             )
