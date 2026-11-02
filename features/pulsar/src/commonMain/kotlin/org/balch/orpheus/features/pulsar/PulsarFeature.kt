@@ -1614,14 +1614,19 @@ class PulsarViewModel(
                     ) {
                         rampStartedForSectionVisit = true
                         val startBpm = vibe.bpm * section.bpmMultiplier
-                        val endBpm = vibe.bpm  // full base tempo = the drop target
+                        val endBpm = vibe.bpm * section.bpmRampTo
                         // Pre-set lastSectionMult to the target so a section flip mid-ramp
                         // composes correctly (no overshoot) even before the ramp finishes.
-                        lastSectionMult = 1.0f
+                        lastSectionMult = section.bpmRampTo
                         if (endBpm - startBpm > 0.01f) {
                             log.debug { "Accelerando: sec=$sectionIndex ${startBpm.toInt()}->${endBpm.toInt()} BPM over $rampBars bar(s)" }
                             bpmRampJob = launch(dispatcherProvider.io) {
                                 rampBpm(startBpm, endBpm, rampBars)
+                            }
+                        } else if (startBpm - endBpm > 0.01f) {
+                            log.debug { "Ritardando: sec=$sectionIndex ${startBpm.toInt()}->${endBpm.toInt()} BPM over $rampBars bar(s)" }
+                            bpmRampJob = launch(dispatcherProvider.io) {
+                                ritardBpm(startBpm, endBpm, rampBars, vibe.stepCount)
                             }
                         }
                     }
@@ -1683,6 +1688,23 @@ class PulsarViewModel(
             val t = i.toFloat() / steps
             globalTempo.setBpm((startBpm + (endBpm - startBpm) * (t * t)).toDouble())
             delay(stepMs)
+        }
+        globalTempo.setBpm(endBpm.toDouble())
+    }
+
+    /**
+     * Ritardando helper: a straight line from [startBpm] down to [endBpm]. A linear fall plays
+     * exactly the average tempo's worth of beats, so sizing the window at that average lands
+     * [endBpm] on the last of [rampBars] loop-cycles of [stepCount] steps.
+     */
+    private suspend fun ritardBpm(startBpm: Float, endBpm: Float, rampBars: Int, stepCount: Int) {
+        val beats = rampBars * stepCount / 4f
+        val windowMs = (beats * 60_000f / ((startBpm + endBpm) / 2f)).toLong()
+        val stepMs = 100L
+        val steps = (windowMs / stepMs).toInt().coerceAtLeast(1)
+        for (i in 1..steps) {
+            delay(stepMs)
+            globalTempo.setBpm((startBpm + (endBpm - startBpm) * i / steps).toDouble())
         }
         globalTempo.setBpm(endBpm.toDouble())
     }

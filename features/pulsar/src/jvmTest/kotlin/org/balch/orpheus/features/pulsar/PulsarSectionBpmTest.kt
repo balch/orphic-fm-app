@@ -49,6 +49,7 @@ import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -122,6 +123,39 @@ class PulsarSectionBpmTest {
             engagementTracker = DefaultEngagementTracker(),
             musicPulseSource = MusicPulseSource.Silent,
         )
+    }
+
+    @Test
+    fun `a ramp below the section tempo falls in a line and holds at its target`() = runTest(testDispatcher) {
+        val vibe = sectionedVibe(bpm = 100f, mults = listOf(1.0f, 1.0f)).copy(
+            arrangement = Arrangement(
+                sections = listOf(
+                    Section(name = "s0"),
+                    Section(name = "s1", barsMin = 2, barsMax = 2, bpmRampBars = 2, bpmRampTo = 0.7f),
+                ),
+            ),
+        )
+        val tempo = GlobalTempo(StubAudioEngine())
+        val vm = makeViewModel(vibe, tempo)
+        vm.actions.setVibe(vibe)
+        advanceUntilIdle()
+        pushSection(0); advanceUntilIdle()
+        assertBpmNear(100.0, tempo.getBpm(), "before the ramp")
+
+        pushSection(1, barsElapsed = 0, barsTotal = 2)
+        val windowMs = (2 * vibe.stepCount / 4f * 60_000f / 85f).toLong()
+        advanceTimeBy(windowMs / 2)
+        assertTrue(abs(85.0 - tempo.getBpm()) < 1.0, "halfway down the line, got ${tempo.getBpm()}")
+
+        advanceUntilIdle()
+        assertBpmNear(70.0, tempo.getBpm(), "lands on the target")
+
+        // The terminal section looping for the handoff must not start the ramp again.
+        pushSection(1, barsElapsed = 0, barsTotal = 2); advanceUntilIdle()
+        assertBpmNear(70.0, tempo.getBpm(), "holds through the loop")
+
+        pushSection(0); advanceUntilIdle()
+        assertBpmNear(100.0, tempo.getBpm(), "the next section snaps back to its tempo")
     }
 
     @Test

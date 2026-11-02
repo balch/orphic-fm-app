@@ -271,6 +271,10 @@ data class Section(
      *  Bars are counted in the same units as [barsMin]/[barsMax]. Prototype: ramps toward
      *  full base tempo (1.0×); see PulsarViewModel accelerando. Useful range 1..2. */
     val bpmRampBars: Int = 0,
+    /** Where a [bpmRampBars] ramp lands, as a multiple of the vibe's base tempo. 1.0 is the
+     *  wind-up above. Below [bpmMultiplier] it is a ritardando: the tempo falls in a straight
+     *  line across the whole window, then holds through a terminal section's handoff. */
+    val bpmRampTo: Float = 1.0f,
     /** Carry an in-flight band solo across THIS section's entry seam. When true
      *  and a solo is active as this section begins (and this section declares a
      *  [soloMode]), the engine skips the section-entry solo reset: same soloist,
@@ -353,6 +357,7 @@ data class Section(
             "Section.recencyDecay must be 0..1, got $recencyDecay"
         }
         require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
+        require(bpmRampTo > 0f) { "Section.bpmRampTo must be > 0, got $bpmRampTo" }
         require(bpmRampBars >= 0) { "Section.bpmRampBars must be >= 0, got $bpmRampBars" }
         lickIndex?.let {
             require(it in 0 until LickRotation.MAX_LICK_POOL) {
