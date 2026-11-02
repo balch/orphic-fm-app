@@ -139,7 +139,7 @@ class LickLabViewModelTest {
         r.vm.actions.arm(4)
         assertEquals(
             listOf(
-                "track_3_live_gate" to 0f, "track_3_live_active" to 0f, "track_3_live_boost" to 1f,
+                "track_3_live_gate" to 0f, "track_3_live_active" to 0f, "track_3_live_boost" to 1f, "track_3_live_ghost" to 0f,
                 "track_4_live_active" to 1f,
             ),
             writes,
@@ -203,7 +203,7 @@ class LickLabViewModelTest {
         writes.clear()
         r.pulsar.applyVibe(r.pulsar.vibeList[1])
         runCurrent()
-        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f), writes)
+        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f, "track_4_live_ghost" to 0f), writes)
         assertNull(r.vm.stateFlow.value.armedTrack)
         assertNull(r.vm.stateFlow.value.heldMidi)
         val take = r.vm.stateFlow.value.takes.single()
@@ -254,7 +254,7 @@ class LickLabViewModelTest {
         r.vm.actions.keyDown(Key.A)
         writes.clear()
         r.vm.actions.toggleShown()
-        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f), writes)
+        assertEquals(listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f, "track_4_live_ghost" to 0f), writes)
         assertNull(r.vm.stateFlow.value.armedTrack)
         writes.clear()
         r.vm.actions.keyDown(Key.S)
@@ -445,20 +445,29 @@ class LickLabViewModelTest {
     }
 
     @Test
-    fun `the armed track is never its own caller`() = labTest {
+    fun `the armed track can be its own caller, which runs its pattern unheard`() = labTest {
         val r = rig()
         r.vm.actions.toggleShown()
         r.vm.actions.setCaller(4)
         r.vm.actions.arm(4)
         assertEquals(4, r.vm.stateFlow.value.armedTrack)
-        assertNull(r.vm.stateFlow.value.callerTrack)
-        r.vm.actions.setCaller(4)
-        assertNull(r.vm.stateFlow.value.callerTrack)
+        assertEquals(4, r.vm.stateFlow.value.callerTrack)
+        assertEquals(1f, value("track_4_live_ghost"))
+        // Picking another caller hands the readback back to the live note.
         r.vm.actions.setCaller(3)
         assertEquals(3, r.vm.stateFlow.value.callerTrack)
-        // Arming another track keeps a caller that is not the armed one.
+        assertEquals(0f, value("track_4_live_ghost"))
+        // Picked while armed.
+        r.vm.actions.setCaller(4)
+        assertEquals(1f, value("track_4_live_ghost"))
+        r.vm.actions.setCaller(null)
+        assertEquals(0f, value("track_4_live_ghost"))
+        // Moving the player off the track stops the ghost and keeps the caller.
+        r.vm.actions.setCaller(4)
         r.vm.actions.arm(5)
-        assertEquals(3, r.vm.stateFlow.value.callerTrack)
+        assertEquals(0f, value("track_4_live_ghost"))
+        assertTrue(writes.none { it.first == "track_5_live_ghost" })
+        assertEquals(4, r.vm.stateFlow.value.callerTrack)
     }
 
     @Test

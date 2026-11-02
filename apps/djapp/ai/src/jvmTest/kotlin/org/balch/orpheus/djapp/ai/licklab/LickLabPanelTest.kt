@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -58,7 +57,7 @@ class LickLabPanelTest {
     fun `the CALL chip of the armed track is disabled and the others are not`() = runComposeUiTest {
         val spy = Spy()
         setContent { OrpheusTheme { LickLabPanel(feature(spy), Modifier.size(1000.dp, 600.dp), animate = false) } }
-        onNodeWithTag(callChipTag(4)).assertIsNotEnabled()
+        onNodeWithTag(callChipTag(4)).assertIsEnabled()
         onNodeWithTag(callChipTag(5)).assertIsEnabled().performClick()
         assertEquals(listOf<Int?>(5), spy.callers)
     }

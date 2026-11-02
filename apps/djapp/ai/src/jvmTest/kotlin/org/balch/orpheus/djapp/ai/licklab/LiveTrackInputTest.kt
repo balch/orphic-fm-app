@@ -24,7 +24,7 @@ class LiveTrackInputTest {
         writes.clear()
         input.disarm(4)
         assertEquals(
-            listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f),
+            listOf("track_4_live_gate" to 0f, "track_4_live_active" to 0f, "track_4_live_boost" to 1f, "track_4_live_ghost" to 0f),
             writes,
         )
     }

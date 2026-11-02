@@ -261,8 +261,6 @@ private fun LickHeader(ui: LickLabUiState, actions: LickLabActions, meters: Stat
                 selected = t.index == ui.callerTrack,
                 selectedFill = CALL_INK.copy(alpha = 0.35f),
                 m.testTag(callChipTag(t.index)),
-                // A track cannot both play and call.
-                enabled = t.index != ui.armedTrack,
                 animate = animate,
             ) {
                 actions.setCaller(if (t.index == ui.callerTrack) null else t.index)

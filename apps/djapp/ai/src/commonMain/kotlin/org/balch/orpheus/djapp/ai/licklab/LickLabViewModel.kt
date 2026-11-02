@@ -167,12 +167,12 @@ class LickLabViewModel internal constructor(
             return
         }
         disarm()
+        // A track that is its own caller shows the notes it would have played, unheard.
+        if (s.callerTrack == track) live.ghost(track, on = true)
         live.arm(track)
         // Boost moves with the player onto the new track.
         if (s.boost) boost(track, on = true)
         armedVibe = vibe.name
-        // The armed track cannot also be its own caller.
-        if (s.callerTrack == track) setCaller(null)
         _state.update {
             keyed(it.copy(armedTrack = track, slot = LickPitch.defaultSlotFor(vibe, track), boost = s.boost), vibe)
         }
@@ -194,7 +194,7 @@ class LickLabViewModel internal constructor(
     }
 
     override fun setCaller(track: Int?) {
-        if (track != null && track == _state.value.armedTrack) return
+        _state.value.armedTrack?.let { live.ghost(it, on = it == track) }
         call.clear()
         callSounding = null
         _state.update { it.copy(callerTrack = track, callNotes = emptyList()) }

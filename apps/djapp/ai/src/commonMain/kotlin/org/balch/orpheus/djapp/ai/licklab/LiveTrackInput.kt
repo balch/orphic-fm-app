@@ -14,7 +14,11 @@ class LiveTrackInput(private val controller: SynthController) {
         int(PulsarSymbol.TRACK_0_LIVE_GATE, track, 0)
         int(PulsarSymbol.TRACK_0_LIVE_ACTIVE, track, 0)
         float(PulsarSymbol.TRACK_0_LIVE_BOOST, track, 1f)
+        int(PulsarSymbol.TRACK_0_LIVE_GHOST, track, 0)
     }
+
+    /** The armed track keeps running its pattern unheard and reports those notes, not the live ones. */
+    fun ghost(track: Int, on: Boolean) = int(PulsarSymbol.TRACK_0_LIVE_GHOST, track, if (on) 1 else 0)
 
     /** Gain 1..4 on the whole live track, sends included. Live only: disarm puts it back to 1. */
     fun boost(track: Int, gain: Float) = float(PulsarSymbol.TRACK_0_LIVE_BOOST, track, gain)
