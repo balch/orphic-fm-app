@@ -23,6 +23,7 @@ object VibeNames {
     val KALEIDOSCOPE_DRIFT = VibeName("Kaleidoscope Drift")
     val LOST_IN_SPACE = VibeName("Lost In Space")
     val NATALIS_SHIMMER = VibeName("Natalis Shimmer")
+    val OR_5 = VibeName("OR-5")
     val ORPHIC_LORE = VibeName("Orphic Lore")
     val OUROBOROS_BLOOM = VibeName("Ouroboros Bloom")
     val RUNNING_OUT = VibeName("Running Out")

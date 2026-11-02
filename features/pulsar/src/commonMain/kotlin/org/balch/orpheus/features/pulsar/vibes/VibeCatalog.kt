@@ -98,6 +98,7 @@ object VibeCatalog {
         VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
         VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         VibeNames.FILTER_FUNK to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        VibeNames.OR_5 to CatalogEntry(VibeStatus.LIVE, tags = listOf("ai", "rock", "reggae")),
         VibeNames.FIRE_SKY to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         VibeNames.SPACE_AND_DRUMS to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
         VibeNames.RUST_BELT to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
