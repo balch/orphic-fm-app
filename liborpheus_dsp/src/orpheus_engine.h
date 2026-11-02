@@ -1421,6 +1421,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_live_glide[8] = {};
     // Gain on the whole armed track (dry and sends), 1..4. Live only; defaults to 1.0.
     std::atomic<float> pulsar_track_live_boost[8] = {};
+    // An armed track keeps running its pattern unheard, and its sounding-note readback reports that
+    // pattern instead of the live note. Off for an armed track that is not its own caller.
+    std::atomic<int>   pulsar_track_live_ghost[8] = {};
     // Pulsar sets this while it plays an armed track through a pause; the master out then lets
     // it past the app mute, which the pause sets. Written by the Pulsar unit every block.
     std::atomic<int>   pulsar_live_noodle{0};

@@ -26,6 +26,7 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
  * @param activePatches Per-track DX patch index (0..31) sounding now, walk included; -1 off DX.
  * @param trackNotes Per-track sounding MIDI pitch, glide included, rounded to the semitone; -1 while the gate is low.
+ *   A live-armed track with `track_N_live_ghost` on reports its unheard pattern here instead of the live note.
  * @param chordRootDegree Scale degree (0..6) of the current chord's root; -1 when none.
  * @param nextChordRootDegree Scale degree (0..6) of the chord a beat or so ahead; -1 when none.
  * @param beatsToChordChange Beats until that change, in 1/16-beat steps; -1 when no next chord.

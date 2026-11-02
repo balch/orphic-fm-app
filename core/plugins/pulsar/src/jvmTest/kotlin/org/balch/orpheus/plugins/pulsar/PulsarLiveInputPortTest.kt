@@ -12,11 +12,11 @@ class PulsarLiveInputPortTest {
 
     private val defaults = mapOf(
         "active" to 0f, "note" to 60f, "gate" to 0f,
-        "strike" to 0f, "velocity" to 0.8f, "glide" to 0f,
+        "strike" to 0f, "velocity" to 0.8f, "glide" to 0f, "ghost" to 0f,
     )
 
     @Test
-    fun `each track has all six live ports named track_N_live_x and excluded from presets`() {
+    fun `each track has all seven live ports named track_N_live_x and excluded from presets`() {
         val plugin = PulsarPlugin()
         for (t in 0..7) for ((name, default) in defaults) {
             val key = "track_${t}_live_$name"

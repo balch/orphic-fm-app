@@ -184,6 +184,7 @@ class PulsarPlugin : DspPlugin {
     private val _liveVelocity = FloatArray(8) { 0.8f }
     private val _liveGlide = FloatArray(8)
     private val _liveBoost = FloatArray(8) { 1f }
+    private val _liveGhost = IntArray(8)
     private val _modLfoRate = FloatArray(8) { 0.2f }
     private val _modLfoDepth = FloatArray(8) { 0f }
     private val _modLfoShape = FloatArray(8) { 0.3f }
@@ -902,6 +903,9 @@ class PulsarPlugin : DspPlugin {
             }
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_BOOST.ordinal + t]) {
                 floatType { default = 1f; min = 1f; max = 4f; excludeFromPresets = true; get { _liveBoost[t] }; set { _liveBoost[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_GHOST.ordinal + t]) {
+                intType { default = 0; min = 0; max = 1; excludeFromPresets = true; get { _liveGhost[t] }; set { _liveGhost[t] = it } }
             }
         }
 

@@ -520,6 +520,131 @@ static bool test_chord_root_readback_tracks_progression() {
     return ok;
 }
 
+static float track_note(OrpheusEngine* e) {
+    float notes[8];
+    orpheus_engine_get_pulsar_track_notes(e, notes);
+    return notes[kTrack];
+}
+
+static bool test_ghost_port_routes() {
+    printf("\n=== Test: track_N_live_ghost reaches its atomic ===\n");
+    OrpheusEngine* e = orpheus_engine_create(48000.0f);
+    const bool off = e->pulsar_track_live_ghost[5].load() == 0;
+    orpheus_engine_set_port(e, "org.balch.orpheus.plugins.pulsar", "track_5_live_ghost", 1.0f);
+    const bool ok = off && e->pulsar_track_live_ghost[5].load() == 1 && e->pulsar_track_live_ghost[4].load() == 0;
+    orpheus_engine_destroy(e);
+    printf("Ghost port: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_ghost_reads_back_the_pattern_it_would_play() {
+    printf("\n=== Test: an armed ghost reads back the notes the unarmed track really plays ===\n");
+    Rig played(false), ghost(true);
+    ghost.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    int blocks = 0, sounding = 0, differ = 0;
+    for (int b = 0; b < kBarBlocks * 8; b++) {
+        played.block();
+        ghost.block();
+        const float want = track_note(played.e), got = track_note(ghost.e);
+        blocks++;
+        if (want >= 0.0f) sounding++;
+        if (want != got) differ++;
+    }
+    const bool ok = sounding > kBarBlocks && differ == 0;
+    printf("  %d blocks, %d sounding, %d differ\n", blocks, sounding, differ);
+    printf("Ghost matches pattern: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_ghost_is_unheard() {
+    printf("\n=== Test: a ghost makes no note-ons and no sound while the player is silent ===\n");
+    Rig r(true);
+    r.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    r.run(kSettle);
+    const int before = r.note_ons();
+    float peak = 0.0f;
+    int sounding = 0;
+    for (int b = 0; b < kBarBlocks * 4; b++) {
+        peak = std::max(peak, r.block());
+        if (track_note(r.e) >= 0.0f) sounding++;
+    }
+    const bool ok = sounding > 0 && r.note_ons() == before && peak < 1e-4f && !r.ts().voice_active;
+    printf("  %d blocks with a ghost note, note-ons +%d, peak %.6f\n", sounding, r.note_ons() - before, peak);
+    printf("Ghost unheard: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_ghost_leaves_the_live_voice_untouched() {
+    printf("\n=== Test: the live voice renders bit for bit the same with a ghost running ===\n");
+    Rig plain(true), ghost(true);
+    ghost.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    int differ = 0, count = 0;
+    float peak = 0.0f;
+    for (int b = 0; b < kBarBlocks * 4; b++) {
+        // A press every half bar, held for a quarter of a bar, with a legato on the way.
+        const int phase = b % (kBarBlocks / 2);
+        if (phase == 0) {
+            count++;
+            const float note = 60.0f + static_cast<float>(count % 7);
+            plain.strike(note, count);
+            ghost.strike(note, count);
+        } else if (phase == kBarBlocks / 8) {
+            plain.e->pulsar_track_live_note[kTrack].store(72.0f, std::memory_order_relaxed);
+            ghost.e->pulsar_track_live_note[kTrack].store(72.0f, std::memory_order_relaxed);
+        } else if (phase == kBarBlocks / 4) {
+            plain.e->pulsar_track_live_gate[kTrack].store(0, std::memory_order_relaxed);
+            ghost.e->pulsar_track_live_gate[kTrack].store(0, std::memory_order_relaxed);
+        }
+        peak = std::max(peak, plain.block());
+        ghost.block();
+        if (std::memcmp(plain.taps->track_l[kTrack], ghost.taps->track_l[kTrack], kFrames * sizeof(float)) != 0) differ++;
+    }
+    const bool ok = peak > 0.01f && differ == 0 && plain.note_ons() == ghost.note_ons();
+    printf("  peak %.4f, %d blocks differ, note-ons %d vs %d\n", peak, differ, plain.note_ons(), ghost.note_ons());
+    printf("Live voice untouched: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_ghost_off_reads_the_live_note_again() {
+    printf("\n=== Test: turning the ghost off hands the readback back to the live note ===\n");
+    Rig r(true);
+    r.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    r.run(kSettle);
+    r.strike(74.0f, 1);
+    r.run(2);
+    r.e->pulsar_track_live_ghost[kTrack].store(0, std::memory_order_relaxed);
+    r.block();
+    const bool ok = track_note(r.e) == 74.0f;
+    printf("  readback %.2f\n", track_note(r.e));
+    printf("Ghost off: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_ghost_silent_in_density_out_and_pause() {
+    printf("\n=== Test: a density 0 section and a pause show no ghost notes ===\n");
+    auto sounding_blocks = [](Rig& r) {
+        int n = 0;
+        for (int b = 0; b < kBarBlocks * 2; b++) {
+            r.block();
+            if (track_note(r.e) >= 0.0f) n++;
+        }
+        return n;
+    };
+    Rig out(true), paused(true);
+    out.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    paused.e->pulsar_track_live_ghost[kTrack].store(1, std::memory_order_relaxed);
+    out.run(kSettle);
+    paused.run(kBarBlocks);
+    out.e->pulsar_state->tracks[kTrack].section_density_out = true;
+    const int in_out = sounding_blocks(out);
+    paused.e->pulsar_playing.store(0, std::memory_order_relaxed);
+    const int in_pause = sounding_blocks(paused);
+    const bool ok = in_out == 0 && in_pause == 0;
+    printf("  sounding blocks: density out %d, paused %d\n", in_out, in_pause);
+    printf("Ghost silent sections: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_live_input_tests() {
     printf("\n========== PULSAR LIVE INPUT TESTS ==========\n");
     int pass = 0, fail = 0;
@@ -540,6 +665,12 @@ bool run_pulsar_live_input_tests() {
     tally(test_track_note_readback_follows_live_note());
     tally(test_track_note_readback_includes_floor_fold());
     tally(test_chord_root_readback_tracks_progression());
+    tally(test_ghost_port_routes());
+    tally(test_ghost_reads_back_the_pattern_it_would_play());
+    tally(test_ghost_is_unheard());
+    tally(test_ghost_leaves_the_live_voice_untouched());
+    tally(test_ghost_off_reads_the_live_note_again());
+    tally(test_ghost_silent_in_density_out_and_pause());
     printf("\nPulsar live input tests: %s\n", fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(pass, fail);
 }

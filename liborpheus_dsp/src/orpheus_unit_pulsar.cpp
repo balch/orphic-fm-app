@@ -1959,6 +1959,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.solo_density_mod_current = 0.0f;
         ts.gate_timer = 0.0f;
         ts.voice_active = false;
+        ts.ghost = PulsarGhostVoice{};
         // The old vibe's grains are in its key and bank; the next Mist block drops them.
         ts.mist_prev_active = false;
         // Likewise grain FX: the next block clears the old vibe's recorded voice.
@@ -2967,6 +2968,11 @@ static void sync_live_arm(PulsarState* state, const OrpheusEngine* engine) {
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
         const bool armed = engine->pulsar_track_live_active[t].load(std::memory_order_acquire) != 0;
+        const bool ghost = armed && engine->pulsar_track_live_ghost[t].load(std::memory_order_relaxed) != 0;
+        if (ghost != ts.live_ghost) {
+            ts.live_ghost = ghost;
+            ts.ghost = PulsarGhostVoice{};
+        }
         if (armed == ts.live_armed) continue;
         ts.live_armed = armed;
         ts.live_gate_prev = false;
@@ -3027,6 +3033,111 @@ static void apply_live_input(PulsarTrackState& ts, const OrpheusEngine* engine, 
         ts.glide_rate = 0.0f;
         ts.current_pitch = note;
     }
+}
+
+// One block of a voice's gate timer, arpeggio and glide.
+static void tick_voice(PulsarTrackState& ts, int num_frames, double samples_per_step) {
+    // Decrement gate timer by num_frames (block-rate approximation).
+    if (ts.gate_timer > 0.0f) {
+        ts.gate_timer -= static_cast<float>(num_frames);
+        if (ts.gate_timer <= 0.0f) {
+            ts.gate_timer = 0.0f;
+            // in_hold means the next step continues this same note, so an
+            // underrun here is block-rate quantization (and the drunk offset
+            // shortening the timer), not the end of the note. Clearing the
+            // gate would hand every envelope reading voice_active a release
+            // and an attack the phrase never asked for: the Tides generator
+            // re-attacks, and a PLUCK-mode LPG re-blooms. The hold path
+            // re-arms the timer on the next step, and the chain always ends
+            // on a step with hold=false, so the note still stops on time.
+            if (!ts.in_hold) ts.voice_active = false;
+        }
+    }
+
+    // ── Arpeggiator per-block countdown ──
+    // Fires next chord tone when countdown expires. Uses block-rate decrement
+    // (same convention as gate_timer). Option A sustain: hold last note.
+    if (ts.arp_note_count > 0 && ts.arp_index < ts.arp_note_count) {
+        ts.arp_next_sample -= static_cast<int64_t>(num_frames);
+        if (ts.arp_next_sample <= 0) {
+            // Retrigger voice with next arp note
+            ts.target_pitch = static_cast<float>(ts.arp_notes[ts.arp_index]);
+            ts.current_pitch = ts.target_pitch;  // no glide between arp notes
+            ts.arp_index++;
+
+            // Force rising edge so Tides/AD envelope restarts
+            ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
+            ts.voice_active = true;
+            // Reset gate timer so the voice fires a full envelope for this note.
+            // Use current playhead step duration; fall back to one arp interval.
+            float arp_note_duration = 1.0f;
+            if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
+                arp_note_duration = ts.steps[ts.playhead].duration;
+            }
+            int spn_for_gate = arp_samples_per_note(ts.arp_speed,
+                                                    static_cast<int>(samples_per_step));
+            float base_gate = static_cast<float>(arp_note_duration) * static_cast<float>(spn_for_gate);
+            ts.gate_timer = std::max(base_gate, static_cast<float>(720));
+
+            if (ts.arp_index < ts.arp_note_count) {
+                // Schedule next retrigger
+                int spn = arp_samples_per_note(ts.arp_speed,
+                                                static_cast<int>(samples_per_step));
+                ts.arp_next_sample = static_cast<int64_t>(spn);
+            } else {
+                // Option A: sequence complete — hold last note, no more retriggers
+                ts.arp_note_count = 0;
+            }
+        }
+    }
+
+    // Apply pitch glide (exponential approach toward target_pitch)
+    if (ts.glide_rate != 0.0f) {
+        float alpha = pulsar_glide_alpha(ts.glide_rate, num_frames);
+        ts.current_pitch += (ts.target_pitch - ts.current_pitch) * alpha;
+        if (std::abs(ts.target_pitch - ts.current_pitch) < 0.01f) {
+            ts.current_pitch = ts.target_pitch;
+            ts.glide_rate = 0.0f;
+        }
+    }
+}
+
+static void swap_ghost_voice(PulsarTrackState& ts) {
+    PulsarGhostVoice& g = ts.ghost;
+    std::swap(ts.gate_timer, g.gate_timer);
+    std::swap(ts.voice_active, g.voice_active);
+    std::swap(ts.tides_prev_gate, g.tides_prev_gate);
+    std::swap(ts.current_pitch, g.current_pitch);
+    std::swap(ts.target_pitch, g.target_pitch);
+    std::swap(ts.kraken_base_pitch, g.kraken_base_pitch);
+    std::swap(ts.kraken_base_valid, g.kraken_base_valid);
+    std::swap(ts.glide_rate, g.glide_rate);
+    std::swap(ts.prev_step_gated, g.prev_step_gated);
+    std::swap(ts.suppress_hold_tail, g.suppress_hold_tail);
+    std::swap(ts.last_chord_index, g.last_chord_index);
+    std::swap(ts.restrike_degree_seen, g.restrike_degree_seen);
+    std::swap(ts.in_hold, g.in_hold);
+    std::swap(ts.trigger_offset, g.trigger_offset);
+    std::swap(ts.pending_retrig, g.pending_retrig);
+    std::swap(ts.head_origin, g.head_origin);
+    std::swap(ts.repick_live, g.repick_live);
+    std::swap(ts.current_velocity, g.current_velocity);
+    std::swap(ts.arp_notes, g.arp_notes);
+    std::swap(ts.arp_note_count, g.arp_note_count);
+    std::swap(ts.arp_index, g.arp_index);
+    std::swap(ts.arp_next_sample, g.arp_next_sample);
+    std::swap(ts.arp_updown_down, g.arp_updown_down);
+}
+
+// What the unheard pattern would sound now; -1 while it would be silent. A density-0 section and a
+// paused timeline play no pattern, whatever the ghost's last note was.
+static float ghost_note(const PulsarTrackState& ts, bool self_env, bool paused) {
+    const PulsarGhostVoice& g = ts.ghost;
+    if (paused || ts.section_density_out || !(g.voice_active || (self_env && g.in_hold))) return -1.0f;
+    float note = g.current_pitch;
+    const int floor_note = engine_note_floor(ts.engine_index);
+    if (floor_note > 0) while (note < floor_note) note += 12.0f;
+    return note;
 }
 
 static bool any_track_live_armed(const PulsarState* state) {
@@ -4222,6 +4333,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Advance playhead at each step boundary.
         // Determine gate state for voice rendering.
         int repick_seg_start = 0;  // the triplet clock checks one step segment at a time
+        // A paused timeline has no steps to run, so the ghost holds where the pause left it.
+        const bool ghost_pass = ts.live_ghost && !live_noodle;
+        if (ghost_pass) {
+            swap_ghost_voice(ts);
+            ts.trigger_offset = 0;
+            ts.pending_retrig = false;
+        }
         for (int b = 0; b < num_boundaries; b++) {
             int prev_playhead = ts.playhead;
             // Tension half-lick: a FILL lead loops only its first bar while active,
@@ -5515,7 +5633,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
             // Live input owns an armed track's notes (apply_live_input below); the playhead
             // keeps time so a disarm hands the track back on its next step.
-            if (ts.live_armed) continue;
+            if (ts.live_armed && !ghost_pass) continue;
 
             if (ts.playhead >= kMaxPulsarSteps) ts.playhead = 0;
             PulsarStep pinned_scratch = {};
@@ -6021,71 +6139,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             resolve_breathe_block(state, sample_rate);
         }
 
+        if (ghost_pass) {
+            tick_voice(ts, num_frames, samples_per_step);
+            swap_ghost_voice(ts);
+        }
+
         if (ts.live_armed) apply_live_input(ts, engine, t);
 
-        // Decrement gate timer by num_frames (block-rate approximation).
-        if (ts.gate_timer > 0.0f) {
-            ts.gate_timer -= static_cast<float>(num_frames);
-            if (ts.gate_timer <= 0.0f) {
-                ts.gate_timer = 0.0f;
-                // in_hold means the next step continues this same note, so an
-                // underrun here is block-rate quantization (and the drunk offset
-                // shortening the timer), not the end of the note. Clearing the
-                // gate would hand every envelope reading voice_active a release
-                // and an attack the phrase never asked for: the Tides generator
-                // re-attacks, and a PLUCK-mode LPG re-blooms. The hold path
-                // re-arms the timer on the next step, and the chain always ends
-                // on a step with hold=false, so the note still stops on time.
-                if (!ts.in_hold) ts.voice_active = false;
-            }
-        }
-
-        // ── Arpeggiator per-block countdown ──
-        // Fires next chord tone when countdown expires. Uses block-rate decrement
-        // (same convention as gate_timer). Option A sustain: hold last note.
-        if (ts.arp_note_count > 0 && ts.arp_index < ts.arp_note_count) {
-            ts.arp_next_sample -= static_cast<int64_t>(num_frames);
-            if (ts.arp_next_sample <= 0) {
-                // Retrigger voice with next arp note
-                ts.target_pitch = static_cast<float>(ts.arp_notes[ts.arp_index]);
-                ts.current_pitch = ts.target_pitch;  // no glide between arp notes
-                ts.arp_index++;
-
-                // Force rising edge so Tides/AD envelope restarts
-                ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
-                ts.voice_active = true;
-                // Reset gate timer so the voice fires a full envelope for this note.
-                // Use current playhead step duration; fall back to one arp interval.
-                float arp_note_duration = 1.0f;
-                if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
-                    arp_note_duration = ts.steps[ts.playhead].duration;
-                }
-                int spn_for_gate = arp_samples_per_note(ts.arp_speed,
-                                                        static_cast<int>(samples_per_step));
-                float base_gate = static_cast<float>(arp_note_duration) * static_cast<float>(spn_for_gate);
-                ts.gate_timer = std::max(base_gate, static_cast<float>(720));
-
-                if (ts.arp_index < ts.arp_note_count) {
-                    // Schedule next retrigger
-                    int spn = arp_samples_per_note(ts.arp_speed,
-                                                    static_cast<int>(samples_per_step));
-                    ts.arp_next_sample = static_cast<int64_t>(spn);
-                } else {
-                    // Option A: sequence complete — hold last note, no more retriggers
-                    ts.arp_note_count = 0;
-                }
-            }
-        }
-
-        // Apply pitch glide (exponential approach toward target_pitch)
-        if (ts.glide_rate != 0.0f) {
-            float alpha = pulsar_glide_alpha(ts.glide_rate, num_frames);
-            ts.current_pitch += (ts.target_pitch - ts.current_pitch) * alpha;
-            if (std::abs(ts.target_pitch - ts.current_pitch) < 0.01f) {
-                ts.current_pitch = ts.target_pitch;
-                ts.glide_rate = 0.0f;
-            }
-        }
+        tick_voice(ts, num_frames, samples_per_step);
 
         // A pending engine id lands on this block's note-on, or once armed on the bar line with a
         // strike there so self-enveloped engines sound. Every engine_index reader below sees it.
@@ -6465,7 +6526,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 : -1,
             std::memory_order_relaxed);
         engine->pulsar_track_sounding_note[t].store(
-            gate_for_render != 0 ? sounding_note : -1.0f, std::memory_order_relaxed);
+            ts.live_ghost ? ghost_note(ts, is_self_env, live_noodle)
+                          : (gate_for_render != 0 ? sounding_note : -1.0f),
+            std::memory_order_relaxed);
 
         // Renders the engine (every family but Mist) at `note` into `out` on one voice set:
         // the track's own, or the detuned double's second set in state->dbl. Scalars are

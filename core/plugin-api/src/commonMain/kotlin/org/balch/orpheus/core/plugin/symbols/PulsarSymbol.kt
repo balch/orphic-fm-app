@@ -1098,6 +1098,14 @@ enum class PulsarSymbol(
     TRACK_5_LIVE_BOOST("track_5_live_boost"),
     TRACK_6_LIVE_BOOST("track_6_live_boost"),
     TRACK_7_LIVE_BOOST("track_7_live_boost"),
+    TRACK_0_LIVE_GHOST("track_0_live_ghost"),
+    TRACK_1_LIVE_GHOST("track_1_live_ghost"),
+    TRACK_2_LIVE_GHOST("track_2_live_ghost"),
+    TRACK_3_LIVE_GHOST("track_3_live_ghost"),
+    TRACK_4_LIVE_GHOST("track_4_live_ghost"),
+    TRACK_5_LIVE_GHOST("track_5_live_ghost"),
+    TRACK_6_LIVE_GHOST("track_6_live_ghost"),
+    TRACK_7_LIVE_GHOST("track_7_live_ghost"),
 
     // Section pan target: the track glides here, where a TRACK_N_PAN write snaps
     TRACK_0_PAN_GLIDE("track_0_pan_glide"),

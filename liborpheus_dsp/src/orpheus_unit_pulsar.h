@@ -282,6 +282,34 @@ enum class HalfLickMode : int {
                        // on release the riff re-locks to bar 1
 };
 
+// The sequencer's note state for a live-armed track that is also its own Lick Lab caller. It swaps in
+// around the track's step pass, so the pattern runs unheard and never touches the live voice.
+struct PulsarGhostVoice {
+    float gate_timer = 0.0f;
+    bool voice_active = false;
+    stmlib::GateFlags tides_prev_gate = stmlib::GATE_FLAG_LOW;
+    float current_pitch = 60.0f;
+    float target_pitch = 60.0f;
+    float kraken_base_pitch = 0.0f;
+    bool kraken_base_valid = false;
+    float glide_rate = 0.0f;
+    bool prev_step_gated = false;
+    bool suppress_hold_tail = false;
+    int last_chord_index = -1;
+    int restrike_degree_seen = -1;
+    bool in_hold = false;
+    int trigger_offset = 0;
+    bool pending_retrig = false;
+    double head_origin = 0.0;
+    bool repick_live = false;
+    float current_velocity = 0.8f;
+    uint8_t arp_notes[4] = {};
+    int arp_note_count = 0;
+    int arp_index = 0;
+    int64_t arp_next_sample = 0;
+    bool arp_updown_down = false;
+};
+
 struct PulsarTrackState {
     OrpheusVoice voice;
     // Per-track Braids macro oscillator. Used when engine_index >= 100.
@@ -509,6 +537,8 @@ struct PulsarTrackState {
     bool live_gate_prev = false;
     bool live_tapped = false;  // last block saw a new count with the gate down
     int  live_strike_seen = 0;
+    bool live_ghost = false;  // armed and its own caller: ghost holds the sequencer's notes
+    PulsarGhostVoice ghost;
 
     // Reverb send brightness filter (one-pole LP per channel)
     float reverb_send_filter_state_l = 0.0f;
