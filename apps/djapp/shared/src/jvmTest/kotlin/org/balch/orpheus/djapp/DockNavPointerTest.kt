@@ -18,6 +18,10 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.djapp.variant.DjEdition
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -138,6 +142,37 @@ class DockNavPointerTest {
         show(recorder, OgTvNavBar)
         mouseDragOnto(tab("Cowbell"), onNode(hasTestTag(NavOpenSlotTag)))
         assertEquals(listOf<Pair<NavEntry, NavEntry>>(NavEntry.Panel(CowbellTab) to NavEntry.Open), recorder.exchanges)
+    }
+
+    private fun positionFor(slotCenterX: Int, popupWidth: Int): IntOffset {
+        val bar = IntRect(0, 800, 1600, 1000)
+        val slot = IntRect(slotCenterX - 50, 810, slotCenterX + 50, 990)
+        return ChipRowPositioner(NavChipRowState(MixTab, listOf(HornTab), bar, slot), vertical = false, gapPx = 8)
+            .calculatePosition(IntRect.Zero, IntSize(1600, 1000), LayoutDirection.Ltr, IntSize(popupWidth, 60))
+    }
+
+    @Test
+    fun `the chip row sits above the pressed tab`() {
+        assertEquals(IntOffset(1000 - 150, 800 - 60 - 8), positionFor(1000, popupWidth = 300))
+    }
+
+    @Test
+    fun `the chip row stays in the window at the bar's ends`() {
+        assertEquals(0, positionFor(50, popupWidth = 300).x)
+        assertEquals(1600 - 300, positionFor(1550, popupWidth = 300).x)
+    }
+
+    @Test
+    fun `the chip row is only as wide as its chips`() = runComposeUiTest {
+        val recorder = Recorder()
+        show(recorder, navBar(aiOrder, drops, maxEvenSlots = 4))
+        tab("Mix").performMouseInput { rightClick() }
+        waitForIdle()
+        val chips = onAllNodes(hasTestTag(NavChipTag)).fetchSemanticsNodes().map { it.boundsInWindow }
+        val span = chips.maxOf { it.right } - chips.minOf { it.left }
+        assertTrue(span < 640f, "three chips span $span of the 1280 bar")
+        val mixX = tab("Mix").fetchSemanticsNode().boundsInWindow.center.x
+        assertTrue(mixX in (chips.minOf { it.left } - 16f)..(chips.maxOf { it.right } + 16f), "the row left Mix at $mixX: $chips")
     }
 
     @Test

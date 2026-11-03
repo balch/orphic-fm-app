@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -331,8 +331,8 @@ private suspend fun AwaitPointerEventScope.consumeUntilLift(down: PointerInputCh
     }
 }
 
-/** Places the row above the bar spanning its width, or beside the rail on its open side. */
-private class ChipRowPositioner(
+/** Places the row above the bar centred on the pressed tab, or beside the rail on its open side. */
+internal class ChipRowPositioner(
     private val row: NavChipRowState,
     private val vertical: Boolean,
     private val gapPx: Int,
@@ -349,7 +349,7 @@ private class ChipRowPositioner(
                 .coerceIn(window.top, (window.bottom - popupContentSize.height).coerceAtLeast(window.top))
             IntOffset(row.anchor.right + gapPx, y)
         } else {
-            val x = row.anchor.left
+            val x = (row.slotBounds.center.x - popupContentSize.width / 2)
                 .coerceIn(window.left, (window.right - popupContentSize.width).coerceAtLeast(window.left))
             IntOffset(x, (row.anchor.top - popupContentSize.height - gapPx).coerceAtLeast(window.top))
         }
@@ -369,7 +369,8 @@ internal fun NavChipPopup(host: NavGestureHost?) {
         properties = PopupProperties(focusable = true),
     ) {
         // The bar's glass frames the row; each chip sits on a fill of its own, so no glass is behind text.
-        val width = if (host.vertical) Modifier else Modifier.width(with(density) { row.anchor.width.toDp() })
+        // As wide as its chips, scrolling only when they outgrow the bar.
+        val width = if (host.vertical) Modifier else Modifier.widthIn(max = with(density) { row.anchor.width.toDp() })
         Box(Modifier.then(width).tvBarGlass(true).padding(ChipGap)) {
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
