@@ -28,7 +28,7 @@ enum class AiTurnOutcome {
     /** The agent replied, ending the turn. */
     REPLIED,
 
-    /** The run failed (an API error or a crash) after spending these tokens. */
+    /** The run failed (an API error or a crash) or the turn ended on an empty reply, after spending these tokens. */
     FAILED,
 
     /** The run was cancelled: a stop, a model switch or a new conversation. */

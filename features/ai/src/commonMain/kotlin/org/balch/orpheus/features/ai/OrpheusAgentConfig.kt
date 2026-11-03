@@ -68,10 +68,32 @@ class OrpheusAgentConfig(
     val turnToolBudgetMessage =
         "I have woven a great deal into that one. Take a listen, then tell me what you would like to reshape."
 
-    /** Shown as Orpheus's reply when the model spent its whole reply thinking (max_tokens) with no text or tool call. */
-    val thinkingOnlyMessage =
-        "I thought so long about that one that I ran out of room before doing anything. Nothing changed. " +
-            "Try asking for one smaller piece of it."
+    /** How many blank replies a turn re-requests before giving up. Out-of-room and refused replies are never re-requested. */
+    val maxEmptyReplyRetriesPerTurn = 1
+
+    /** Orpheus's reply when a turn ends on an empty reply. [workDone]: tools already ran this turn, so their changes stand. */
+    fun emptyReplyMessage(kind: EmptyReplyKind, workDone: Boolean): String = when (kind) {
+        EmptyReplyKind.OUT_OF_ROOM ->
+            if (workDone) {
+                "I thought so long about the next step that I ran out of room. What I already did is still in place. " +
+                    "Ask me to carry on, or for one smaller piece of it."
+            } else {
+                "I thought so long about that one that I ran out of room before doing anything. Nothing changed. " +
+                    "Try asking for one smaller piece of it."
+            }
+        EmptyReplyKind.REFUSED ->
+            if (workDone) {
+                "I had to stop there. What I already did is still in place. Try putting the rest another way."
+            } else {
+                "I can't take that one as asked. Nothing changed. Try putting it another way."
+            }
+        EmptyReplyKind.BLANK ->
+            if (workDone) {
+                "My reply came back empty, but what I already did is still in place. Ask me to carry on."
+            } else {
+                "My reply came back empty. Nothing changed. Please ask me again."
+            }
+    }
 
     /** System instruction defining Orpheus persona */
     val systemInstruction = """
@@ -424,6 +446,7 @@ class OrpheusAgentConfig(
         name: String,
         onAssistantMessage: suspend (String) -> String,
         onReasoning: (String) -> Unit = {},
+        onEmptyReply: (EmptyReply) -> Unit = {},
         // Anthropic must run the BATCHED LLM nodes on Koog 1.0.0: the streaming path never
         // appends the assistant turn to session history (Anthropic then rejects the next
         // request — tool_result without its tool_use) AND drops thinking signature deltas,
@@ -440,6 +463,7 @@ class OrpheusAgentConfig(
         // counts LLM tool-result continuations this turn and is reset at the turn boundary
         // (nodeAssistantMessage). When it reaches maxToolRoundsPerTurn the graph force-ends the turn.
         var toolRoundsThisTurn = 0
+        var emptyRetriesThisTurn = 0
 
         // Both flavors are declared; nodes materialize lazily, so only the selected branch
         // ever creates one. (`by if (...) a else b` defeats Kotlin's delegate resolution.)
@@ -452,6 +476,7 @@ class OrpheusAgentConfig(
             if (streamResponses) nodeRequestLLMStreaming else nodeRequestLLMBatched
         val nodeAssistantMessage by node<String, String> { message ->
             toolRoundsThisTurn = 0   // turn is ending; reset the per-turn tool budget
+            emptyRetriesThisTurn = 0
             turnBudget.reset()       // and the apply / mix-edit caps the tools enforce
             // Koog's node counter spans the whole run, so a long chat would hit maxAgentIterations.
             stateManager.withStateLock { it.iterations = 0 }
@@ -474,6 +499,19 @@ class OrpheusAgentConfig(
         val nodeSendToolResult: AIAgentNodeBase<ReceivedToolResults, Message.Assistant> =
             if (streamResponses) nodeSendToolResultStreaming else nodeSendToolResultBatched
         val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
+        // Asks again from the same history, so the empty reply leaves no trace in what the model sees next.
+        val nodeRetryEmptyReply by node<Message.Assistant, Message.Assistant>("nodeRetryEmptyReply") { empty ->
+            emptyRetriesThisTurn++
+            onEmptyReply(EmptyReply(empty.finishReason, empty.metaInfo.outputTokensCount, retrying = true))
+            dropEmptyReply()
+            if (streamResponses) {
+                llm.writeSession { requestLLMStreaming() }.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning)
+            } else {
+                llm.writeSession { requestLLM() }.tapReasoning(onReasoning).tapToolTurnNarration(onReasoning)
+            }
+        }
+        fun Message.Assistant.shouldRetry() =
+            isEmptyReply() && emptyReplyKind(finishReason) == EmptyReplyKind.BLANK && emptyRetriesThisTurn < maxEmptyReplyRetriesPerTurn
 
         edge(nodeStart forwardTo nodeBeginRun)
         edge(nodeBeginRun forwardTo nodeRequestLLM)
@@ -483,11 +521,13 @@ class OrpheusAgentConfig(
                     onToolCalls { true }
         )
 
-        // A reply that is only thinking (max_tokens spent on it) matches no other edge and would kill the run.
+        // A reply with no text and no tool call matches no other edge and would kill the run.
+        edge(nodeRequestLLM forwardTo nodeRetryEmptyReply onCondition { it.shouldRetry() })
+
         edge(
             nodeRequestLLM forwardTo nodeAssistantMessage
-                    onCondition { it.isThinkingOnly() }
-                    transformed { replaceThinkingOnlyReply() }
+                    onCondition { it.isEmptyReply() }
+                    transformed { endTurnOnEmptyReply(it, toolRoundsThisTurn > 0, onEmptyReply) }
         )
 
         edge(
@@ -531,32 +571,78 @@ class OrpheusAgentConfig(
                     onToolCalls { true }
         )
 
+        edge(nodeSendToolResult forwardTo nodeRetryEmptyReply onCondition { it.shouldRetry() })
+
         edge(
             nodeSendToolResult forwardTo nodeAssistantMessage
-                    onCondition { it.isThinkingOnly() }
-                    transformed { replaceThinkingOnlyReply() }
+                    onCondition { it.isEmptyReply() }
+                    transformed { endTurnOnEmptyReply(it, toolRoundsThisTurn > 0, onEmptyReply) }
         )
 
         edge(
             nodeSendToolResult forwardTo nodeAssistantMessage
                     onTextMessage { true }
         )
+
+        edge(
+            nodeRetryEmptyReply forwardTo nodeExecuteTool
+                    onToolCalls { true }
+        )
+
+        edge(
+            nodeRetryEmptyReply forwardTo nodeAssistantMessage
+                    onCondition { it.isEmptyReply() }
+                    transformed { endTurnOnEmptyReply(it, toolRoundsThisTurn > 0, onEmptyReply) }
+        )
+
+        edge(
+            nodeRetryEmptyReply forwardTo nodeAssistantMessage
+                    onTextMessage { true }
+        )
     }
 
-    private fun Message.Assistant.isThinkingOnly(): Boolean =
+    private fun Message.Assistant.isEmptyReply(): Boolean =
         parts.none { it is MessagePart.Tool.Call || (it is MessagePart.Text && it.text.isNotBlank()) }
 
-    // Swaps the thinking-only reply in history for the notice, so the next request has a plain assistant turn.
-    private suspend fun AIAgentGraphContextBase.replaceThinkingOnlyReply(): String {
+    private suspend fun AIAgentGraphContextBase.dropEmptyReply() {
         llm.writeSession {
             rewritePrompt { p ->
                 p.withMessages { messages ->
                     val last = messages.lastOrNull()
-                    val kept = if (last is Message.Assistant && last.isThinkingOnly()) messages.dropLast(1) else messages
-                    kept + Message.Assistant(parts = listOf(MessagePart.Text(thinkingOnlyMessage)), metaInfo = ResponseMetaInfo.Empty)
+                    if (last is Message.Assistant && last.isEmptyReply()) messages.dropLast(1) else messages
                 }
             }
         }
-        return thinkingOnlyMessage
     }
+
+    // Swaps the empty reply in history for the notice, so the next request has a plain assistant turn.
+    private suspend fun AIAgentGraphContextBase.endTurnOnEmptyReply(
+        reply: Message.Assistant,
+        workDone: Boolean,
+        onEmptyReply: (EmptyReply) -> Unit,
+    ): String {
+        onEmptyReply(EmptyReply(reply.finishReason, reply.metaInfo.outputTokensCount, retrying = false))
+        val notice = emptyReplyMessage(emptyReplyKind(reply.finishReason), workDone)
+        dropEmptyReply()
+        llm.writeSession {
+            appendPrompt { message(Message.Assistant(parts = listOf(MessagePart.Text(notice)), metaInfo = ResponseMetaInfo.Empty)) }
+        }
+        return notice
+    }
+}
+
+/** Why a reply had no text and no tool call. */
+enum class EmptyReplyKind { OUT_OF_ROOM, REFUSED, BLANK }
+
+/** One empty reply: the provider's stop reason, what it billed and whether the turn asks again. */
+data class EmptyReply(val finishReason: String?, val outputTokens: Int?, val retrying: Boolean) {
+    fun describe() = "Empty reply: finishReason=$finishReason, outputTokens=$outputTokens, " + if (retrying) "retrying" else "turn ended"
+}
+
+/** Reads the stop reasons of Anthropic, Google and OpenAI. Anything else, such as MALFORMED_FUNCTION_CALL, may go right on a second try. */
+fun emptyReplyKind(finishReason: String?): EmptyReplyKind = when (finishReason?.lowercase()) {
+    "max_tokens", "length" -> EmptyReplyKind.OUT_OF_ROOM
+    "refusal", "content_filter", "safety", "recitation", "blocklist", "prohibited_content", "spii", "language", "image_safety" ->
+        EmptyReplyKind.REFUSED
+    else -> EmptyReplyKind.BLANK
 }

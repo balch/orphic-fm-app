@@ -388,6 +388,11 @@ class OrpheusAgent(
                 userPrompt.prompt
             },
             onReasoning = { agentActivityEventBus.emitReasoning(it) },
+            onEmptyReply = { empty ->
+                logger.w { empty.describe() }
+                errorLog.record(AgentErrorSource.AGENT, empty.describe())
+                if (!empty.retrying) usageMeter.endTurn(AiTurnOutcome.FAILED)
+            },
             // See agentStrategy: Anthropic needs the batched nodes (signed thinking replay
             // + correct history); Google keeps live streaming.
             streamResponses = aiModelProvider.selectedModel.value.aiProvider != AiProvider.Anthropic,
