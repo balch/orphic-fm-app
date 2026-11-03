@@ -8,11 +8,12 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 
 /**
- * Android [VibeCatalogPolicy]: WIP vibes are visible only on debuggable builds.
+ * Android [VibeCatalogPolicy]: WIP vibes are visible on debuggable builds and on `aiDebugRelease`.
  *
  * FLAG_DEBUGGABLE mirrors the app module's `BuildConfig.DEBUG` semantics without this library
  * needing a per-buildType compilation (AGP KMP libraries are single-variant): the `debug` build
- * type is debuggable; `release` and `debugRelease` (initWith(release), R8) are not.
+ * type is debuggable; `release` and `debugRelease` (initWith(release), R8) are not. For the same
+ * reason `aiDebugRelease` is told apart by its id suffix, the flavor's `.ai` plus the type's `.debug`.
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
@@ -21,7 +22,10 @@ interface VibeCatalogPolicyProvider {
         @Provides
         fun provideVibeCatalogPolicy(application: Application): VibeCatalogPolicy =
             VibeCatalogPolicy(
-                catalogLevel = if (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+                catalogLevel = if (
+                    application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 ||
+                    application.packageName.endsWith(".ai.debug")
+                ) {
                     VibeStatus.WIP
                 } else {
                     VibeStatus.LIVE
