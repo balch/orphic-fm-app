@@ -11,16 +11,22 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import org.balch.orpheus.features.visualizations.viz.sprite.SOLID_DISC
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteBatch
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteCell
+import org.balch.orpheus.features.visualizations.viz.sprite.drawSprites
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 // ============================================================================
-// Rendering — all DrawScope drawing extracted from AntColonyViz
+// Rendering: all DrawScope drawing extracted from AntColonyViz
 // ============================================================================
 
 internal fun DrawScope.drawBackground() {
@@ -160,10 +166,11 @@ internal fun DrawScope.drawBlocks(
     }
 }
 
-internal fun DrawScope.drawAnts(
+/** Each active ant's screen position, heading vector (not unit length) and colour. */
+private inline fun DrawScope.forEachAntOnScreen(
     ants: Array<Ant>,
     voiceColors: Array<Color>,
-    strokeLeg: Stroke,
+    action: (sx: Float, sy: Float, headingX: Float, headingY: Float, antColor: Color) -> Unit,
 ) {
     val w = size.width
     val h = size.height
@@ -186,140 +193,162 @@ internal fun DrawScope.drawAnts(
         val hdx = cos(ant.headingAngle)
         val hdz = sin(ant.headingAngle)
         isoProjectInto(gx + hdx, 0f, gz + hdz, centerX, centerY, isoOut)
-        val screenDx = isoOut[0] * w - sx
-        val screenDy = isoOut[1] * h - sy
-        val headingDeg = atan2(screenDy, screenDx) * (180f / PI.toFloat())
-        val segRadius = ANT_SEG_RADIUS
-        val segGap = ANT_SEG_GAP
+        action(sx, sy, isoOut[0] * w - sx, isoOut[1] * h - sy, antColor)
+    }
+}
 
+/** One ant in draw order, centred on its thorax and facing +x. */
+private inline fun antShape(
+    disc: (x: Float, radius: Float, alpha: Float) -> Unit,
+    outline: (x: Float, radius: Float) -> Unit,
+    line: (x0: Float, y0: Float, x1: Float, y1: Float, width: Float, alpha: Float) -> Unit,
+) {
+    val segRadius = ANT_SEG_RADIUS
+    val segGap = ANT_SEG_GAP
+
+    // Abdomen (back, largest): elongated oval via two overlapping circles
+    val abdomenX = -segRadius * 2f - segGap
+    disc(abdomenX, segRadius * 1.4f, 0.85f)
+    disc(abdomenX + segRadius * 0.5f, segRadius * 1.2f, 0.9f)
+    outline(abdomenX, segRadius * 1.4f)
+
+    // Thorax (middle): slightly smaller
+    disc(0f, segRadius, 0.9f)
+    outline(0f, segRadius)
+
+    // Head (front): oval shape
+    val headX = segRadius + segGap
+    disc(headX, segRadius * 0.75f, 0.95f)
+    outline(headX, segRadius * 0.75f)
+
+    // 6 legs (3 pairs): longer, angled lines from thorax with knees
+    val legLen = ANT_LEG_LENGTH
+    for (legPair in 0 until 3) {
+        val legBaseX = (legPair - 1) * 5f
+        val legAngleOut = 0.7f + legPair * 0.1f
+        val kneeLen = legLen * 0.55f
+        val shinLen = legLen * 0.5f
+        val kneeX = legBaseX - kneeLen * 0.3f
+        val kneeY = kneeLen * legAngleOut
+        val footX = kneeX - shinLen * 0.4f
+        val footY = kneeY + shinLen * 0.3f
+
+        // Left leg (upper + lower)
+        line(legBaseX, 0f, kneeX, -kneeY, 1.2f, 0.7f)
+        line(kneeX, -kneeY, footX, -footY, 1f, 0.6f)
+
+        // Right leg (upper + lower)
+        line(legBaseX, 0f, kneeX, kneeY, 1.2f, 0.7f)
+        line(kneeX, kneeY, footX, footY, 1f, 0.6f)
+    }
+
+    // Antennae: two longer curved lines from head
+    val antennaeBase = headX + segRadius * 0.5f
+    line(antennaeBase, 0f, antennaeBase + 7f, -5f, 0.9f, 0.7f)
+    line(antennaeBase, 0f, antennaeBase + 7f, 5f, 0.9f, 0.7f)
+
+    // Mandibles: small V from head front
+    val mandibleBase = headX + segRadius * 0.6f
+    line(mandibleBase, 0f, mandibleBase + 3f, -2f, 0.8f, 0.6f)
+    line(mandibleBase, 0f, mandibleBase + 3f, 2f, 0.8f, 0.6f)
+}
+
+/** The Canvas path: a rotate and 24 draw calls per ant, for where sprites aren't supported. */
+internal fun DrawScope.drawAnts(
+    ants: Array<Ant>,
+    voiceColors: Array<Color>,
+    strokeLeg: Stroke,
+) {
+    forEachAntOnScreen(ants, voiceColors) { sx, sy, headingX, headingY, antColor ->
+        val headingDeg = atan2(headingY, headingX) * (180f / PI.toFloat())
         rotate(degrees = headingDeg, pivot = Offset(sx, sy)) {
-            // Abdomen (back, largest) — elongated oval via two overlapping circles
-            val abdomenX = sx - segRadius * 2f - segGap
-            drawCircle(
-                color = antColor.copy(alpha = 0.85f),
-                radius = segRadius * 1.4f,
-                center = Offset(abdomenX, sy),
-            )
-            drawCircle(
-                color = antColor.copy(alpha = 0.9f),
-                radius = segRadius * 1.2f,
-                center = Offset(abdomenX + segRadius * 0.5f, sy),
-            )
-            // Abdomen outline
-            drawCircle(
-                color = antColor,
-                radius = segRadius * 1.4f,
-                center = Offset(abdomenX, sy),
-                style = strokeLeg,
-            )
-
-            // Thorax (middle) — slightly smaller
-            drawCircle(
-                color = antColor.copy(alpha = 0.9f),
-                radius = segRadius,
-                center = Offset(sx, sy),
-            )
-            // Thorax outline
-            drawCircle(
-                color = antColor,
-                radius = segRadius,
-                center = Offset(sx, sy),
-                style = strokeLeg,
-            )
-
-            // Head (front) — oval shape
-            val headX = sx + segRadius + segGap
-            drawCircle(
-                color = antColor.copy(alpha = 0.95f),
-                radius = segRadius * 0.75f,
-                center = Offset(headX, sy),
-            )
-            // Head outline
-            drawCircle(
-                color = antColor,
-                radius = segRadius * 0.75f,
-                center = Offset(headX, sy),
-                style = strokeLeg,
-            )
-
-            // 6 legs (3 pairs) — longer, angled lines from thorax with knees
-            val legLen = ANT_LEG_LENGTH
-            for (legPair in 0 until 3) {
-                val legBaseX = sx + (legPair - 1) * 5f
-                val legAngleOut = 0.7f + legPair * 0.1f
-                val kneeLen = legLen * 0.55f
-                val shinLen = legLen * 0.5f
-
-                // Left leg (upper + lower)
-                val kneeLeftX = legBaseX - kneeLen * 0.3f
-                val kneeLeftY = sy - kneeLen * legAngleOut
-                drawLine(
-                    color = antColor.copy(alpha = 0.7f),
-                    start = Offset(legBaseX, sy),
-                    end = Offset(kneeLeftX, kneeLeftY),
-                    strokeWidth = 1.2f,
-                )
-                drawLine(
-                    color = antColor.copy(alpha = 0.6f),
-                    start = Offset(kneeLeftX, kneeLeftY),
-                    end = Offset(kneeLeftX - shinLen * 0.4f, kneeLeftY - shinLen * 0.3f),
-                    strokeWidth = 1f,
-                )
-
-                // Right leg (upper + lower)
-                val kneeRightX = legBaseX - kneeLen * 0.3f
-                val kneeRightY = sy + kneeLen * legAngleOut
-                drawLine(
-                    color = antColor.copy(alpha = 0.7f),
-                    start = Offset(legBaseX, sy),
-                    end = Offset(kneeRightX, kneeRightY),
-                    strokeWidth = 1.2f,
-                )
-                drawLine(
-                    color = antColor.copy(alpha = 0.6f),
-                    start = Offset(kneeRightX, kneeRightY),
-                    end = Offset(kneeRightX - shinLen * 0.4f, kneeRightY + shinLen * 0.3f),
-                    strokeWidth = 1f,
-                )
-            }
-
-            // Antennae — two longer curved lines from head
-            val antennaeBase = headX + segRadius * 0.5f
-            drawLine(
-                color = antColor.copy(alpha = 0.7f),
-                start = Offset(antennaeBase, sy),
-                end = Offset(antennaeBase + 7f, sy - 5f),
-                strokeWidth = 0.9f,
-            )
-            drawLine(
-                color = antColor.copy(alpha = 0.7f),
-                start = Offset(antennaeBase, sy),
-                end = Offset(antennaeBase + 7f, sy + 5f),
-                strokeWidth = 0.9f,
-            )
-
-            // Mandibles — small V from head front
-            drawLine(
-                color = antColor.copy(alpha = 0.6f),
-                start = Offset(headX + segRadius * 0.6f, sy),
-                end = Offset(headX + segRadius * 0.6f + 3f, sy - 2f),
-                strokeWidth = 0.8f,
-            )
-            drawLine(
-                color = antColor.copy(alpha = 0.6f),
-                start = Offset(headX + segRadius * 0.6f, sy),
-                end = Offset(headX + segRadius * 0.6f + 3f, sy + 2f),
-                strokeWidth = 0.8f,
+            antShape(
+                disc = { x, radius, alpha ->
+                    drawCircle(antColor.copy(alpha = alpha), radius, Offset(sx + x, sy))
+                },
+                outline = { x, radius ->
+                    drawCircle(antColor, radius, Offset(sx + x, sy), style = strokeLeg)
+                },
+                line = { x0, y0, x1, y1, width, alpha ->
+                    drawLine(
+                        color = antColor.copy(alpha = alpha),
+                        start = Offset(sx + x0, sy + y0),
+                        end = Offset(sx + x1, sy + y1),
+                        strokeWidth = width,
+                    )
+                },
             )
         }
 
-        // Glow around ant — larger to match bigger body
+        // Glow around ant: larger to match bigger body
         drawCircle(
             color = antColor.copy(alpha = 0.12f),
             radius = ANT_GLOW_RADIUS,
             center = Offset(sx, sy),
             blendMode = BlendMode.Plus,
         )
+    }
+}
+
+private const val ANT_CELL_GLOW = 0
+private const val ANT_CELL_BODY = 1
+private const val ANT_CELL_OUTLINE = 2
+internal const val ANT_CELL_LINE = 3
+
+// Sprites have no edge antialiasing, so the soft edges in these cells stand in for it: about a
+// pixel wide at thorax size, centred on the true radius at the quad scales below.
+private const val ANT_BODY_QUAD_SCALE = 1.1f
+private const val ANT_OUTLINE_QUAD_SCALE = 1.25f
+private val ANT_BODY_CELL = SpriteCell(0f to 1f, 0.82f to 1f, 1f to 0f)
+private val ANT_OUTLINE_CELL = SpriteCell(0f to 0f, 0.67f to 0f, 0.8f to 1f, 0.93f to 0f, 1f to 0f)
+
+/** Opaque corner to corner, because a line's quad stretches the whole cell along it. */
+private val ANT_LINE_CELL = SpriteCell(0f to 1f, 1f to 1f)
+
+internal fun antSpriteBatch() = SpriteBatch(listOf(SOLID_DISC, ANT_BODY_CELL, ANT_OUTLINE_CELL, ANT_LINE_CELL))
+
+/** [drawAnts] through [batch]: every body in one pass, then every glow in a Plus pass. */
+internal fun DrawScope.drawAntSprites(
+    ants: Array<Ant>,
+    voiceColors: Array<Color>,
+    batch: SpriteBatch,
+) {
+    drawSprites(batch, BlendMode.SrcOver) {
+        forEachAntOnScreen(ants, voiceColors) { sx, sy, headingX, headingY, antColor ->
+            val headingLen = sqrt(headingX * headingX + headingY * headingY)
+            val c = if (headingLen > 0f) headingX / headingLen else 1f
+            val s = if (headingLen > 0f) headingY / headingLen else 0f
+            antShape(
+                disc = { x, radius, alpha ->
+                    disc(ANT_CELL_BODY, sx + x * c, sy + x * s, radius * ANT_BODY_QUAD_SCALE, antColor.copy(alpha = alpha))
+                },
+                outline = { x, radius ->
+                    disc(ANT_CELL_OUTLINE, sx + x * c, sy + x * s, radius * ANT_OUTLINE_QUAD_SCALE, antColor)
+                },
+                line = { x0, y0, x1, y1, width, alpha ->
+                    val mx = (x0 + x1) * 0.5f
+                    val my = (y0 + y1) * 0.5f
+                    val dx = x1 - x0
+                    val dy = y1 - y0
+                    val length = sqrt(dx * dx + dy * dy)
+                    // Under a pixel wide a hard-edged quad can miss every pixel centre,
+                    // so widen it and thin the alpha to land the same ink.
+                    val quadWidth = max(width, 1f)
+                    quad(
+                        ANT_CELL_LINE,
+                        sx + mx * c - my * s, sy + mx * s + my * c,
+                        length * 0.5f, quadWidth * 0.5f,
+                        (dx * c - dy * s) / length, (dx * s + dy * c) / length,
+                        antColor.copy(alpha = alpha * width / quadWidth),
+                    )
+                },
+            )
+        }
+    }
+    drawSprites(batch, BlendMode.Plus) {
+        forEachAntOnScreen(ants, voiceColors) { sx, sy, _, _, antColor ->
+            disc(ANT_CELL_GLOW, sx, sy, ANT_GLOW_RADIUS, antColor.copy(alpha = 0.12f))
+        }
     }
 }
 

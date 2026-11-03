@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -21,7 +22,9 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.playback.MetadataProducer
+import org.balch.orpheus.features.visualizations.viz.shader.LayerShader
 import org.balch.orpheus.features.visualizations.viz.shader.PlasmaShader
+import org.balch.orpheus.features.visualizations.viz.sprite.spriteBatchSupported
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -113,6 +116,7 @@ class AntColonyViz(
     private val clusterOffsets = intArrayOf(-1, 0, 1, 0, 0, -1, 0, 1) // dx,dz pairs
     private val grid = Grid()
     private val pods = PodField()
+    private val podLayer = PodLayer()
     private val ants = Array(MAX_ANTS) { Ant() }
     private val debris = Array(MAX_DEBRIS) { Debris() }
     private val columnOrder = IntArray(GRID_W * GRID_D)
@@ -169,6 +173,9 @@ class AntColonyViz(
     private val strokeCrack = Stroke(width = 2f)
     private val strokeLens = Stroke(width = 2f)
     private val strokeLeg = Stroke(width = 1f)
+    private val antSprites by lazy(LazyThreadSafetyMode.NONE) {
+        if (spriteBatchSupported()) antSpriteBatch() else null
+    }
 
     private val _uiState = mutableStateOf(AntColonyUiState(), neverEqualPolicy())
 
@@ -244,6 +251,9 @@ class AntColonyViz(
 
         val podShader = remember { PlasmaShader(PodsSksl.SOURCE) }
         DisposableEffect(podShader) { onDispose { podShader.dispose() } }
+        val podLayerShader = remember { LayerShader(PodsSksl.LAYER_SOURCE, "content") }
+        DisposableEffect(podLayerShader) { onDispose { podLayerShader.dispose() } }
+        val podGraphicsLayer = rememberGraphicsLayer()
 
         Canvas(modifier = modifier.fillMaxSize()) {
             // Read inside drawScope so per-frame _uiState writes only invalidate
@@ -265,14 +275,23 @@ class AntColonyViz(
             } else Offset.Zero
             translate(shake.x, shake.y) {
                 drawGroundPlane()
-                if (podShader.isSupported) {
+                var podsMelted = podLayerSupported(podLayerShader) && podLayer.draw(
+                    this, podLayerShader, podGraphicsLayer, pods,
+                    grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo, debris,
+                )
+                if (!podsMelted && podShader.isSupported) {
                     pods.splat(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo, size.width, size.height, debris)
                     drawPods(podShader, pods)
-                } else {
-                    drawBlocks(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo)
+                    podsMelted = true
                 }
-                drawAnts(ants, voiceColors, strokeLeg)
-                drawDebris(debris, voiceColors, gooInPods = podShader.isSupported, drawIso)
+                if (!podsMelted) drawBlocks(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo)
+                val sprites = antSprites
+                if (sprites != null) {
+                    drawAntSprites(ants, voiceColors, sprites)
+                } else {
+                    drawAnts(ants, voiceColors, strokeLeg)
+                }
+                drawDebris(debris, voiceColors, gooInPods = podsMelted, drawIso)
 
                 if (destroying) {
                     when (state.destructionType) {

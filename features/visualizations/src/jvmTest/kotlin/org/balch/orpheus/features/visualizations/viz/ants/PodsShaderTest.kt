@@ -11,6 +11,7 @@ class PodsShaderTest {
     @Test fun `every metaball shader compiles`() {
         val sources = mapOf(
             "pods" to PodsSksl.SOURCE,
+            "pods layer" to PodsSksl.LAYER_SOURCE,
             "orphogram" to PlasmaSksl.ORPHOGRAM,
             "orphograph" to PlasmaSksl.ORPHOGRAPH,
             "mt hood lava" to MtHoodLavaSksl.SOURCE,

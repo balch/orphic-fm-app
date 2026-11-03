@@ -10,7 +10,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.Density
+import org.balch.orpheus.features.visualizations.viz.shader.LayerShader
 import org.balch.orpheus.features.visualizations.viz.shader.PlasmaShader
 import org.balch.orpheus.ui.theme.OrpheusColors
 import java.io.File
@@ -21,9 +23,9 @@ import kotlin.random.Random
 import kotlin.test.Test
 
 /**
- * Renders a built-up Bugs mound as Canvas pods and as metaball pods, quiet and loud, and the
- * destruction effects over it, and prints what building each frame costs on the CPU (the splat,
- * or recording the Canvas pods). Asserts nothing.
+ * Renders a built-up Bugs mound as Canvas pods and as metaball pods (the sprite layer, and the CPU
+ * field it falls back to), quiet and loud, and the destruction effects over it, and prints what
+ * building each frame costs on the CPU. Asserts nothing.
  * Output: features/visualizations/build/bugs-render/
  *
  * ./gradlew :features:visualizations:jvmTest --tests '*BugsPodsRenderHarness*' -PrenderHarness --rerun
@@ -100,17 +102,24 @@ class BugsPodsRenderHarness {
         grid: Grid = mound(), debris: Array<Debris> = emptyArray(),
         effects: (PodField, Float, Float) -> Unit = { _, _, _ -> },
         overlay: DrawScope.(PodField) -> Unit = {},
+        cpuField: Boolean = false,
     ) {
         val pods = PodField()
+        val podLayer = PodLayer()
         val scene = ImageComposeScene(width, height, Density(1f)) {
             val shader = remember { PlasmaShader(PodsSksl.SOURCE) }
             DisposableEffect(shader) { onDispose { shader.dispose() } }
+            val layerShader = remember { LayerShader(PodsSksl.LAYER_SOURCE, "content") }
+            DisposableEffect(layerShader) { onDispose { layerShader.dispose() } }
+            val layer = rememberGraphicsLayer()
             Canvas(Modifier.fillMaxSize()) {
                 drawBackground()
                 drawGroundPlane()
                 pods.clearEffects()
                 effects(pods, size.width, size.height)
-                if (shaderPods) {
+                if (shaderPods && !cpuField) {
+                    podLayer.draw(this, layerShader, layer, pods, grid, voiceColors, duoLevels, master, 0.3f, debris)
+                } else if (shaderPods) {
                     pods.splat(grid, voiceColors, duoLevels, master, 0.3f, size.width, size.height, debris)
                     drawPods(shader, pods)
                 } else {
@@ -139,7 +148,7 @@ class BugsPodsRenderHarness {
     private fun DrawScope.drawAnts() = drawAnts(ants, voiceColors, Stroke(width = 1f))
 
     /** The stomp at [progress], with the boot where the simulation puts it then. */
-    private fun stomp(name: String, progress: Float) {
+    private fun stomp(name: String, progress: Float, cpuField: Boolean = false) {
         val impact = progress >= STOMP_IMPACT
         val stompY = when {
             !impact -> -0.3f + progress / STOMP_IMPACT * 0.75f
@@ -159,12 +168,14 @@ class BugsPodsRenderHarness {
                     drawStompEffect(progress, stompY, phase, pods.shock, Path(), Stroke(width = 3f), Stroke(width = 2f))
                 }
             },
+            cpuField = cpuField,
         )
     }
 
     @Test fun canvasPods() = render("canvas_pods", 1200, 800, shaderPods = false)
     @Test fun canvasPodsLoud() = render("canvas_pods_loud", 1200, 800, false, loudLevels, 1f)
     @Test fun metaballPods() = render("metaball_pods", 1200, 800, shaderPods = true)
+    @Test fun metaballPodsCpuField() = render("metaball_pods_cpu", 1200, 800, shaderPods = true, cpuField = true)
     @Test fun metaballPodsQuiet() = render("metaball_pods_quiet", 1200, 800, true, quietLevels, 0f)
     @Test fun metaballPodsLoud() = render("metaball_pods_loud", 1200, 800, true, loudLevels, 1f)
     @Test fun metaballPodsFullscreen() = render("metaball_pods_fullscreen", 2560, 1440, shaderPods = true)
@@ -172,6 +183,8 @@ class BugsPodsRenderHarness {
     @Test fun stompFalling() = stomp("stomp_1_falling", 0.22f)
     @Test fun stompSplash() = stomp("stomp_2_splash", 0.42f)
     @Test fun stompPuddles() = stomp("stomp_3_puddles", 0.6f)
+    @Test fun stompSplashCpuField() = stomp("stomp_2_splash_cpu", 0.42f, cpuField = true)
+    @Test fun stompPuddlesCpuField() = stomp("stomp_3_puddles_cpu", 0.6f, cpuField = true)
 
     @Test fun fireAnts() = render("fire_ants", 1200, 800, true, overlay = {
         drawAnts()

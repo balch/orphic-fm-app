@@ -1,11 +1,23 @@
 package org.balch.orpheus.features.visualizations.viz.ants
 
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.unit.IntSize
+import org.balch.orpheus.features.visualizations.viz.shader.LayerShader
 import org.balch.orpheus.features.visualizations.viz.shader.PlasmaShader
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteBatch
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteCell
+import org.balch.orpheus.features.visualizations.viz.sprite.drawSprites
+import org.balch.orpheus.features.visualizations.viz.sprite.spriteBatchSupported
 import kotlin.math.atan2
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -31,10 +43,87 @@ private const val POD_FIELD_MAX_WIDTH = 480
 private const val POD_GLOW_INNER = 1.3f
 private const val POD_GLOW_OUTER = 2.6f
 
+/** How much a buried pod adds to the field, so the surface ones bead on top. */
+private const val POD_BURIED_WEIGHT = 0.55f
+
+/** The biggest pod's reach (size, swell and stretch) plus the glow's outer ring, in pod radii. */
+private const val POD_BOUNDS_PAD = POD_REACH * 2.9f + POD_GLOW_OUTER
+
+/**
+ * Every visible pod in [grid] and the stomp's [debris] in draw order, in screen pixels, placed,
+ * sized, stretched and lit as [drawBlocks] places them. [emit] gets centre x, y, radius,
+ * elongation, angle, colour, light and field weight.
+ */
+private inline fun forEachPod(
+    grid: Grid, voiceColors: Array<Color>, duoLevels: FloatArray,
+    smoothedMaster: Float, smoothedLfo: Float, screenW: Float, screenH: Float,
+    debris: Array<Debris>, iso: FloatArray,
+    emit: (cx: Float, cy: Float, radius: Float, elongation: Float, angle: Float, color: Color, light: Float, weight: Float) -> Unit,
+) {
+    val baseSize = CUBE_SIZE * screenW * BLOB_BASE_SIZE_FACTOR
+    val audioIntensity = (smoothedMaster * 0.6f + smoothedLfo * 0.15f).coerceIn(0f, 0.85f)
+
+    for (y in 0 until GRID_H) for (z in 0 until GRID_D) for (x in 0 until GRID_W) {
+        val colorIdx = grid.get(x, y, z)
+        if (colorIdx == 0) continue
+        val hasBlockAbove = y < GRID_H - 1 && grid.get(x, y + 1, z) != 0
+        val hasBlockFront = z < GRID_D - 1 && grid.get(x, y, z + 1) != 0
+        val hasBlockRight = x < GRID_W - 1 && grid.get(x + 1, y, z) != 0
+        if (hasBlockAbove && hasBlockFront && hasBlockRight) continue
+
+        val color = voiceColors[(colorIdx - 1).coerceIn(0, voiceColors.lastIndex)]
+        isoProjectInto(x.toFloat(), y.toFloat(), z.toFloat(), ISO_CENTER_X, ISO_CENTER_Y, iso)
+        val hash = (x * 73 + z * 137 + y * 251) and 0xFF
+        val sizeMul = 0.7f + (hash % 40) / 66f
+        val cx = iso[0] * screenW + ((hash % 11) - 5) * 0.6f
+        val cy = iso[1] * screenH + ((hash / 7 % 9) - 4) * 0.5f
+        val elongation = 1.3f + (hash % 29) / 40f
+        val angle = (hash * 137 % 360) * (kotlin.math.PI.toFloat() / 180f)
+
+        val duoEnergy = duoLevels[((colorIdx - 1) / 2).coerceIn(0, 5)]
+        val isSurface = !hasBlockAbove
+        val baseAlpha = if (isSurface) BLOB_SURFACE_ALPHA else BLOB_INTERIOR_ALPHA
+        // The Canvas pods' alpha, as a brightness: loud duos glow, buried pods stay dim.
+        val light = ((baseAlpha + audioIntensity * 0.5f + duoEnergy * 0.3f).coerceIn(0.05f, 0.8f) / 0.8f)
+        // A loud duo's pods swell, as its Canvas glow widens; buried pods sink in, so the
+        // surface ones bead on top instead of everything fusing into one mass.
+        val radius = baseSize * sizeMul * (0.85f + duoEnergy * 0.25f)
+        emit(cx, cy, radius, elongation, angle, color, light, if (isSurface) 1f else POD_BURIED_WEIGHT)
+    }
+
+    // The stomp's splash: droplets stretched along their flight, flattened into puddles once
+    // they land, shrinking and dimming as they fade.
+    for (d in debris) {
+        if (!d.active || !d.goo) continue
+        val gx = d.x * GRID_W
+        val gy = d.y * GRID_H
+        val gz = d.z * GRID_D
+        isoProjectInto(gx, gy, gz, ISO_CENTER_X, ISO_CENTER_Y, iso)
+        val cx = iso[0] * screenW
+        val cy = iso[1] * screenH
+        val elongation: Float
+        val angle: Float
+        if (d.y <= 0f) {
+            elongation = 1.9f
+            angle = 0f
+        } else {
+            isoProjectInto(gx + d.vx * GRID_W, gy + d.vy * GRID_H, gz + d.vz * GRID_D, ISO_CENTER_X, ISO_CENTER_Y, iso)
+            val vx = iso[0] * screenW - cx
+            val vy = iso[1] * screenH - cy
+            elongation = 1f + min(1.2f, sqrt(vx * vx + vy * vy) / (baseSize * 6f))
+            angle = atan2(vy, vx)
+        }
+        val color = voiceColors[(d.colorIndex - 1).coerceIn(0, voiceColors.lastIndex)]
+        val radius = baseSize * (d.size / 0.006f) * (0.3f + 0.4f * d.life)
+        emit(cx, cy, radius, elongation, angle, color, 0.4f + 0.6f * d.life, 1f)
+    }
+}
+
 /**
  * The colony's pods as one metaball field, splatted on the CPU at a quarter of the screen's size:
  * [field] is the summed falloff and [red], [green], [blue] each texel's colour, weighted by how
  * strongly each pod reaches it and lit by its loudness. One byte a texel each, for [PodsSksl].
+ * The fallback for [PodLayer]; the stomp's and the glass's uniforms live here for both.
  */
 internal class PodField {
     var width = 0
@@ -89,7 +178,7 @@ internal class PodField {
         f = FloatArray(n); r = FloatArray(n); g = FloatArray(n); b = FloatArray(n)
     }
 
-    /** Splats every visible pod in [grid], placed, sized, stretched and lit as [drawBlocks] places them. */
+    /** Splats every pod [forEachPod] gives. */
     fun splat(
         grid: Grid, voiceColors: Array<Color>, duoLevels: FloatArray,
         smoothedMaster: Float, smoothedLfo: Float, screenW: Float, screenH: Float,
@@ -99,72 +188,18 @@ internal class PodField {
         f.fill(0f); r.fill(0f); g.fill(0f); b.fill(0f)
         val sx = width / screenW
         val sy = height / screenH
-        val baseSize = CUBE_SIZE * screenW * BLOB_BASE_SIZE_FACTOR
-        val audioIntensity = (smoothedMaster * 0.6f + smoothedLfo * 0.15f).coerceIn(0f, 0.85f)
-        podRadius = baseSize * sx
+        podRadius = CUBE_SIZE * screenW * BLOB_BASE_SIZE_FACTOR * sx
         var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
         var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
 
-        for (y in 0 until GRID_H) for (z in 0 until GRID_D) for (x in 0 until GRID_W) {
-            val colorIdx = grid.get(x, y, z)
-            if (colorIdx == 0) continue
-            val hasBlockAbove = y < GRID_H - 1 && grid.get(x, y + 1, z) != 0
-            val hasBlockFront = z < GRID_D - 1 && grid.get(x, y, z + 1) != 0
-            val hasBlockRight = x < GRID_W - 1 && grid.get(x + 1, y, z) != 0
-            if (hasBlockAbove && hasBlockFront && hasBlockRight) continue
-
-            val color = voiceColors[(colorIdx - 1).coerceIn(0, voiceColors.lastIndex)]
-            isoProjectInto(x.toFloat(), y.toFloat(), z.toFloat(), ISO_CENTER_X, ISO_CENTER_Y, iso)
-            val hash = (x * 73 + z * 137 + y * 251) and 0xFF
-            val sizeMul = 0.7f + (hash % 40) / 66f
-            val cx = (iso[0] * screenW + ((hash % 11) - 5) * 0.6f) * sx
-            val cy = (iso[1] * screenH + ((hash / 7 % 9) - 4) * 0.5f) * sy
-            val elongation = 1.3f + (hash % 29) / 40f
-            val angle = (hash * 137 % 360) * (kotlin.math.PI.toFloat() / 180f)
-
-            val duoEnergy = duoLevels[((colorIdx - 1) / 2).coerceIn(0, 5)]
-            val isSurface = !hasBlockAbove
-            val baseAlpha = if (isSurface) BLOB_SURFACE_ALPHA else BLOB_INTERIOR_ALPHA
-            // The Canvas pods' alpha, as a brightness: loud duos glow, buried pods stay dim.
-            val light = ((baseAlpha + audioIntensity * 0.5f + duoEnergy * 0.3f).coerceIn(0.05f, 0.8f) / 0.8f)
-            // A loud duo's pods swell, as its Canvas glow widens; buried pods sink in, so the
-            // surface ones bead on top instead of everything fusing into one mass.
-            val radius = baseSize * sizeMul * (0.85f + duoEnergy * 0.25f) * sx
-            splatPod(cx, cy, radius, elongation, angle, color, light, if (isSurface) 1f else 0.55f)
+        forEachPod(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo, screenW, screenH, debris, iso) { x, y, radius, elongation, angle, color, light, weight ->
+            val cx = x * sx
+            val cy = y * sy
+            splatPod(cx, cy, radius * sx, elongation, angle, color, light, weight)
             minX = min(minX, cx); maxX = max(maxX, cx)
             minY = min(minY, cy); maxY = max(maxY, cy)
         }
-
-        // The stomp's splash: droplets stretched along their flight, flattened into puddles once
-        // they land, shrinking and dimming as they fade.
-        for (d in debris) {
-            if (!d.active || !d.goo) continue
-            val gx = d.x * GRID_W
-            val gy = d.y * GRID_H
-            val gz = d.z * GRID_D
-            isoProjectInto(gx, gy, gz, ISO_CENTER_X, ISO_CENTER_Y, iso)
-            val cx = iso[0] * screenW * sx
-            val cy = iso[1] * screenH * sy
-            val elongation: Float
-            val angle: Float
-            if (d.y <= 0f) {
-                elongation = 1.9f
-                angle = 0f
-            } else {
-                isoProjectInto(gx + d.vx * GRID_W, gy + d.vy * GRID_H, gz + d.vz * GRID_D, ISO_CENTER_X, ISO_CENTER_Y, iso)
-                val vx = iso[0] * screenW * sx - cx
-                val vy = iso[1] * screenH * sy - cy
-                elongation = 1f + min(1.2f, sqrt(vx * vx + vy * vy) / (podRadius * 6f))
-                angle = atan2(vy, vx)
-            }
-            val color = voiceColors[(d.colorIndex - 1).coerceIn(0, voiceColors.lastIndex)]
-            val radius = podRadius * (d.size / 0.006f) * (0.3f + 0.4f * d.life)
-            splatPod(cx, cy, radius, elongation, angle, color, 0.4f + 0.6f * d.life, 1f)
-            minX = min(minX, cx); maxX = max(maxX, cx)
-            minY = min(minY, cy); maxY = max(maxY, cy)
-        }
-        // The biggest pod's reach (size, swell and stretch) plus the glow's outer ring.
-        val pad = podRadius * (POD_REACH * 2.9f + POD_GLOW_OUTER) + 2f
+        val pad = podRadius * POD_BOUNDS_PAD + 2f
         bounds[0] = minX - pad; bounds[1] = minY - pad
         bounds[2] = maxX + pad; bounds[3] = maxY + pad
 
@@ -234,14 +269,15 @@ internal class PodField {
 }
 
 /**
- * Melts [PodField] into glossy glowing pods: lit by their own colour, a broad sheen up top and
- * a glow on the ground around them. Also bends them under the stomp's ripple and the glass's lens,
- * and heats them near its burn. Transparent elsewhere, so the ground shows through. SkSL and AGSL.
+ * Melts the pods into glossy glowing ones: lit by their own colour, a broad sheen up top and a glow
+ * on the ground around them. Also bends them under the stomp's ripple and the glass's lens, and
+ * heats them near its burn. Transparent elsewhere, so the ground shows through. SkSL and AGSL.
+ * [SOURCE] reads [PodField] and [LAYER_SOURCE] the layer [PodLayer] draws; the look is shared.
  */
 internal object PodsSksl {
     private val SURFACE_E = 1f - exp(-POD_SURFACE / POD_FIELD_SOFTNESS)
 
-    val SOURCE = """
+    private const val UNIFORMS = """
 uniform float2 resolution;
 uniform float2 fieldSize;
 uniform float podRadius;
@@ -249,14 +285,9 @@ uniform float4 bounds;
 uniform float4 shock;
 uniform float3 lens;
 uniform float3 heat;
-uniform shader field;
-uniform shader red;
-uniform shader green;
-uniform shader blue;
+"""
 
-// The encoded field, 0..1: the surface level below is in the same encoding.
-float E(float2 q) { return field.eval(q).a; }
-
+    private val MELT = """
 // How hot the glass has made screen point p: 1 at the burn's edge, 0 well clear of it.
 float heatAt(float2 p) {
     if (heat.z <= 0.0) return 0.0;
@@ -273,20 +304,18 @@ float3 burn(float3 c, float h) {
 
 // The pods' light on the ground: the field averaged on two rings around q, in the taps' colours
 // weighted by their strength. The outer ring counts by loudness, so loud pods glow wider.
-half4 glow(float2 q, float e, float surf, float h, float ring) {
+half4 glow(float2 q, float4 s, float surf, float h, float ring) {
     float2 d = float2(1.0, 0.0);
     float inner = 0.0;
     float outer = 0.0;
-    float3 c = float3(red.eval(q).a, green.eval(q).a, blue.eval(q).a) * e;
+    float e = s.a;
+    float3 c = s.rgb;
     for (int i = 0; i < 8; i++) {
-        float2 qa = q + d * (podRadius * $POD_GLOW_INNER);
-        float2 qb = q + d * (podRadius * $POD_GLOW_OUTER);
-        float ea = E(qa);
-        float eb = E(qb);
-        inner += ea;
-        outer += eb;
-        c += float3(red.eval(qa).a, green.eval(qa).a, blue.eval(qa).a) * ea;
-        c += float3(red.eval(qb).a, green.eval(qb).a, blue.eval(qb).a) * eb;
+        float4 tapA = S(q + d * (podRadius * $POD_GLOW_INNER));
+        float4 tapB = S(q + d * (podRadius * $POD_GLOW_OUTER));
+        inner += tapA.a;
+        outer += tapB.a;
+        c += tapA.rgb + tapB.rgb;
         d = float2(d.x - d.y, d.x + d.y) * 0.70710678;
     }
     float total = e + inner + outer;
@@ -324,19 +353,19 @@ half4 main(float2 p) {
     float surf = $SURFACE_E * (1.0 - 0.45 * h); // hot pods swell
     float2 q = sp / resolution * fieldSize;
     if (q.x < bounds.x || q.y < bounds.y || q.x > bounds.z || q.y > bounds.w) return half4(0.0);
-    float e = E(q);
+    float4 s = S(q);
+    float e = s.a;
     // Pods fade into their glow across a band around the surface, so their edges are soft.
     float edgeLo = surf - 0.045;
     float edgeHi = surf + 0.07;
-    if (e < edgeLo) return glow(q, e, surf, h, ring);
-    float3 c = float3(red.eval(q).a, green.eval(q).a, blue.eval(q).a);
+    if (e < edgeLo) return glow(q, s, surf, h, ring);
+    float3 c = s.rgb / max(e, 0.002);
     float lum = max(c.r, max(c.g, c.b));
     // The pod's hue at full strength; its loudness comes back in as glow, and heat makes it blaze.
     float3 hue = burn(c / max(lum, 0.05), h);
     float shine = max(0.35 + 0.65 * lum, h) * (1.0 + ring * 0.6);
-    float gx = E(q + float2(1.0, 0.0)) - E(q - float2(1.0, 0.0));
-    float gy = E(q + float2(0.0, 1.0)) - E(q - float2(0.0, 1.0));
-    float3 n = normalize(float3(-gx * 6.0, -gy * 6.0, 1.0));
+    float2 g = slope(q);
+    float3 n = normalize(float3(-g.x * 6.0, -g.y * 6.0, 1.0));
     float3 L = normalize(float3(-0.4, -0.7, 0.6));
     float diff = max(dot(n, L), 0.0);
     // A broad sheen and a faint bounce light follow the curve; a tight highlight drew a white dot.
@@ -349,9 +378,150 @@ half4 main(float2 p) {
     float a = 0.6 + 0.35 * smoothstep(surf, surf + 0.1, e);
     half4 top = half4(half3(min(col, float3(1.0)) * a), half(a));
     if (e >= edgeHi) return top;
-    return mix(glow(q, e, surf, h, ring), top, half(smoothstep(edgeLo, edgeHi, e)));
+    return mix(glow(q, s, surf, h, ring), top, half(smoothstep(edgeLo, edgeHi, e)));
 }
 """
+
+    val SOURCE = UNIFORMS + """
+uniform shader field;
+uniform shader red;
+uniform shader green;
+uniform shader blue;
+
+// The encoded field, 0..1: the surface level below is in the same encoding.
+float E(float2 q) { return field.eval(q).a; }
+
+// Colour weighted by the field in rgb, the field in a.
+float4 S(float2 q) {
+    float e = E(q);
+    return float4(red.eval(q).a * e, green.eval(q).a * e, blue.eval(q).a * e, e);
+}
+
+float2 slope(float2 q) {
+    return float2(E(q + float2(1.0, 0.0)) - E(q - float2(1.0, 0.0)), E(q + float2(0.0, 1.0)) - E(q - float2(0.0, 1.0)));
+}
+""" + MELT
+
+    /** Texels here are pixels: `texel` is the [PodField] texel the sheen was tuned at, in pixels. */
+    val LAYER_SOURCE = UNIFORMS + """
+uniform float texel;
+uniform shader content;
+
+float E(float2 q) { return content.eval(q).a; }
+
+float4 S(float2 q) { return float4(content.eval(q)); }
+
+// Eight taps on pixel corners: at full size one byte of field is a visible bump in the sheen, which
+// the quarter-size field hid by interpolating. This smooths it back out at about the same width.
+float2 slope(float2 q) {
+    float2 c = floor(q);
+    float t = floor(texel + 0.5);
+    float tl = E(c + float2(-t, -t));
+    float tr = E(c + float2(t, -t));
+    float bl = E(c + float2(-t, t));
+    float br = E(c + float2(t, t));
+    float gx = tr + 2.0 * E(c + float2(t, 0.0)) + br - tl - 2.0 * E(c + float2(-t, 0.0)) - bl;
+    float gy = bl + 2.0 * E(c + float2(0.0, t)) + br - tl - 2.0 * E(c + float2(0.0, -t)) - tr;
+    return float2(gx, gy) * 0.25 * texel / t;
+}
+""" + MELT
+}
+
+/** Where [PodLayer] can run: a layer effect for the melt and `drawVertices` for the sprites. */
+internal fun podLayerSupported(shader: LayerShader): Boolean = shader.isSupported && spriteBatchSupported()
+
+/**
+ * The colony's pods as sprites in a GPU layer, melted by [PodsSksl.LAYER_SOURCE]. The field needs no
+ * floats: stacking sprites of alpha 1 - exp(-w / softness) source-over multiplies their
+ * transmittance, so the layer's alpha is the sum's encoding, 1 - exp(-sum / softness), and can't
+ * clip. Its rgb is the premultiplied colour, weighted toward the pods drawn last. One per [PodField].
+ */
+internal class PodLayer {
+    // Half a texel inside the gradient, where SpriteBatch keeps linear filtering off the next cell.
+    private val spriteReach = POD_REACH * 63f / 64f
+    private val batch by lazy(LazyThreadSafetyMode.NONE) { SpriteBatch(listOf(podCell(1f), podCell(POD_BURIED_WEIGHT))) }
+    private val iso = FloatArray(2)
+    private var minX = 0f
+    private var minY = 0f
+    private var maxX = 0f
+    private var maxY = 0f
+
+    // What the held effect was built from: most frames nothing here moves, so it is reused.
+    private val uniforms = FloatArray(UNIFORM_COUNT)
+    private val built = FloatArray(UNIFORM_COUNT)
+    private var effect: RenderEffect? = null
+
+    private fun podCell(weight: Float) = SpriteCell(
+        *Array(CELL_STOPS + 1) { i ->
+            val d = i.toFloat() / CELL_STOPS
+            val k = 1f - d * d
+            d to 1f - exp(-k * k * k * weight / POD_FIELD_SOFTNESS)
+        },
+    )
+
+    /** False if the shader wouldn't build, with nothing drawn, so the caller can fall back. */
+    fun draw(
+        scope: DrawScope, shader: LayerShader, layer: GraphicsLayer, effects: PodField,
+        grid: Grid, voiceColors: Array<Color>, duoLevels: FloatArray,
+        smoothedMaster: Float, smoothedLfo: Float, debris: Array<Debris>,
+    ): Boolean = with(scope) {
+        val w = size.width
+        val h = size.height
+        if (w < 1f || h < 1f) return true
+        minX = Float.MAX_VALUE; minY = Float.MAX_VALUE
+        maxX = -Float.MAX_VALUE; maxY = -Float.MAX_VALUE
+        layer.record(this, layoutDirection, IntSize(w.toInt(), h.toInt())) {
+            drawSprites(batch, BlendMode.SrcOver) {
+                forEachPod(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo, w, h, debris, iso) { cx, cy, radius, elongation, angle, color, light, weight ->
+                    val minor = radius * spriteReach
+                    quad(
+                        if (weight == 1f) 0 else 1, cx, cy, minor * elongation, minor, cos(angle), sin(angle),
+                        Color(color.red * light, color.green * light, color.blue * light),
+                    )
+                    minX = min(minX, cx); maxX = max(maxX, cx)
+                    minY = min(minY, cy); maxY = max(maxY, cy)
+                }
+            }
+        }
+        // Nothing to melt: no reason to pay for the layer.
+        if (minX > maxX) return true
+        layer.renderEffect = effect(shader, effects, w, h) ?: return false
+        drawLayer(layer)
+        true
+    }
+
+    fun effect(shader: LayerShader, effects: PodField, w: Float, h: Float): RenderEffect? {
+        val podRadius = CUBE_SIZE * w * BLOB_BASE_SIZE_FACTOR
+        // Whole pixels, so a droplet's sub-pixel drift doesn't rebuild the effect.
+        val pad = podRadius * POD_BOUNDS_PAD + 2f
+        uniforms[0] = w
+        uniforms[1] = h
+        uniforms[2] = podRadius
+        uniforms[3] = floor(minX - pad)
+        uniforms[4] = floor(minY - pad)
+        uniforms[5] = ceil(maxX + pad)
+        uniforms[6] = ceil(maxY + pad)
+        effects.shock.copyInto(uniforms, 7)
+        effects.lens.copyInto(uniforms, 11)
+        effects.heat.copyInto(uniforms, 14)
+        if (effect != null && uniforms.contentEquals(built)) return effect
+        uniforms.copyInto(built)
+        shader.uniform("resolution", w, h)
+        shader.uniform("fieldSize", w, h)
+        shader.uniform("podRadius", podRadius)
+        shader.uniform("bounds", uniforms.copyOfRange(3, 7))
+        shader.uniform("shock", effects.shock)
+        shader.uniform("lens", effects.lens)
+        shader.uniform("heat", effects.heat)
+        shader.uniform("texel", 1f / min(POD_FIELD_SCALE, POD_FIELD_MAX_WIDTH / w))
+        effect = shader.effect()
+        return effect
+    }
+
+    private companion object {
+        const val CELL_STOPS = 32
+        const val UNIFORM_COUNT = 17
+    }
 }
 
 /** The colony's pods through [shader]; the caller draws [drawBlocks] instead where it isn't supported. */
