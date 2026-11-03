@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -206,7 +207,8 @@ internal val OgTvNavBar: NavBar = navBar(OgNavOrder, navDrops(DjLayout.LargeScre
  * The dock's bottom bar: the [nav]'s tabs either side of the play/pause dome, between ◀/▶ vibe
  * navigator tiles at either end. An open slot is an empty gap. Every toggle docks/undocks its own
  * panel (see [DjPanelDock]). With [navActions], holding OK on a toggle opens a chip row to swap it
- * or slide it along the bar (see [TvNavCustomize]); a short OK toggles as ever.
+ * or slide it along the bar (see [TvNavCustomize]); a short OK toggles as ever. A pointer gets the
+ * phone bar's long press, right click and drag (see [navTabGestures]).
  *
  * Play/pause is the vibe transport's dome in the centre slot, between the two middle toggles as in
  * the phone bar, hung from the toggles' label line with its name in a pill above it (see [DockDome]).
@@ -225,7 +227,7 @@ fun DjTvBottomBar(
     pulsarFeature: PulsarFeature,
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
-    // The remote's long-press and move gestures; null (OG) leaves the bar as a plain row of toggles.
+    // The remote's and the pointer's customizing gestures; null leaves the bar as a plain row of toggles.
     navActions: NavActions? = null,
     // The centre dome's ring, from dockDomeRingSize. Defaults to the phone bar's own ring only as an
     // unsized fallback.
@@ -256,6 +258,7 @@ fun DjTvBottomBar(
     val vibeNav by navState
     val customize = rememberTvNavCustomize(navActions)
     TvNavFocusRestore(customize, nav)
+    val gestures = rememberNavGestureHost(navActions, nav.offBar, vertical = false)
 
     // Single accent for every viz-following color in this bar — region border, the docked items'
     // wash and content, the dome's focus mark — mirrors DjTvTopBar's own title.titleColor source
@@ -313,6 +316,7 @@ fun DjTvBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navAnchor(gestures)
                     // Bottom trimmed well below top: the safe-area inset already sits below the
                     // bar, so a full 12.dp here on top of that read bottom-heavy.
                     .padding(start = TvBottomBarSidePadding, end = TvBottomBarSidePadding, top = TvBottomBarTopPadding, bottom = 2.dp),
@@ -334,7 +338,7 @@ fun DjTvBottomBar(
                 }
                 // Aligned by the first baseline, so the dome hangs from the toggles' label line.
                 Row(horizontalArrangement = Arrangement.spacedBy(TvBottomBarItemGap)) {
-                    for (entry in nav.left) key(entry) { NavSlot(entry, nav, customize, isDocked, onToggle, dockAccent, previewFocusedRoute) }
+                    for (entry in nav.left) key(entry) { NavSlot(entry, nav, customize, gestures, isDocked, onToggle, dockAccent, previewFocusedRoute) }
                     DockDome(
                         pulsarFeature = pulsarFeature,
                         onTogglePlayback = onTogglePlayback,
@@ -346,7 +350,7 @@ fun DjTvBottomBar(
                         previewWavePhase = previewWavePhase,
                         previewZipMs = previewZipMs,
                     )
-                    for (entry in nav.right) key(entry) { NavSlot(entry, nav, customize, isDocked, onToggle, dockAccent, previewFocusedRoute) }
+                    for (entry in nav.right) key(entry) { NavSlot(entry, nav, customize, gestures, isDocked, onToggle, dockAccent, previewFocusedRoute) }
                 }
                 StepSlot(Alignment.CenterEnd, Modifier.weight(1f)) { slotWidth ->
                     val name = nextTileName(vibeNav)
@@ -364,6 +368,7 @@ fun DjTvBottomBar(
         }
         // Over the stage above the bar, taking no room of its own.
         if (customize != null) TvNavChipRow(customize, Modifier.align(Alignment.TopCenter).floatAboveParent(TvChipRowGap))
+        NavChipPopup(gestures)
     }
 }
 
@@ -373,6 +378,7 @@ private fun RowScope.NavSlot(
     entry: NavEntry,
     nav: NavBar,
     customize: TvNavCustomize?,
+    gestures: NavGestureHost?,
     isDocked: (DjRoute) -> Boolean,
     onToggle: (DjRoute) -> Unit,
     accent: DockAccent,
@@ -380,7 +386,9 @@ private fun RowScope.NavSlot(
 ) {
     when (entry) {
         // A gap the width of a toggle, so the dome stays on the bar's centre; nothing in it takes focus.
-        NavEntry.Open -> Spacer(Modifier.size(TvBottomBarMinWidth, TvBottomBarMinHeight))
+        NavEntry.Open -> Spacer(
+            Modifier.size(TvBottomBarMinWidth, TvBottomBarMinHeight).navOpenSlot(gestures).testTag(NavOpenSlotTag),
+        )
         is NavEntry.Panel -> {
             val route = entry.route
             TvBottomBarItem(
@@ -389,7 +397,7 @@ private fun RowScope.NavSlot(
                 docked = isDocked(route),
                 onClick = { onToggle(route) },
                 accent = accent,
-                modifier = Modifier.alignBy(FirstBaseline).tvNavTabKeys(customize, route, nav),
+                modifier = Modifier.alignBy(FirstBaseline).tvNavTabKeys(customize, route, nav).navTabGestures(gestures, route),
                 previewFocused = route == previewFocusedRoute,
                 moving = customize?.moving == route,
             )

@@ -941,7 +941,7 @@ internal fun DjAppTvChrome(
     dockedPanels: List<DjRoute>,
     activeSheet: DjRoute?,
     navOrder: List<NavEntry> = OgNavOrder,
-    // The remote's long-press and move gestures; null (OG) leaves the bar as plain toggles.
+    // The remote's and the pointer's customizing gestures; null leaves the bar as plain toggles.
     navActions: NavActions? = null,
     onToggleDocked: (DjRoute) -> Unit,
     onActiveSheetChange: (DjRoute?) -> Unit,
