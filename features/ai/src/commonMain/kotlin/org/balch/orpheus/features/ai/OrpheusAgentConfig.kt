@@ -7,9 +7,7 @@ import ai.koog.agents.core.dsl.extension.ReceivedToolResults
 import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
 import ai.koog.agents.core.dsl.extension.nodeLLMRequest
-import ai.koog.agents.core.dsl.extension.nodeLLMRequestStreaming
 import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
-import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResultsStreaming
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
@@ -452,7 +450,8 @@ class OrpheusAgentConfig(
         // request — tool_result without its tool_use) AND drops thinking signature deltas,
         // which Anthropic requires for replaying thinking blocks in tool loops. The batched
         // client captures signatures and appends history correctly; reasoning still reaches
-        // the feeds per turn via tapReasoning. Google keeps the live streaming path.
+        // the feeds per turn via tapReasoning. Google keeps the live streaming path, and
+        // [streamReply] writes each reply to history itself.
         streamResponses: Boolean = true,
         // Off for models that bind thinking to an unedited history (Opus 5.5): Koog's
         // compression replays the trailing tool call's thinking after a rewritten prefix.
@@ -468,8 +467,10 @@ class OrpheusAgentConfig(
         // Both flavors are declared; nodes materialize lazily, so only the selected branch
         // ever creates one. (`by if (...) a else b` defeats Kotlin's delegate resolution.)
         // Explicit node names keep Koog's graph logs stable across both modes.
-        val nodeRequestLLMStreaming by nodeLLMRequestStreaming("nodeRequestLLM")
-            .transform { it.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning) }
+        val nodeRequestLLMStreaming by node<String, Message.Assistant>("nodeRequestLLM") { input ->
+            llm.writeSession { appendPrompt { user(input) } }
+            streamReply(onReasoning)
+        }
         val nodeRequestLLMBatched by nodeLLMRequest("nodeRequestLLM")
             .transform { it.tapReasoning(onReasoning).tapToolTurnNarration(onReasoning) }
         val nodeRequestLLM: AIAgentNodeBase<String, Message.Assistant> =
@@ -488,9 +489,12 @@ class OrpheusAgentConfig(
             input
         }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
-        val nodeSendToolResultStreaming by nodeLLMSendToolResultsStreaming("nodeSendToolResult").transform {
+        val nodeSendToolResultStreaming by node<ReceivedToolResults, Message.Assistant>("nodeSendToolResult") { results ->
             toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
-            it.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning)
+            llm.writeSession {
+                appendPrompt { user { results.toolResults.forEach { toolResult(it.toMessagePart()) } } }
+            }
+            streamReply(onReasoning)
         }
         val nodeSendToolResultBatched by nodeLLMSendToolResults("nodeSendToolResult").transform {
             toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
@@ -505,7 +509,7 @@ class OrpheusAgentConfig(
             onEmptyReply(EmptyReply(empty.finishReason, empty.metaInfo.outputTokensCount, retrying = true))
             dropEmptyReply()
             if (streamResponses) {
-                llm.writeSession { requestLLMStreaming() }.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning)
+                streamReply(onReasoning)
             } else {
                 llm.writeSession { requestLLM() }.tapReasoning(onReasoning).tapToolTurnNarration(onReasoning)
             }
@@ -603,6 +607,17 @@ class OrpheusAgentConfig(
 
     private fun Message.Assistant.isEmptyReply(): Boolean =
         parts.none { it is MessagePart.Tool.Call || (it is MessagePart.Text && it.text.isNotBlank()) }
+
+    // Koog's streaming request never writes the reply to history, so the model would forget its own calls and
+    // replies. Reasoning stays out: streaming loses the signatures a replay of it needs.
+    private suspend fun AIAgentGraphContextBase.streamReply(onReasoning: (String) -> Unit): Message.Assistant {
+        val reply = llm.writeSession { requestLLMStreaming() }.collapseToMessage(onReasoning)
+        if (!reply.isEmptyReply()) {
+            val kept = reply.copy(parts = reply.parts.filterNot { it is MessagePart.Reasoning })
+            llm.writeSession { appendPrompt { message(kept) } }
+        }
+        return reply.tapToolTurnNarration(onReasoning)
+    }
 
     private suspend fun AIAgentGraphContextBase.dropEmptyReply() {
         llm.writeSession {

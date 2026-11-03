@@ -95,6 +95,21 @@ class EmptyReplyTest {
         assertEquals(listOf("One.", "Two."), run.replies)
     }
 
+    /** Koog's streaming request leaves the reply out of history, so the model forgot its own calls and replies. */
+    @Test
+    fun streamedRepliesReachHistoryWithoutTheirReasoning() {
+        val toolTurn = Message.Assistant(
+            parts = listOf(MessagePart.Reasoning("why"), MessagePart.Tool.Call("c1", "noop", "{}")),
+            metaInfo = ResponseMetaInfo.Empty,
+        )
+        val run = run(listOf(toolTurn, text("First."), text("Second.")), turns = 2, streamed = true)
+
+        assertEquals(listOf("First.", "Second."), run.replies)
+        val sent = run.prompts.last().messages.filterIsInstance<Message.Assistant>()
+        assertEquals(listOf("Tool.Call", "Text"), sent.flatMap { m -> m.parts.map { it.label() } })
+        assertEquals("First.", sent.last().textOf())
+    }
+
     @Test
     fun readsEveryProvidersStopReasons() {
         listOf("max_tokens", "MAX_TOKENS", "length").forEach { assertEquals(EmptyReplyKind.OUT_OF_ROOM, emptyReplyKind(it)) }
@@ -109,6 +124,12 @@ class EmptyReplyTest {
     }
 
     private fun Message.Assistant.textOf() = parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
+
+    private fun MessagePart.label() = when (this) {
+        is MessagePart.Tool.Call -> "Tool.Call"
+        is MessagePart.Text -> "Text"
+        else -> this::class.simpleName.orEmpty()
+    }
 
     private fun forBothPaths(block: (Boolean) -> Unit) {
         block(false)
