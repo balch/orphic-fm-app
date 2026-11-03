@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metro.ContributesIntoSet
@@ -22,6 +23,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.visualizations.viz.sprite.SOLID_DISC
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteBatch
+import org.balch.orpheus.features.visualizations.viz.sprite.drawSprites
+import org.balch.orpheus.features.visualizations.viz.sprite.spriteBatchSupported
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -67,6 +72,68 @@ data class FireworksUiState(
 )
 
 // --------------------------------------------------------------------------------
+// Particle Drawing
+// --------------------------------------------------------------------------------
+
+/**
+ * With [sprites], every spark goes out in one additive pass and the rockets land on top of them.
+ * Without, each particle is its own draw call, in list order.
+ */
+internal fun DrawScope.drawParticles(particles: List<Particle>, sprites: SpriteBatch?, colorKnob: Float) {
+    val scaleX = size.width / 1000f
+    val scaleY = size.height / 1000f
+
+    if (sprites == null) {
+        particles.forEach { p ->
+            if (p.type == ParticleType.ROCKET) {
+                drawRocket(p, scaleX, scaleY, colorKnob)
+            } else {
+                drawCircle(
+                    color = p.sparkColor(),
+                    radius = p.sparkRadius(scaleX),
+                    center = Offset(p.x * scaleX, p.y * scaleY),
+                    blendMode = BlendMode.Plus
+                )
+            }
+        }
+        return
+    }
+
+    drawSprites(sprites, BlendMode.Plus) {
+        particles.forEach { p ->
+            if (p.type != ParticleType.ROCKET) {
+                disc(0, p.x * scaleX, p.y * scaleY, p.sparkRadius(scaleX), p.sparkColor())
+            }
+        }
+    }
+    particles.forEach { p ->
+        if (p.type == ParticleType.ROCKET) drawRocket(p, scaleX, scaleY, colorKnob)
+    }
+}
+
+private fun Particle.sparkColor(): Color =
+    color.copy(alpha = (color.alpha * life.coerceIn(0f, 1f)).coerceIn(0f, 1f))
+
+private fun Particle.sparkRadius(scaleX: Float): Float =
+    size * (0.5f + life.coerceIn(0f, 1f) * 0.5f) * scaleX
+
+private fun DrawScope.drawRocket(p: Particle, scaleX: Float, scaleY: Float, colorKnob: Float) {
+    val px = p.x * scaleX
+    val py = p.y * scaleY
+    drawLine(
+        color = Color.White.copy(alpha = 0.5f * colorKnob),
+        start = Offset(px - p.vx * 0.05f * scaleX, py - p.vy * 0.05f * scaleY),
+        end = Offset(px, py),
+        strokeWidth = 2f
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = colorKnob),
+        radius = 2f * scaleX,
+        center = Offset(px, py)
+    )
+}
+
+// --------------------------------------------------------------------------------
 // Visualization Implementation
 // --------------------------------------------------------------------------------
 
@@ -108,7 +175,12 @@ class FireworksViz(
     private var previousEnergy = 0f
     private var previousVoiceLevels = FloatArray(8)
     private var timeSinceLastLaunch = 0f
-    
+
+    // Built on first draw: the viz is constructed whether or not it is ever shown.
+    private val sprites by lazy(LazyThreadSafetyMode.NONE) {
+        if (spriteBatchSupported()) SpriteBatch(listOf(SOLID_DISC)) else null
+    }
+
     // Config
     private val colors = listOf(
         OrpheusColors.neonCyan,
@@ -413,10 +485,8 @@ class FireworksViz(
             // Read inside drawScope so per-frame _uiState writes only invalidate
             // the draw pass, not recompose this @Composable.
             val state = _uiState.value
-            val scaleX = size.width / 1000f
-            val scaleY = size.height / 1000f
-            
-            drawRect(OrpheusColors.fireworksBackground) 
+
+            drawRect(OrpheusColors.fireworksBackground)
             
             if (state.flashIntensity > 0.01f) {
                 drawRect(
@@ -425,40 +495,10 @@ class FireworksViz(
                 )
             }
             
-            state.particles.forEach { p ->
-                val alpha = p.life.coerceIn(0f, 1f)
-                val drawColor = p.color.copy(alpha = (p.color.alpha * alpha).coerceIn(0f, 1f))
-                val px = p.x * scaleX
-                val py = p.y * scaleY
-                val pScale = p.size * (0.5f + alpha * 0.5f) 
-                
-                when (p.type) {
-                    ParticleType.ROCKET -> {
-                         drawLine(
-                             color = Color.White.copy(alpha = 0.5f * _colorKnob),
-                             start = Offset(px - p.vx * 0.05f * scaleX, py - p.vy * 0.05f * scaleY),
-                             end = Offset(px, py),
-                             strokeWidth = 2f
-                         )
-                         drawCircle(
-                             color = Color.White.copy(alpha = _colorKnob),
-                             radius = 2f * scaleX,
-                             center = Offset(px, py)
-                         )
-                    }
-                    else -> {
-                        drawCircle(
-                            color = drawColor,
-                            radius = pScale * scaleX,
-                            center = Offset(px, py),
-                            blendMode = BlendMode.Plus
-                        )
-                    }
-                }
-            }
+            drawParticles(state.particles, sprites, _colorKnob)
         }
     }
-    
+
     private fun lerpColor(c1: Color, c2: Color, t: Float): Color {
         val ct = t.coerceIn(0f, 1f)
         return Color(

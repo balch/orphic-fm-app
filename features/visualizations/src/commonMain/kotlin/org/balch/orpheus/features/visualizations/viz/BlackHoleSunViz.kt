@@ -20,6 +20,11 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.visualizations.viz.sprite.SOLID_DISC
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteBatch
+import org.balch.orpheus.features.visualizations.viz.sprite.SpriteCell
+import org.balch.orpheus.features.visualizations.viz.sprite.drawSprites
+import org.balch.orpheus.features.visualizations.viz.sprite.spriteBatchSupported
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -196,6 +201,9 @@ class BlackHoleSunViz(
         0.7f to Color.Transparent,
         1f to Color.Black.copy(alpha = 0.3f)
     )
+
+    // Lazy: the mesh and atlas cost nothing until this viz is first drawn.
+    private val particleSprites by lazy(LazyThreadSafetyMode.NONE) { particleSpriteBatch() }
 
     // neverEqualPolicy: always recompose on write since particles are mutated in-place
     private val _uiState = mutableStateOf(BlackholeSunUiState(), neverEqualPolicy())
@@ -548,99 +556,10 @@ class BlackHoleSunViz(
         )
 
         // Draw particles as irregular cloud-like shapes
-        state.particles.forEach { p ->
-            val alpha = (p.life * p.color.alpha).coerceIn(0f, 1f)
-            if (alpha < 0.01f) return@forEach
-
-            val px = cx + p.x * scale
-            val py = cy + p.y * scale
-            
-            // Size based on type
-            val sizeMultiplier = when (p.type) {
-                AccretionParticleType.EMITTED -> 1f
-                AccretionParticleType.ORBITING -> 1.2f + (1f - p.distanceFromCenter / eventHorizon) * 0.5f
-                AccretionParticleType.ABSORBED -> 0.8f * p.life
-            }
-            val particleSize = p.size * sizeMultiplier * (scale / 400f)
-
-            // Glow color
-            val glowColor = when (p.type) {
-                AccretionParticleType.ABSORBED -> {
-                    // Shift toward hot orange as particle is absorbed
-                    lerpColor(p.color, OrpheusColors.blackHoleParticleOrange, 1f - p.life)
-                }
-                else -> p.color
-            }
-
-            // Calculate angle toward center for cloud stretching
-            val angleToCenter = atan2(p.y, p.x)
-            
-            // Draw irregular cloud shape using multiple overlapping blobs
-            // Each particle gets 5-7 sub-blobs positioned with pseudo-noise
-            val blobCount = 5 + (p.id % 3)
-            val seed = p.id * 1337f
-            
-            for (i in 0 until blobCount) {
-                // Pseudo-noise offsets using sine/cosine of seed values
-                val noiseAngle = seed + i * 2.3f + state.time * 0.3f
-                val noiseRadius = particleSize * (0.8f + sin(noiseAngle * 0.7f) * 0.6f)
-                
-                // Offset position - clouds stretch perpendicular to center direction (wrapping around)
-                val tangentAngle = angleToCenter + PI.toFloat() / 2f
-                val offsetStretch = cos(noiseAngle * 1.3f + i) * particleSize * 1.5f  // Tangential stretch
-                val offsetRadial = sin(noiseAngle * 0.9f + i * 1.7f) * particleSize * 0.6f  // Radial variation
-                
-                val blobX = px + cos(tangentAngle) * offsetStretch + cos(angleToCenter) * offsetRadial
-                val blobY = py + sin(tangentAngle) * offsetStretch + sin(angleToCenter) * offsetRadial
-                
-                // Vary blob size
-                val blobSize = noiseRadius * (0.6f + (i.toFloat() / blobCount) * 0.8f)
-                
-                // Vary alpha per blob for organic feel
-                val blobAlpha = alpha * (0.4f + sin(noiseAngle * 0.5f) * 0.3f)
-                
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to glowColor.copy(alpha = blobAlpha * 0.7f),
-                            0.3f to glowColor.copy(alpha = blobAlpha * 0.5f),
-                            0.6f to glowColor.copy(alpha = blobAlpha * 0.2f),
-                            1f to Color.Transparent
-                        ),
-                        center = Offset(blobX, blobY),
-                        radius = blobSize * 2.5f
-                    ),
-                    radius = blobSize * 2.5f,
-                    center = Offset(blobX, blobY),
-                    blendMode = BlendMode.Plus
-                )
-            }
-            
-            // Core glow at center of cloud
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0f to glowColor.copy(alpha = alpha * 0.6f),
-                        0.5f to glowColor.copy(alpha = alpha * 0.3f),
-                        1f to Color.Transparent
-                    ),
-                    center = Offset(px, py),
-                    radius = particleSize * 2f
-                ),
-                radius = particleSize * 2f,
-                center = Offset(px, py),
-                blendMode = BlendMode.Plus
-            )
-
-            // Bright core for emitted particles
-            if (p.type == AccretionParticleType.EMITTED && alpha > 0.5f) {
-                drawCircle(
-                    color = Color.White.copy(alpha = alpha * 0.3f),
-                    radius = particleSize * 0.4f,
-                    center = Offset(px, py),
-                    blendMode = BlendMode.Plus
-                )
-            }
+        if (spriteBatchSupported()) {
+            drawParticleSprites(particleSprites, state.particles, state.time, cx, cy, scale, eventHorizon)
+        } else {
+            drawParticleCircles(state.particles, state.time, cx, cy, scale, eventHorizon)
         }
 
         // Subtle vignette
@@ -650,16 +569,6 @@ class BlackHoleSunViz(
                 center = Offset(cx, cy),
                 radius = scale * 1.4f
             )
-        )
-    }
-
-    private fun lerpColor(c1: Color, c2: Color, t: Float): Color {
-        val ct = t.coerceIn(0f, 1f)
-        return Color(
-            red = c1.red + (c2.red - c1.red) * ct,
-            green = c1.green + (c2.green - c1.green) * ct,
-            blue = c1.blue + (c2.blue - c1.blue) * ct,
-            alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
         )
     }
 
@@ -696,4 +605,173 @@ class BlackHoleSunViz(
             ),
         )
     }
+}
+
+private const val BLOB_CELL = 0
+private const val CORE_CELL = 1
+private const val BRIGHT_CELL = 2
+
+internal fun particleSpriteBatch() = SpriteBatch(
+    listOf(
+        SpriteCell(0f to 1f, 0.3f to 0.714f, 0.6f to 0.286f, 1f to 0f),
+        SpriteCell(0f to 1f, 0.5f to 0.5f, 1f to 0f),
+        SOLID_DISC,
+    )
+)
+
+/** Every particle in one batch, in the order [forEachParticleSprite] emits them. */
+internal fun DrawScope.drawParticleSprites(
+    batch: SpriteBatch,
+    particles: List<AccretionParticle>,
+    time: Float,
+    cx: Float,
+    cy: Float,
+    scale: Float,
+    eventHorizon: Float,
+) {
+    drawSprites(batch, BlendMode.Plus) {
+        forEachParticleSprite(particles, time, cx, cy, scale, eventHorizon) { cell, x, y, radius, tint ->
+            disc(cell, x, y, radius, tint)
+        }
+    }
+}
+
+/** One draw call per sprite, for platforms where [spriteBatchSupported] is false. */
+internal fun DrawScope.drawParticleCircles(
+    particles: List<AccretionParticle>,
+    time: Float,
+    cx: Float,
+    cy: Float,
+    scale: Float,
+    eventHorizon: Float,
+) {
+    forEachParticleSprite(particles, time, cx, cy, scale, eventHorizon) { cell, x, y, radius, tint ->
+        val center = Offset(x, y)
+        when (cell) {
+            BLOB_CELL -> drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to tint,
+                        0.3f to tint.copy(alpha = tint.alpha * 0.5f / 0.7f),
+                        0.6f to tint.copy(alpha = tint.alpha * 0.2f / 0.7f),
+                        1f to Color.Transparent
+                    ),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center,
+                blendMode = BlendMode.Plus
+            )
+            CORE_CELL -> drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to tint,
+                        0.5f to tint.copy(alpha = tint.alpha * 0.5f),
+                        1f to Color.Transparent
+                    ),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center,
+                blendMode = BlendMode.Plus
+            )
+            else -> drawCircle(
+                color = tint,
+                radius = radius,
+                center = center,
+                blendMode = BlendMode.Plus
+            )
+        }
+    }
+}
+
+/** Walks the particle clouds once, handing [sprite] each cell, centre, radius and centre colour. */
+private inline fun forEachParticleSprite(
+    particles: List<AccretionParticle>,
+    time: Float,
+    cx: Float,
+    cy: Float,
+    scale: Float,
+    eventHorizon: Float,
+    sprite: (cell: Int, x: Float, y: Float, radius: Float, tint: Color) -> Unit,
+) {
+    for (index in particles.indices) {
+        val p = particles[index]
+        val alpha = (p.life * p.color.alpha).coerceIn(0f, 1f)
+        if (alpha < 0.01f) continue
+
+        val px = cx + p.x * scale
+        val py = cy + p.y * scale
+
+        // Size based on type
+        val sizeMultiplier = when (p.type) {
+            AccretionParticleType.EMITTED -> 1f
+            AccretionParticleType.ORBITING -> 1.2f + (1f - p.distanceFromCenter / eventHorizon) * 0.5f
+            AccretionParticleType.ABSORBED -> 0.8f * p.life
+        }
+        val particleSize = p.size * sizeMultiplier * (scale / 400f)
+
+        // Glow color
+        val glowColor = when (p.type) {
+            AccretionParticleType.ABSORBED -> {
+                // Shift toward hot orange as particle is absorbed
+                lerpColor(p.color, OrpheusColors.blackHoleParticleOrange, 1f - p.life)
+            }
+            else -> p.color
+        }
+
+        // Calculate angle toward center for cloud stretching
+        val angleToCenter = atan2(p.y, p.x)
+        val tangentAngle = angleToCenter + PI.toFloat() / 2f
+        val radialX = cos(angleToCenter)
+        val radialY = sin(angleToCenter)
+        val tangentX = cos(tangentAngle)
+        val tangentY = sin(tangentAngle)
+
+        // Draw irregular cloud shape using multiple overlapping blobs
+        // Each particle gets 5-7 sub-blobs positioned with pseudo-noise
+        val blobCount = 5 + (p.id % 3)
+        val seed = p.id * 1337f
+
+        for (i in 0 until blobCount) {
+            // Pseudo-noise offsets using sine/cosine of seed values
+            val noiseAngle = seed + i * 2.3f + time * 0.3f
+            val noiseRadius = particleSize * (0.8f + sin(noiseAngle * 0.7f) * 0.6f)
+
+            // Offset position - clouds stretch perpendicular to center direction (wrapping around)
+            val offsetStretch = cos(noiseAngle * 1.3f + i) * particleSize * 1.5f  // Tangential stretch
+            val offsetRadial = sin(noiseAngle * 0.9f + i * 1.7f) * particleSize * 0.6f  // Radial variation
+
+            val blobX = px + tangentX * offsetStretch + radialX * offsetRadial
+            val blobY = py + tangentY * offsetStretch + radialY * offsetRadial
+
+            // Vary blob size
+            val blobSize = noiseRadius * (0.6f + (i.toFloat() / blobCount) * 0.8f)
+
+            // Vary alpha per blob for organic feel
+            val blobAlpha = alpha * (0.4f + sin(noiseAngle * 0.5f) * 0.3f)
+
+            sprite(BLOB_CELL, blobX, blobY, blobSize * 2.5f, glowColor.copy(alpha = blobAlpha * 0.7f))
+        }
+
+        // Core glow at center of cloud
+        sprite(CORE_CELL, px, py, particleSize * 2f, glowColor.copy(alpha = alpha * 0.6f))
+
+        // Bright core for emitted particles
+        if (p.type == AccretionParticleType.EMITTED && alpha > 0.5f) {
+            sprite(BRIGHT_CELL, px, py, particleSize * 0.4f, Color.White.copy(alpha = alpha * 0.3f))
+        }
+    }
+}
+
+private fun lerpColor(c1: Color, c2: Color, t: Float): Color {
+    val ct = t.coerceIn(0f, 1f)
+    return Color(
+        red = c1.red + (c2.red - c1.red) * ct,
+        green = c1.green + (c2.green - c1.green) * ct,
+        blue = c1.blue + (c2.blue - c1.blue) * ct,
+        alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
+    )
 }
