@@ -12,7 +12,6 @@ import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
-import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -38,9 +37,6 @@ class VibePresetPorts(
     private val bass = flow(PulsarSymbol.BASS_GAIN.controlId)
     private val keys = flow(PulsarSymbol.KEYS_GAIN.controlId)
     private val fx = flow(PulsarSymbol.FX_GAIN.controlId)
-    private val drive = flow(DistortionSymbol.DRIVE.controlId)
-    // DRIVE and MIX are written together, as MixerViewModel does.
-    private val distMix = flow(DistortionSymbol.MIX.controlId)
 
     private val hornSpeed = flow(HornSymbol.SPEED.controlId)
     private val hornRatio = flow(HornSymbol.RATIO.controlId)
@@ -88,10 +84,6 @@ class VibePresetPorts(
         PresetField.MIX_BASS to port(bass, floatPort(bass)),
         PresetField.MIX_KEYS to port(keys, floatPort(keys)),
         PresetField.MIX_FX to port(fx, floatPort(fx)),
-        PresetField.MIX_DIST to port(drive) {
-            drive.value = FloatValue(it)
-            distMix.value = FloatValue(it)
-        },
         PresetField.HORN_SPEED to port(hornSpeed, floatPort(hornSpeed)),
         PresetField.HORN_RATIO to port(hornRatio, floatPort(hornRatio)),
         PresetField.HORN_DEPTH to port(hornDepth, floatPort(hornDepth)),
@@ -133,7 +125,7 @@ class VibePresetPorts(
      */
     val changes: Flow<Unit> = (
         listOf<Flow<Any>>(
-            perc, bass, keys, fx, drive,
+            perc, bass, keys, fx,
             hornSpeed, hornRatio, hornDepth, hornMix, hornBrake,
             energy, complexity, mood, space, deep, root, scale, envelope,
             bellLevel, bellMore, bellBody, bellTone, bellRing, bellIntensity, bellOctave,

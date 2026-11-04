@@ -166,6 +166,9 @@ class MixerViewModel(
             )
 
     init {
+        // Default drive for new users, set first so a saved value always lands on top of it.
+        driveId.value = FloatValue(DEFAULT_DRIVE)
+        mixId.value = FloatValue(DEFAULT_DRIVE)
         persistence.bind(
             stateFlow = stateFlow,
             serializer = MixerUiState.serializer(),
@@ -194,10 +197,6 @@ class MixerViewModel(
                 mixId.value = FloatValue(drive)
             },
         )
-        // Default drive for new users — persistence.bind() restore is async,
-        // so this value sticks for new users and gets overwritten for existing ones.
-        driveId.value = FloatValue(DEFAULT_DRIVE)
-        mixId.value = FloatValue(DEFAULT_DRIVE)
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {

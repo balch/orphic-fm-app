@@ -14,6 +14,9 @@ enum class PresetModule(val label: String) {
  * The DJ panel is left out: it carries across vibe changes for live transitions. Stored
  * `dj.*` keys from older presets no longer match a field, so they are ignored.
  *
+ * GAIN (the mixer's distortion fader) is left out too: it belongs to the listening setup, not the
+ * vibe, and stays at its last value. Stored `mix.dist` keys are ignored the same way.
+ *
  * The cowbell is optional: a preset holds its `bell.*` keys only when the user changed the bell.
  */
 enum class PresetField(val key: String, val module: PresetModule, val label: String) {
@@ -21,7 +24,6 @@ enum class PresetField(val key: String, val module: PresetModule, val label: Str
     MIX_BASS("mix.bass", PresetModule.MIX, "BASS"),
     MIX_KEYS("mix.keys", PresetModule.MIX, "KEYS"),
     MIX_FX("mix.fx", PresetModule.MIX, "FX"),
-    MIX_DIST("mix.dist", PresetModule.MIX, "DIST"),
 
     TRACKS_0_LEVEL("tracks.0.level", PresetModule.MIX, "T0 LEVEL"),
     TRACKS_1_LEVEL("tracks.1.level", PresetModule.MIX, "T1 LEVEL"),

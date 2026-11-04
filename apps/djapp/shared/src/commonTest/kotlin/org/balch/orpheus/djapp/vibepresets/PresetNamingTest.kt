@@ -55,8 +55,6 @@ class PresetNamingTest {
             suggestPresetName(listOf(PresetChange(field, from, to)), emptySet())
 
         assertEquals("Quiet Keys", name(PresetField.MIX_KEYS, 0.8f, 0.4f))
-        assertEquals("Heavy Drive", name(PresetField.MIX_DIST, 0.1f, 0.6f))
-        assertEquals("Light Drive", name(PresetField.MIX_DIST, 0.6f, 0.1f))
         assertEquals("More Mood", name(PresetField.PULSAR_MOOD, 0.1f, 0.6f))
         assertEquals("Less Energy", name(PresetField.PULSAR_ENERGY, 0.9f, 0.4f))
         assertEquals("Muted T3", name(PresetField.TRACKS_3_MUTE, 0f, 1f))

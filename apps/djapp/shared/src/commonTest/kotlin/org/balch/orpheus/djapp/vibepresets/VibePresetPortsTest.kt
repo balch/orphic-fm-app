@@ -92,7 +92,6 @@ class VibePresetPortsTest {
             PresetField.MIX_BASS.key to 0.6f,
             PresetField.MIX_KEYS.key to 0.7f,
             PresetField.MIX_FX.key to 0.8f,
-            PresetField.MIX_DIST.key to 0.45f,
             PresetField.HORN_SPEED.key to 0.2f,
             PresetField.HORN_RATIO.key to 0.3f,
             PresetField.HORN_DEPTH.key to 0.4f,
@@ -129,11 +128,19 @@ class VibePresetPortsTest {
     }
 
     @Test
-    fun distWritesDriveAndMix() {
-        ports().write(mapOf(PresetField.MIX_DIST.key to 0.6f))
+    fun gainStaysOutOfPresets() {
+        val drive = synth.controlFlow(DistortionSymbol.DRIVE.controlId)
+        val mix = synth.controlFlow(DistortionSymbol.MIX.controlId)
+        drive.value = FloatValue(0.3f)
+        mix.value = FloatValue(0.3f)
 
-        assertEquals(FloatValue(0.6f), portOf(DistortionSymbol.DRIVE.controlId))
-        assertEquals(FloatValue(0.6f), portOf(DistortionSymbol.MIX.controlId))
+        // Presets saved before GAIN left them still hold this key.
+        val p = ports()
+        p.write(mapOf("mix.dist" to 0.97f))
+
+        assertEquals(FloatValue(0.3f), drive.value)
+        assertEquals(FloatValue(0.3f), mix.value)
+        assertFalse("mix.dist" in p.read(TrackTuning()))
     }
 
     @Test

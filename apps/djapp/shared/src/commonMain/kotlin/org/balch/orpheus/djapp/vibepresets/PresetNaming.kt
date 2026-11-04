@@ -16,7 +16,6 @@ private fun PresetChange.word(): String {
         key.endsWith(".solo") -> if (on) "Solo T$track" else "Unsolo T$track"
         field == PresetField.PULSAR_BPM -> "${if (up) "Fast" else "Slow"} BPM"
         field == PresetField.HORN_SPEED -> "${if (up) "Fast" else "Slow"} Horn"
-        field == PresetField.MIX_DIST -> "${if (up) "Heavy" else "Light"} Drive"
         field == PresetField.MIX_BASS -> if (up) "Bright Bass" else "Deep Bass"
         field == PresetField.MIX_PERC || field == PresetField.MIX_KEYS || field == PresetField.MIX_FX ->
             "${if (up) "Bright" else "Quiet"} ${field.label.titleCase()}"
