@@ -31,7 +31,6 @@ Never copy another `*Vibe.kt`, or edit one into a new vibe. Shipped vibes are fo
 
 - Source: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/<Name>Vibe.kt`
 - Schema (every type you will reference): the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — **one file per type**, not a single `PulsarVibe.kt` (that file does not exist). The top-level `Vibe` data class plus the `RootNote` / `ScaleType` / `EnvelopeType` / `Album` enums live in `models/Vibe.kt`; the rest are siblings (`OrpheusEngine.kt`, `TrackVoice.kt`, `TrackRole.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Lick.kt`, `ChordStep.kt`, `Band.kt`, `TensionProfile.kt`, `VibeEffects.kt`, `Arrangement.kt`, `Anomaly.kt`, `LickAnomaly.kt`, `VoidAnomaly.kt`, `MacroTarget.kt`, `Evolution.kt`, `EnvelopeProfile.kt`, `SoloBehavior.kt`, `VibeProvider.kt`).
-- Quality benchmark: `DogHouseVibe.kt`. After any Pulsar change, listen to this vibe first; a new vibe should feel at least as coherent and musical. It is a listening benchmark, not a template.
 
 DI registration is automatic via Metro — each vibe class carries `@Inject` and `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())`, and `PulsarViewModel` receives `Set<VibeProvider>` in its constructor. No DI module edit is needed, but the apps show a vibe only once it has a name and a catalog entry in `vibes/`:
 
@@ -74,8 +73,8 @@ Outside those two conditions nothing changes. A vibe that references a modern ba
 3. **Compose on the skeleton** per the guide. If the AI app is running, `pulsar_apply_vibe` lets you hear the JSON before it becomes Kotlin, and the guide's mix pass applies.
 4. **Bring it into Kotlin** with `import_vibe.sh`, then polish (see "Starting from a codegen-imported vibe"). The script adds the `VibeNames` constant and a `WIP` `VibeCatalog` entry. It lands on STEALTH; add it to `AlbumCatalog.kt`, at its track position, only if it belongs on RIF, 0-2-1 or Anomalies.
 5. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors. If any section sets a `soloMode`, the vibe needs a `band` — `BandPresets.quartet(...)` is the one-liner (see "Kotlin authoring").
-6. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against `DogHouseVibe`.
-7. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop — the DogHouseVibe benchmark exists to catch regressions, and vibes should only tune what the schema exposes.
+6. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against a shipped vibe of similar feel; ask the user which.
+7. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop: vibes should only tune what the schema exposes.
 8. **Measure the mix, then level-match.** Balance the tracks with the headless harness, then set `levelDb` so the vibe plays at -16 LUFS like every other live vibe. See "Mixing and level matching" under Testing.
 
 ## Kotlin authoring
@@ -336,8 +335,8 @@ To mix by ear, launch the Mix Bench: `./gradlew :apps:djapp:desktopApp:run -Pben
    - The bass riff (if using a `Lick`) plays and transposes with the progression.
    - Section transitions happen within the expected bar ranges.
    - The macro knobs (Energy/Complexity/Space/Mood/Deep) feel coherent across their full range.
-4. **A/B against `DogHouseVibe`**: switch back and forth. Does the new vibe feel equally tight, equally musical? If it is noticeably less coherent, see the guide's "When a vibe does not hang together" (section 13).
-5. **Regression-check on `DogHouseVibe`**: If you ended up changing anything under `models/` or further down (you should not have — vibes are data), load `DogHouseVibe` and confirm it still sounds great. This is the benchmark the project holds to.
+4. **A/B against a shipped vibe of similar feel** (ask the user which): switch back and forth. Does the new vibe feel equally tight, equally musical? If it is noticeably less coherent, see the guide's "When a vibe does not hang together" (section 13).
+5. **Regression-check**: If you ended up changing anything under `models/` or further down (you should not have — vibes are data), ask the user which shipped vibes to ear-test against the change.
 6. **Mix and level-match** (below).
 
 ### Mixing and level matching
@@ -371,7 +370,6 @@ Then level-match: with the balance settled, add `-16 - LUFS` to the vibe's curre
 - **The caster:** `features/ai/src/commonMain/kotlin/org/balch/orpheus/features/ai/composer/` (`VibeCaster.kt`, `CastRules.kt`, `VoicePalette.kt`), exposed as `pulsar_cast_vibe` (`tools/VibeCastTool.kt`).
 - **JSON to Kotlin:** `.claude/skills/grab-ai-vibes/scripts/import_vibe.sh` (runs `tools:vibe-codegen`).
 - Schema source-of-truth: the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — one KDoc-annotated file per type (`Vibe.kt`, `OrpheusEngine.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Arrangement.kt`, …). There is no single `PulsarVibe.kt`.
-- Listening benchmark: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/DogHouseVibe.kt`.
 - ViewModel that consumes vibes (for reference — no edits needed): `PulsarViewModel` (in `PulsarFeature.kt`) — takes `Set<VibeProvider>` via DI.
 - **`references/fm_patches.md`** — full SixOp FM patch banks for `DX`/`DX2`/`DX3`. Read before setting `harmonics` on any of these engines. Includes a per-bank index→patch-name table and the harmonics-zone math.
 - **`references/envelopes.md`** — `EnvelopeType` (vibe-global) and `EnvelopeProfile` (per-track) reference. Includes solo and ducking behavior per profile and the AD/TIDES/BLEND crossover math.

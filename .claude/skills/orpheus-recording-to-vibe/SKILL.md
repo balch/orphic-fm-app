@@ -224,4 +224,4 @@ Tell the user what Pulsar cannot reproduce, with the nearest workaround:
 
 Show the proposed `OrpheusEngine(...)` block and the gap list, then let the user listen. Do not
 edit a vibe until they pick the vibe and track. The `vibe-creator` skill covers everything after
-the track is written: naming rules, file layout, catalog entries, tuning and the DogHouse benchmark.
+the track is written: naming rules, file layout, catalog entries and tuning.

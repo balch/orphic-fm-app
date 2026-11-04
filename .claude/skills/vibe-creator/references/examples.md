@@ -53,4 +53,4 @@ Reading this end-to-end shows how each musical property of the reference maps to
 ./gradlew :features:pulsar:compileKotlinJvm
 ```
 
-Then launch the JVM desktop app and pick "Sunken Place" from the vibe menu. A/B against "Dog House" — they should feel equally tight and purposeful.
+Then launch the JVM desktop app and pick "Sunken Place" from the vibe menu. A/B against a shipped vibe of similar feel; they should feel equally tight and purposeful.
