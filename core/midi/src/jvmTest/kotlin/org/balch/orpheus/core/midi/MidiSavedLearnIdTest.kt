@@ -178,8 +178,8 @@ class MidiSavedLearnIdTest {
     @Test
     fun savedBeatsBpmSpansThePortsTempoRange() {
         restoreCc("beats_bpm")
-        assertEquals(20f, cc(BeatsSymbol.BPM, 0))
-        assertEquals(300f, cc(BeatsSymbol.BPM, 127))
+        assertEquals(60f, cc(BeatsSymbol.BPM, 0))
+        assertEquals(200f, cc(BeatsSymbol.BPM, 127))
     }
 
     @Test

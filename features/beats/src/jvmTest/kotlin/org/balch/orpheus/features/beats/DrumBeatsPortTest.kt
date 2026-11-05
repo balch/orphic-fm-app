@@ -2,6 +2,7 @@ package org.balch.orpheus.features.beats
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -16,11 +17,13 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
 import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
-class DrumBeatsRunPortTest {
+class DrumBeatsPortTest {
     /** The sequencer only reads the clock and fires drums, so everything else can stay blank. */
     private val synthEngine = Proxy.newProxyInstance(
         SynthEngine::class.java.classLoader,
@@ -35,6 +38,9 @@ class DrumBeatsRunPortTest {
         }
     } as SynthEngine
 
+    /** Every tempo GlobalTempo was given, which its StateFlow would conflate. */
+    private val tempoSent = CopyOnWriteArrayList<Float>()
+
     private val audioEngine = object : AudioEngine {
         override fun start() {}
         override fun stop() {}
@@ -42,6 +48,7 @@ class DrumBeatsRunPortTest {
         override val sampleRate = 48000
         override fun getCpuLoad() = 0f
         override fun getCurrentTime() = 0.0
+        override fun setPort(uri: String, symbol: String, value: Float) { tempoSent += value }
     }
 
     private val dispatchers = object : DispatcherProvider {
@@ -59,13 +66,39 @@ class DrumBeatsRunPortTest {
         )
     }
     private val scope = FeatureCoroutineScope()
-    private val viewModel = DrumBeatsViewModel(synthEngine, controller, dispatchers, GlobalTempo(audioEngine), scope)
+    private val tempo = GlobalTempo(audioEngine)
+    private val viewModel = DrumBeatsViewModel(synthEngine, controller, dispatchers, tempo, scope)
 
     @AfterTest
     fun stopTheClock() = scope.cancel()
 
     private fun awaitRunning(running: Boolean) = runBlocking {
         withTimeout(5_000) { viewModel.stateFlow.first { it.isRunning == running } }
+    }
+
+    /** Writes until it lands: the collector subscribes on another thread, some time after init. */
+    private fun moveTempo(bpm: Float, origin: ControlEventOrigin) = runBlocking {
+        withTimeout(5_000) {
+            while (tempo.getBpm() != bpm.toDouble()) {
+                controller.setPluginControl(BeatsSymbol.BPM.controlId, PortValue.FloatValue(bpm), origin)
+                delay(10)
+            }
+        }
+    }
+
+    @Test
+    fun aCcMovesTheAppsTempo() = moveTempo(90f, ControlEventOrigin.MIDI)
+
+    @Test
+    fun theAiMovesTheAppsTempo() = moveTempo(90f, ControlEventOrigin.AI)
+
+    @Test
+    fun theTempoEchoIsNotReadAsAMove() {
+        moveTempo(90f, ControlEventOrigin.MIDI)
+        // What GlobalTempo's collector writes: the port catching up, not someone asking for a tempo.
+        controller.controlFlow(BeatsSymbol.BPM.controlId).value = PortValue.FloatValue(77f)
+        moveTempo(100f, ControlEventOrigin.MIDI)
+        assertFalse(77f in tempoSent, "an echo overwrote the tempo: $tempoSent")
     }
 
     @Test

@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drumpatterns.DrumBeatsGenerator
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -312,9 +313,9 @@ private fun TransportControls(
         ) {
             HorizontalMiniSlider(
                 trackWidth = 70,
-                value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
+                value = GlobalTempo.sliderFraction(state.bpm),
                 onValueChange = { frac ->
-                    actions.setBpm(40f + (frac * 200f))
+                    actions.setBpm(GlobalTempo.bpmAtSlider(frac))
                 },
                 color = OrpheusColors.seahawksGreen,
                 controlId = BeatsSymbol.BPM.controlId.key

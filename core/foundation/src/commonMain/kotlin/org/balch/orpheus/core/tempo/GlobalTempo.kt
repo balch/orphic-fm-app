@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.dsp.AudioEngine
+import org.balch.orpheus.core.plugin.symbols.MAX_BPM
+import org.balch.orpheus.core.plugin.symbols.MIN_BPM
 
 /**
  * Centralized global tempo management for all time-synced modules.
@@ -34,11 +36,11 @@ class GlobalTempo(
 
     /**
      * Set the global tempo in BPM (beats per minute).
-     * Valid range: 60-200 BPM
+     * Valid range: [MIN_BPM]-[MAX_BPM]
      * Updates both the StateFlow and forwards the BPM to the C++ engine.
      */
     fun setBpm(bpm: Double) {
-        val coercedBpm = bpm.coerceIn(60.0, 200.0)
+        val coercedBpm = bpm.coerceIn(MIN_BPM.toDouble(), MAX_BPM.toDouble())
         _bpm.value = coercedBpm
         updateClockFrequency(coercedBpm)
     }
@@ -84,5 +86,11 @@ class GlobalTempo(
 
     companion object {
         const val TEMPO_URI = "org.balch.orpheus.plugins.tempo"
+
+        /** Where [bpm] sits on a panel's tempo slider, 0..1. */
+        fun sliderFraction(bpm: Float): Float = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)).coerceIn(0f, 1f)
+
+        /** The tempo at a point on a panel's tempo slider. */
+        fun bpmAtSlider(fraction: Float): Float = MIN_BPM + fraction * (MAX_BPM - MIN_BPM)
     }
 }

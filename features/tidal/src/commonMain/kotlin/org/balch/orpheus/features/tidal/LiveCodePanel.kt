@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
@@ -349,9 +350,9 @@ private fun BpmVolumeControlsRow(
 
             HorizontalMiniSlider(
                 trackWidth = 80,
-                value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
+                value = GlobalTempo.sliderFraction(uiState.bpm.toFloat()),
                 onValueChange = { frac ->
-                    actions.setBpm(40 + (frac * 200).toDouble())
+                    actions.setBpm(GlobalTempo.bpmAtSlider(frac).toDouble())
                 },
                 color = OrpheusColors.neonCyan
             )

@@ -16,6 +16,7 @@ import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import kotlin.math.roundToInt
 
@@ -47,6 +48,7 @@ data class SynthControlResult(val success: Boolean, val message: String)
 internal fun integerControlValue(id: PluginControlId, value: Float): Int? = when {
     id.symbol.startsWith("duo_engine") -> value.toInt()
     id == ResonatorSymbol.MODE.controlId -> value.roundToInt().coerceIn(0, 2)
+    id == BeatsSymbol.MODE.controlId -> if (value > 0.5f) 1 else 0
     else -> null
 }
 
@@ -141,18 +143,17 @@ class SynthControlTool(
 
                 val normalizedValue = args.value.coerceIn(0f, 1f)
 
-                // Get current value (or use 0.5 as default starting point)
-                val startValue = currentValues[targetId] ?: 0.5f
+                val startValue = synthController.rampStart(targetId, currentValues[targetId])
                 val stepDelayMs = rampDurationMs / rampSteps
 
                 // Linear ramp from current to target
                 for (step in 1..rampSteps) {
                     val t = step.toFloat() / rampSteps
-                    val interpolatedValue = startValue + (normalizedValue - startValue) * t
+                    val interpolatedValue = if (step == rampSteps) normalizedValue else startValue + (normalizedValue - startValue) * t
 
                     synthController.setPluginControl(
                         id = targetId,
-                        value = PortValue.FloatValue(interpolatedValue),
+                        value = portValueFor(targetId, interpolatedValue),
                         origin = ControlEventOrigin.AI
                     )
 

@@ -17,6 +17,26 @@ import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
+import org.balch.orpheus.core.tempo.GlobalTempo
+
+/** The AI tools speak 0..1, but the tempo port holds BPM and the length ports hold steps. */
+internal fun portValueFor(id: PluginControlId, normalized: Float): PortValue = when (id) {
+    BeatsSymbol.BPM.controlId -> PortValue.FloatValue(GlobalTempo.bpmAtSlider(normalized))
+    BeatsSymbol.EUCLIDEAN_0.controlId,
+    BeatsSymbol.EUCLIDEAN_1.controlId,
+    BeatsSymbol.EUCLIDEAN_2.controlId -> PortValue.IntValue(euclideanSteps(normalized))
+    else -> PortValue.FloatValue(normalized)
+}
+
+private fun euclideanSteps(normalized: Float): Int = ((normalized * 31) + 1).toInt().coerceIn(1, 32)
+
+/** Where a ramp on [id] starts, 0..1. The tempo moves without these tools, so its ramp starts from the port. */
+internal fun SynthController.rampStart(id: PluginControlId, lastSet: Float?): Float =
+    if (id == BeatsSymbol.BPM.controlId) {
+        getPluginControl(id)?.asFloat()?.let(GlobalTempo::sliderFraction) ?: 0.5f
+    } else {
+        lastSet ?: 0.5f
+    }
 
 @Serializable
 data class DrumsControlArgs(
@@ -229,7 +249,6 @@ class DrumsTool(
         "BEATS_DENSITY_2" -> BeatsSymbol.density(1)
         "BEATS_DENSITY_3" -> BeatsSymbol.density(2)
         "BPM", "BEATS_BPM" -> BeatsSymbol.BPM
-        "BEATS_MODE" -> BeatsSymbol.MODE
         "BEATS_EUCLIDEAN_LENGTH_1" -> BeatsSymbol.euclidean(0)
         "BEATS_EUCLIDEAN_LENGTH_2" -> BeatsSymbol.euclidean(1)
         "BEATS_EUCLIDEAN_LENGTH_3" -> BeatsSymbol.euclidean(2)
@@ -250,6 +269,10 @@ class DrumsTool(
             setSwitch(BeatsSymbol.RUN, isOn)
             return DrumsControlResult(success = true, message = if (isOn) "Started the sequencer" else "Stopped the sequencer")
         }
+        if (id == "BEATS_MODE") {
+            synthController.setPluginControl(BeatsSymbol.MODE.controlId, PortValue.IntValue(if (isOn) 1 else 0), ControlEventOrigin.AI)
+            return DrumsControlResult(success = true, message = if (isOn) "Switched to EUCLIDEAN mode" else "Switched to DRUMS mode")
+        }
         TRIGGERS[id]?.let { trigger ->
             // Released straight away: a held trigger wouldn't hit again on the next call.
             if (isOn) setSwitch(trigger, true)
@@ -265,18 +288,18 @@ class DrumsTool(
 
         val targetId = portSymbol.controlId
 
-        // Get current value (or use 0.5 as default starting point)
-        val startValue = currentValues[targetId] ?: 0.5f
+        val startValue = synthController.rampStart(targetId, currentValues[targetId])
         val stepDelayMs = rampDurationMs / rampSteps
 
         // Linear ramp from current to target
         for (step in 1..rampSteps) {
             val t = step.toFloat() / rampSteps
-            val interpolatedValue = startValue + (normalizedValue - startValue) * t
+            // The last step lands exactly: a length one float step short would truncate a whole step down.
+            val interpolatedValue = if (step == rampSteps) normalizedValue else startValue + (normalizedValue - startValue) * t
 
             synthController.setPluginControl(
                 id = targetId,
-                value = PortValue.FloatValue(interpolatedValue),
+                value = portValueFor(targetId, interpolatedValue),
                 origin = ControlEventOrigin.AI
             )
 
@@ -295,13 +318,12 @@ class DrumsTool(
             id.startsWith("DRUM_HH_") -> "Set hi-hat ${portSymbol.displayName} to ${(normalizedValue * 100).toInt()}%"
             id.startsWith("BEATS_") || id == "BPM" -> {
                 when {
-                    id == "BEATS_MODE" -> if (normalizedValue > 0.5f) "Switched to EUCLIDEAN mode" else "Switched to DRUMS mode"
                     id.contains("EUCLIDEAN_LENGTH") -> {
-                        val length = ((normalizedValue * 31) + 1).toInt().coerceIn(1, 32)
+                        val length = euclideanSteps(normalizedValue)
                         "Set ${portSymbol.displayName} to $length steps"
                     }
                     id == "BPM" || id == "BEATS_BPM" -> {
-                        val bpm = (60 + normalizedValue * 140).toInt()
+                        val bpm = GlobalTempo.bpmAtSlider(normalizedValue).toInt()
                         "Set tempo to $bpm BPM"
                     }
                     else -> "Set ${portSymbol.displayName} to ${(normalizedValue * 100).toInt()}%"

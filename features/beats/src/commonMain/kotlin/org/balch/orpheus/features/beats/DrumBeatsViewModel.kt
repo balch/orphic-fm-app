@@ -13,12 +13,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -32,6 +34,8 @@ import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
+import org.balch.orpheus.core.plugin.symbols.MAX_BPM
+import org.balch.orpheus.core.plugin.symbols.MIN_BPM
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drumpatterns.DrumBeatsGenerator
 
@@ -213,6 +217,14 @@ class DrumBeatsViewModel(
                 }
                 .collect { _state.value = it }
         }
+        // A CC or the AI moves the app's tempo, as the panel slider does. The echo below writes as
+        // UI, so it can't be read back as a move and overwrite a newer tempo.
+        scope.launch(dispatcherProvider.io) {
+            val bpmKey = BeatsSymbol.BPM.controlId.key
+            synthController.onControlChange
+                .filter { it.controlId == bpmKey && (it.origin == ControlEventOrigin.MIDI || it.origin == ControlEventOrigin.AI) }
+                .collect { globalTempo.setBpm(it.value.toDouble()) }
+        }
         // Sync GlobalTempo -> BPM port
         scope.launch(dispatcherProvider.io) {
             globalTempo.bpm.collect { bpm ->
@@ -235,7 +247,7 @@ class DrumBeatsViewModel(
                 state.copy(densities = newD)
             }
             is DrumBeatsIntent.Run -> state.copy(isRunning = intent.running)
-            is DrumBeatsIntent.SetBpm -> state.copy(bpm = intent.value.coerceIn(60f, 200f))
+            is DrumBeatsIntent.SetBpm -> state.copy(bpm = intent.value.coerceIn(MIN_BPM, MAX_BPM))
             is DrumBeatsIntent.SetOutputMode -> state.copy(outputMode = intent.mode)
             is DrumBeatsIntent.SetEuclideanLength -> {
                 val newL = state.euclideanLengths.toMutableList()

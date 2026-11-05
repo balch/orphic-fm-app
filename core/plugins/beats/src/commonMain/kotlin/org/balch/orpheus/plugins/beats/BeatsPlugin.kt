@@ -13,6 +13,8 @@ import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BEATS_URI
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.MAX_BPM
+import org.balch.orpheus.core.plugin.symbols.MIN_BPM
 
 /**
  * Beats Plugin — stores beat generation parameters as proper ports.
@@ -54,7 +56,7 @@ class BeatsPlugin : DspPlugin {
             floatType { default = 0.5f; get { _y }; set { _y = it } }
         }
         controlPort(BeatsSymbol.BPM) {
-            floatType { default = 120f; min = 20f; max = 300f; get { _bpm }; set { _bpm = it } }
+            floatType { default = 120f; min = MIN_BPM; max = MAX_BPM; get { _bpm }; set { _bpm = it } }
         }
         controlPort(BeatsSymbol.RANDOMNESS) {
             floatType { default = 0f; get { _randomness }; set { _randomness = it } }

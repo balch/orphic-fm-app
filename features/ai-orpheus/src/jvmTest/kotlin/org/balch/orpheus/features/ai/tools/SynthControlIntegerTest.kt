@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai.tools
 
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import kotlin.test.Test
@@ -28,6 +29,12 @@ class SynthControlIntegerTest {
     @Test
     fun duoEngineStaysAnInteger() {
         assertEquals(7, integerControlValue(VoiceSymbol.DUO_ENGINE_0.controlId, 7f))
+    }
+
+    @Test
+    fun beatsModeSwitchesAtHalfway() {
+        assertEquals(1, integerControlValue(BeatsSymbol.MODE.controlId, 0.8f))
+        assertEquals(0, integerControlValue(BeatsSymbol.MODE.controlId, 0.2f))
     }
 
     @Test

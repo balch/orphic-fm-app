@@ -5,6 +5,10 @@ import org.balch.orpheus.core.plugin.Symbol
 
 const val BEATS_URI = "org.balch.orpheus.plugins.beats"
 
+/** The tempo the app runs at: GlobalTempo clamps to it, and the BPM port and panel sliders span it. */
+const val MIN_BPM = 60f
+const val MAX_BPM = 200f
+
 enum class BeatsSymbol(
     override val symbol: Symbol,
     override val uri: String = BEATS_URI,
