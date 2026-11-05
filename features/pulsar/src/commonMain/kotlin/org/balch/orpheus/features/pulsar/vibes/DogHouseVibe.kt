@@ -21,7 +21,9 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -275,7 +277,7 @@ class DogHouseVibe : VibeProvider {
             complexity = 0.4f,
             space = 0.4f,
             mood = 0.5f,
-            levelDb = 2.9f,  // loudness match to -16 LUFS
+            levelDb = 4.6f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 swingAmount = 0.10f,
                 ghostProbability = 0.25f,
@@ -329,22 +331,34 @@ class DogHouseVibe : VibeProvider {
                     )
                 },
                 // Bass: REPEAT pattern so the riff is tight — chord transposition provides the only variation.
-                // Engines differ in id only; all knobs shared.
+                // PLUCK gives each WSH note an attack and a fall; STR is struck, so it stays raw.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.80f,
+                    volume = 0.75f,
                     noteRangeLow = 33,
                     noteRangeHigh = 52,
                     reverbBrightness = 0.25f,
+                    lpgMode = LpgMode.PLUCK,
+                    lpgDecay = 0.5f,
+                    lpgColour = 0.5f,
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
-                        engineSpace = bass.copy(engineId = OrpheusEngineId.STR),
+                        engineSpace = bass.copy(
+                            engineId = OrpheusEngineId.STR,
+                            lpgMode = LpgMode.ENGINE_DEFAULT,
+                        ),
                         role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                         pan = 0.00f,
                         density = 0.40f,
                         envelopeProfile = EnvelopeProfile.MELODIC,
-                        macroMap = TrackMacroMap.MELODIC,
+                        // Tension's fold hop down to 0.25 starves the note and leaves its 4th
+                        // harmonic on top, so the fold stays high and the fundamental leads.
+                        macroMap = TrackMacroMap.MELODIC.copy(
+                            moodTimbre = MacroTarget(0.55f, 0.8f),
+                            spaceDecay = MacroTarget(0.1f, 0.25f),
+                        ),
+                        evolutionWeight = 0f,
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
@@ -354,7 +368,7 @@ class DogHouseVibe : VibeProvider {
                 // a textural EDM↔Space crossfade. timbre/morph are macro-driven on both slots.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX,
-                    volume = 0.14f,
+                    volume = 0.10f,
                     harmonics = 0.551f,          // DX idx 17 "Insert 1" — base patch (ear-tuned)
                     harmonicsMacroRange = 0.10f, // mood knob walks ±~3 patches around base
                     // harmonicsMacroSource defaults to MOOD (matches pre-pin behavior)
@@ -362,7 +376,7 @@ class DogHouseVibe : VibeProvider {
                     noteRangeHigh = 65,
                     reverbBrightness = 0.5f,
                     delayFeedback = .3f,
-                    delaySend = .3f,
+                    delaySend = .15f,
                     glideRate = 0.1f,
                 ).let { keys ->
                     TrackVoice(
@@ -371,8 +385,8 @@ class DogHouseVibe : VibeProvider {
                             engineId = OrpheusEngineId.GRN,
                             reverbBrightness = 0.8f,
                             delayFeedback = .4f,
-                            delaySend = .5f,
-                            volume = 0.24f,
+                            delaySend = .3f,
+                            volume = 0.17f,
                         ),
                         pan = -0.25f,
                         density = 0.20f,
@@ -388,8 +402,8 @@ class DogHouseVibe : VibeProvider {
                                 humanization = CompingHumanization(
                                     dropProbability = .2f,
                                     ghostProbability = .2f,
-                                    octaveJumpProbability = .4f,
-                                    extensionProbability = .4f
+                                    octaveJumpProbability = .15f,
+                                    extensionProbability = .15f
                                 ),
                                 fills = CompingFills(
                                     everyNBars = 6,
@@ -399,7 +413,11 @@ class DogHouseVibe : VibeProvider {
                             ),
                         ),
                         envelopeProfile = EnvelopeProfile.EFFECT,
-                        macroMap = TrackMacroMap.MELODIC,
+                        // Darker DX tone: less of the comp at 800 Hz-4 kHz, where it read as distracting.
+                        macroMap = TrackMacroMap.MELODIC.copy(
+                            moodTimbre = MacroTarget(0.25f, 0.5f),
+                        ),
+                        evolutionWeight = 0f,
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
