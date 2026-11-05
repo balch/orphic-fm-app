@@ -42,6 +42,7 @@ import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -403,16 +404,18 @@ class PulsarSectionBpmTest {
                 bpm = 100f,
             )
         )
+        // Starts on the later of the two, so landing on the earlier proves the fallback ran.
+        val catalogOrder = VibeCatalog.entries.keys.toList()
+        val (firstLive, initial) = listOf(DogHouseVibe(), FireSkyVibe()).sortedBy { catalogOrder.indexOf(it.name) }
         val vm = makeViewModel(
-            vibe = FireSkyVibe().vibe,
+            vibe = initial.vibe,
             globalTempo = GlobalTempo(StubAudioEngine()),
-            providers = setOf(DogHouseVibe(), FireSkyVibe()),
+            providers = setOf(firstLive, initial),
             prefs = StubPrefs(AppPreferences(lastPulsarJson = savedJson)),
         )
         advanceUntilIdle()
 
-        // Dog House is the first LIVE entry in VibeCatalog order, ahead of the initial Fire Sky.
-        assertEquals(DogHouseVibe().vibe.name, vm.vibeFlow.value.name)
+        assertEquals(firstLive.vibe.name, vm.vibeFlow.value.name)
     }
 }
 
