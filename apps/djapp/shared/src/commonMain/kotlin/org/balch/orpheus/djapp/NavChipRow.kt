@@ -67,7 +67,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toIntRect
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.roundToIntRect
 import androidx.compose.ui.zIndex
@@ -502,7 +501,7 @@ internal fun NavChipPopup(host: NavGestureHost?) {
     Popup(
         popupPositionProvider = positioner,
         onDismissRequest = host::closeChips,
-        properties = PopupProperties(focusable = true),
+        properties = windowPopupProperties(focusable = true),
     ) {
         // The bar's glass frames the row; each chip sits on a fill of its own, so no glass is behind text.
         // As wide as its chips, scrolling only when they outgrow the bar.
@@ -567,7 +566,7 @@ private fun NavTabCalloutPopup(host: NavGestureHost) {
     val at = host.tabCallout ?: return
     val gapPx = with(LocalDensity.current) { CalloutCaretGap.roundToPx() }
     val positioner = remember(at, host.vertical, gapPx) { ChipRowPositioner(at, host.vertical, gapPx) }
-    Popup(popupPositionProvider = positioner, properties = PopupProperties(focusable = false)) {
+    Popup(popupPositionProvider = positioner, properties = windowPopupProperties(focusable = false)) {
         OnboardingCallout(
             text = NavLongPressHint,
             visible = host.tabCalloutVisible,
