@@ -7,7 +7,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -63,14 +65,21 @@ class FeatureStatePersistence(
     ) {
         val tag = serializer.descriptor.serialName
 
-        // Debounced save — always active in both apps
+        // Debounced save — always active in both apps. Keyed on the saved JSON: live fields like
+        // the 5 Hz peak meter would otherwise restart the debounce for as long as music plays.
+        // Comparing the stripped state first spares those ticks the encode.
         scope.launch(dispatcherProvider.io) {
-            stateFlow.drop(1).debounce(2_000L).collect { state ->
-                val toSave = stripTransient(state)
-                val jsonStr = json.encodeToString(serializer, toSave)
-                appPreferencesRepository.update { writer(it, jsonStr) }
-                log.debug { "Saved $tag" }
-            }
+            stateFlow
+                .map(stripTransient)
+                .distinctUntilChanged()
+                .map { json.encodeToString(serializer, it) }
+                .distinctUntilChanged()
+                .drop(1)
+                .debounce(SAVE_DEBOUNCE_MS)
+                .collect { jsonStr ->
+                    appPreferencesRepository.update { writer(it, jsonStr) }
+                    log.debug { "Saved $tag" }
+                }
         }
 
         // Restore on startup only when strategy is USER_PREFERENCES
@@ -94,6 +103,7 @@ class FeatureStatePersistence(
     }
 
     companion object {
+        private const val SAVE_DEBOUNCE_MS = 500L
         private val log = logging("FeatureStatePersistence")
     }
 }

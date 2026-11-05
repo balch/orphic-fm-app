@@ -2,6 +2,7 @@ package org.balch.orpheus.features.pulsar.mixer
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -68,7 +69,11 @@ class MixerViewModelDriveRestoreTest {
         override suspend fun save(preferences: AppPreferences) { saved = preferences }
     }
 
-    private class Launch(val vm: MixerViewModel, val controller: SynthController) {
+    private class Launch(
+        val vm: MixerViewModel,
+        val controller: SynthController,
+        val engine: SongEndingStubSynthEngine,
+    ) {
         val drive get() = controller.controlFlow(DistortionSymbol.DRIVE.controlId).value.asFloat()
         val mix get() = controller.controlFlow(DistortionSymbol.MIX.controlId).value.asFloat()
     }
@@ -86,8 +91,9 @@ class MixerViewModelDriveRestoreTest {
         }
         val scope = FeatureCoroutineScope()
         val pulsar = FakePulsarFeature(listOf(vibe), vibe)
+        val engine = SongEndingStubSynthEngine()
         val vm = MixerViewModel(
-            engine = SongEndingStubSynthEngine(),
+            engine = engine,
             synthController = controller,
             pulsarFeature = pulsar,
             persistence = FeatureStatePersistence(prefs, dispatchers, scope),
@@ -98,7 +104,7 @@ class MixerViewModelDriveRestoreTest {
             trackGainSink = DirectTrackGainSink(controller, pulsar, scope),
         )
         backgroundScope.launch { vm.stateFlow.collect {} }
-        return Launch(vm, controller)
+        return Launch(vm, controller, engine)
     }
 
     @Test
@@ -118,5 +124,28 @@ class MixerViewModelDriveRestoreTest {
         assertEquals(0.55f, second.drive)
         assertEquals(0.55f, second.mix)
         assertEquals(0.55f, second.vm.stateFlow.value.drive)
+    }
+
+    @Test
+    fun gainIsSavedWhileTheMeterIsMoving() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+
+        val first = launchApp(dispatcher)
+        // The engine polls the peak meter at 5 Hz while the music plays.
+        backgroundScope.launch {
+            while (true) {
+                delay(200L)
+                first.engine.peakFlow.value += 0.001f
+            }
+        }
+        advanceTimeBy(1_000L)
+
+        first.vm.actions.setDrive(0.55f)
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        val second = launchApp(dispatcher)
+        runCurrent()
+        assertEquals(0.55f, second.drive)
     }
 }
