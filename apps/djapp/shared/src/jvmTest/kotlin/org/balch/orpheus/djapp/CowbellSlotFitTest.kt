@@ -70,15 +70,16 @@ private const val DjFaderTag = "cowbell-dj-fader"
 
 private const val CollapseTag = "cowbell-dj-collapse"
 
+private const val BodyTag = "cowbell-body"
 private const val ModeTag = "cowbell-ctl-mode"
-private const val EngineTag = "cowbell-ctl-engine"
 private const val OctaveTag = "cowbell-ctl-octave"
 private const val LevelTag = "cowbell-ctl-level"
+/** Five 26dp chips and four 2dp gaps. */
+private const val ChipsClosedUp = 138f
 private const val LockTag = "cowbell-ctl-lock"
-private const val BendTag = "cowbell-ctl-bend"
 private const val SliderTag = "cowbell-ctl-slider"
 private const val KnobsTag = "cowbell-dj-knobs"
-private const val MetalTag = "cowbell-dj-knob-metal"
+private const val ToneTag = "cowbell-dj-knob-tone"
 private const val RingTag = "cowbell-dj-knob-ring"
 private const val IntensityTag = "cowbell-dj-knob-intensity"
 
@@ -171,7 +172,7 @@ internal fun ImageComposeScene.readCowbellFit(tag: String, lift: Float): Cowbell
 }
 
 /** What every DJ cowbell slot shows, whatever its size: the knobs by name, each chip by its leading word. */
-private val DjLabels = listOf("BODY", "RING", "INTENSITY", "Tap|Shake|Hold", "Eng", "Oct", "Vol", "Lock", "Bend")
+private val DjLabels = listOf("TONE", "RING", "INTENSITY", "Metal", "Tap|Shake|Hold", "Oct", "Vol", "Lock")
 
 /** The bell keeps at least this much height in the smallest slot under test. */
 private const val BellFloor = 64f
@@ -390,9 +391,8 @@ class CowbellSlotFitTest {
             val r = scene.readCowbellFit(SlotTag, lift = 0f)
             assertEquals(CowbellDockedHeight.value, r.slot.height, 0.5f, "the docked panel's height")
             scene.assertClears(case, "docked", lift = 0f)
-            // The bell column runs the panel's height, so it is at least as tall as the chip stack beside it.
-            val chips = scene.cowbellNodes().filter { n -> n.config.getOrNull(SemanticsProperties.TestTag) in listOf(ModeTag, BendTag) }
-            assertTrue(r.bell!!.height >= chips.maxOf { it.cowbellLaidOut.bottom } - chips.minOf { it.cowbellLaidOut.top } - 0.5f, "$case docked: the bell is shorter than the controls column")
+            // The bell column runs the panel's height, so it is at least as tall as the five chips closed up.
+            assertTrue(r.bell!!.height >= ChipsClosedUp, "$case docked: the bell is only ${r.bell!!.height} tall")
         } finally {
             scene.close()
         }
@@ -481,10 +481,8 @@ class CowbellSlotFitTest {
         n.config.getOrNull(SemanticsProperties.TestTag)?.let { return it }
         val at = n.cowbellLaidOut.center
         fun inside(tag: String) = nodes.first { it.config.getOrNull(SemanticsProperties.TestTag) == tag }.cowbellLaidOut.contains(at)
-        // The engine pill's focus target is a child of its tagged box.
-        if (inside(EngineTag)) return EngineTag
         if (inside(DjFaderTag)) return "FADER"
-        for ((tag, name) in listOf(MetalTag to "BODY knob", RingTag to "RING knob", IntensityTag to "INTENSITY knob")) {
+        for ((tag, name) in listOf(ToneTag to "TONE knob", RingTag to "RING knob", IntensityTag to "INTENSITY knob")) {
             if (inside(tag)) return name
         }
         return n.cowbellWalk().firstNotNullOfOrNull { c -> c.cowbellText().ifBlank { null } }
@@ -531,7 +529,7 @@ class CowbellSlotFitTest {
         return focused()
     }
 
-    /** The collapse pill, mode, engine, octave, level, lock, bend, the three knobs, the bell, then the fader: Tab walks that. */
+    /** The collapse pill, mode, octave, level, lock, the three knobs, the body segments, the bell, then the fader: Tab walks that. */
     @Test
     fun dpadReachesEveryControlInOrder() {
         val scene = tvScene(mutableStateOf<DjRoute>(CowbellTab))
@@ -539,34 +537,35 @@ class CowbellSlotFitTest {
             scene.settle()
             scene.key(Key.Tab)
             val tab = mutableListOf(scene.focused())
-            repeat(11) { scene.key(Key.Tab); tab += scene.focused() }
+            repeat(10) { scene.key(Key.Tab); tab += scene.focused() }
             assertEquals<List<String?>>(
                 listOf(
-                    CollapseTag, ModeTag, EngineTag, OctaveTag, LevelTag, LockTag, BendTag,
-                    "BODY knob", "RING knob", "INTENSITY knob", BellTag, "FADER",
+                    CollapseTag, ModeTag, OctaveTag, LevelTag, LockTag,
+                    "TONE knob", "RING knob", "INTENSITY knob", BodyTag, BellTag, "FADER",
                 ),
                 tab,
                 "Tab order",
             )
             // The remote's arrows: down the chips and back up, then from the level chip right into the
-            // knob beside it, up to METAL, down the knobs, and right across the bell to the fader.
+            // knob beside it, up to TONE, down the knobs, right across the bell to the fader, then back
+            // to the bell and up onto the selector over it.
             repeat(2) { scene.key(Key.Tab) }  // past the collapse pill to the mode chip
             val path = mutableListOf(scene.focused())
-            val moves = List(5) { Key.DirectionDown } + List(5) { Key.DirectionUp } + List(3) { Key.DirectionDown }
+            val moves = List(3) { Key.DirectionDown } + List(3) { Key.DirectionUp } + List(2) { Key.DirectionDown }
             for (k in moves) path += scene.pressUntilFocusMoves(k)
-            val knobs = listOf("BODY knob", "RING knob", "INTENSITY knob")
+            val knobs = listOf("TONE knob", "RING knob", "INTENSITY knob")
             val entered = scene.pressUntilFocusMoves(Key.DirectionRight)
             assertTrue(entered in knobs, "Right from the level chip went to $entered")
             repeat(knobs.indexOf(entered)) { scene.pressUntilFocusMoves(Key.DirectionUp) }
             path += scene.focused()
-            for (k in listOf(Key.DirectionDown, Key.DirectionDown, Key.DirectionRight, Key.DirectionRight)) {
+            for (k in listOf(Key.DirectionDown, Key.DirectionDown, Key.DirectionRight, Key.DirectionRight, Key.DirectionLeft, Key.DirectionUp)) {
                 path += scene.pressUntilFocusMoves(k)
             }
             println("[cowbell-fit] arrow path: $path")
             assertEquals<List<String?>>(
-                listOf(ModeTag, EngineTag, OctaveTag, LevelTag, LockTag, BendTag) +
-                    listOf(LockTag, LevelTag, OctaveTag, EngineTag, ModeTag) +
-                    listOf(EngineTag, OctaveTag, LevelTag) + knobs + listOf(BellTag, "FADER"),
+                listOf(ModeTag, OctaveTag, LevelTag, LockTag) +
+                    listOf(LevelTag, OctaveTag, ModeTag) +
+                    listOf(OctaveTag, LevelTag) + knobs + listOf(BellTag, "FADER", BellTag, BodyTag),
                 path,
                 "arrow path",
             )
@@ -577,7 +576,7 @@ class CowbellSlotFitTest {
 
     /** Hold OK on the Lock chip to open its slider: the first key-down arms, a repeat is the hold. */
     private fun ImageComposeScene.holdOkOnLock() {
-        repeat(12) { if (focused() != LockTag) key(Key.Tab) }
+        repeat(14) { if (focused() != LockTag) key(Key.Tab) }
         assertEquals(LockTag, focused(), "never focused the Lock chip")
         sendKeyEvent(KeyEvent(Key.DirectionCenter, KeyEventType.KeyDown)); frame()
         sendKeyEvent(KeyEvent(Key.DirectionCenter, KeyEventType.KeyDown)); frame()

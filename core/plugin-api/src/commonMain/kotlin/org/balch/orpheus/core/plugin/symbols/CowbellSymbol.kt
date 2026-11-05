@@ -11,10 +11,10 @@ enum class CowbellSymbol(
     override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
 ) : PortSymbol {
     LEVEL("level", displayName = "Level"),
-    METAL("metal", displayName = "Metal"),
+    BODY("body", displayName = "Body"),
+    TONE("tone", displayName = "Tone"),
     RING("ring", displayName = "Ring"),
     INTENSITY("intensity", displayName = "Intensity"),
-    ENGINE("engine", displayName = "Engine"),
     OCTAVE("octave", displayName = "Octave"),
     GRID("grid", displayName = "Grid"),
     GRID_STRENGTH("grid_strength", displayName = "Grid Strength"),
@@ -25,7 +25,6 @@ enum class CowbellSymbol(
     BEND("bend", displayName = "Bend"),
     STRUCTURE_OFFSET("structure_offset", displayName = "Structure Offset"),
     POSITION_OFFSET("position_offset", displayName = "Position Offset"),
-    BEND_SCALE("bend_scale", displayName = "Bend To Scale"),
     LIVE("live", displayName = "Live"),
     MORE("more", displayName = "More")
 }

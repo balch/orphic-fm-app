@@ -89,10 +89,6 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         stmlib::BufferAllocator bass_allocator(engine->bass_voice_alloc_buffer, kVoiceAllocBytes);
         engine->bass_voice.Init(&bass_allocator);
     }
-    {
-        stmlib::BufferAllocator exciter_allocator(engine->cowbell_exciter_alloc, kVoiceAllocBytes);
-        engine->cowbell_exciter.Init(&exciter_allocator);
-    }
     engine->bass_seq_state.initialized = false;
 
     // Initialize Clouds granular processor

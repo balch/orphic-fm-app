@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
  */
 class CowbellPanelFitTest {
 
-    private val required = listOf("BODY", "RING", "INTENSITY", "TAP", "SHAKE", "HOLD", "MARBLE", "BEADS", "SEEDS", "JINGLES")
+    private val required = listOf("TONE", "RING", "INTENSITY", "TAP", "SHAKE", "HOLD", "MARBLE", "BEADS", "SEEDS", "JINGLES", "Metal")
     private val more = listOf("SHARDS", "OCTAVE", "SNAP", "LEVEL")
 
     /** [inset] is what the host draws over the body: a slot's 8dp of buttons, the phone's 44dp header. */

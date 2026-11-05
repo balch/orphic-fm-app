@@ -1,7 +1,6 @@
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
 #include "cowbell_macros.h"
-#include "kotlin_engine_ordinal.h"
 #include "orpheus_units_common.h"
 #include "orpheus_unit_pulsar.h"
 #include <algorithm>
@@ -14,24 +13,15 @@ constexpr int kSlots = OrpheusCowbellResonator::kMaxStrikes;
 constexpr int kIdleBlocks = 8;
 constexpr float kIdlePeak = 1e-5f;
 constexpr float kBaseNote = 72.0f;  // C5: the root pitch class sounds in octave 5
-constexpr float kEngineImpulseScale = 0.35f;  // the impulse under an engine's hit
-constexpr float kGateVelocity = 0.8f;         // SYNTH's held note: accent and its strike
-// The VCA's full level (SYNTH held, or a TAP at velocity 1). A tone at the bell's pitch builds
-// up in the resonator; above ~0.2 it drives Rings' slow limiter, whose recovery stretches the release.
-constexpr float kVcaLevel = 0.1f;
-constexpr float kHoldsSynthLevel = 0.02f;  // six-op under SYNTH: at full INTENSITY it builds up ~4x VA
-constexpr float kTapGateSeconds = 0.005f;
-constexpr float kVcaAttackSeconds = 0.001f;
-constexpr float kVcaReleaseSeconds = 0.006f;  // shut (below kVcaFloor) ~60 ms after a gate falls
-constexpr float kVcaFloor = 1e-5f;
-// SYNTH noise for engines whose hit decays: band-limited, and trimmed as RING raises the
-// resonator's Q so it stays under Rings' limiter at full INTENSITY and any RING.
+constexpr float kGateVelocity = 0.8f;  // SYNTH's held note: the strike on the gate's rising edge
+constexpr float kNoiseFloor = 1e-5f;   // the noise bed is shut below this
+// SYNTH's held note: band-limited noise, trimmed as RING raises the resonator's Q so it stays
+// under Rings' limiter at full INTENSITY and any RING.
 constexpr float kSynthNoiseLevel = 0.35f;
 constexpr float kNoiseRingTrim = 0.9f;  // level x (1 - 0.9 x RING)
 constexpr float kNoiseCutoffHz = 1000.0f;
 constexpr float kNoiseRampSeconds = 0.003f;
-constexpr float kExciterDrive = 0.2f;  // an HH hit peaks ~5 dB over the bare impulse
-constexpr float kExciterKnob = 0.5f;  // harmonics, timbre and morph, as the drum voices default
+constexpr float kNoiseBedDrive = 0.2f;  // INTENSITY's drive of the noise bed into the resonator
 // A fill's noise burst: this peak amplitude per unit of velocity and INTENSITY, after the band-pass
 // is levelled to the noise's own RMS. The resonator's input scales it down by 8 again.
 constexpr float kBurstDrive = 0.1f;
@@ -58,7 +48,7 @@ inline float bent_semitones(float curve, float note) {
     return std::fmin(curve * kBendRangeSemitones, kMaxBentNote - note);
 }
 // Stacked strikes and bursts can pile the resonator up to its own ceiling, and the makeup gain
-// lifts that past full scale. Linear below kCeilingKnee, then a tanh shoulder that never reaches kCeiling.
+// lifts that past full scale. Linear below kCeilingKnee, then a tanh shoulder that settles at kCeiling.
 constexpr float kCeilingKnee = 0.8f;
 constexpr float kCeiling = 0.98f;
 inline float soft_ceiling(float x) {
@@ -105,54 +95,12 @@ CowbellPushResult push_strike(std::atomic<uint32_t>* slots, uint32_t packed, uin
     return COWBELL_PUSH_DROPPED;
 }
 
-// An exciter trigger: a TAP strike (5 ms gate) or the SYNTH gate's rising edge.
-struct ExciterHit {
-    int offset;
-    float velocity;
-    bool tap;
-};
-// Strikes sounding this block: drained ones, GRID-pending ones landing here, and the gate edge.
+// Strikes sounding this block: drained ones and GRID-pending ones landing here.
 constexpr int kMaxFired = 2 * kSlots;
-constexpr int kMaxExciterHits = kMaxFired + 1;
 constexpr float kJustAfterFraction = 0.25f;  // of a 16th: a strike this soon after a line plays now
 // Below this SNAP, GRID passes hits straight through and claims no slot: a pull this small is
 // inaudible, and spending the slot would turn the knob into one hit per 16th.
 constexpr float kGridPassThroughStrength = 0.15f;
-
-// How an engine's output is bounded, which decides what TAP and SYNTH do with it.
-enum ExciterEnvelope {
-    ENV_VCA,     // none of its own: a gate-following VCA shapes TAP and SYNTH alike
-    ENV_HOLDS,   // its own envelope for TAP; it holds under a gate, so SYNTH uses the VCA
-    ENV_DECAYS,  // a hit plays out even under a held gate, so SYNTH adds the noise bed
-};
-
-constexpr int kPlaitsSpeech = 15;
-constexpr float kSpeechLevel = 0.04f;  // its word lands about as loud as a held VA note
-constexpr int kPlaitsSixOp = 2;  // bank 1 only: banks 2 and 3 already sit well under the knee
-constexpr float kSixOpLevel = 0.2f;    // its tap rang the resonator's limiter (1.13 before the ceiling); this lands it just under an HH hit
-
-// Plaits indices, with the Kotlin PlaitsEngineId names.
-inline ExciterEnvelope exciter_envelope(int engine_index) {
-    if (engine_index >= 2 && engine_index <= 4) return ENV_HOLDS;  // SixOpFM, SixOpFM_2, SixOpFM_3
-    if (engine_index == kPlaitsSpeech) return ENV_DECAYS;          // Speech: one word per trigger
-    if (engine_index >= 19 && engine_index <= 23) return ENV_DECAYS;  // String, Modal, BD, SD, HH
-    return ENV_VCA;  // FM (and FMDrum), Noise, Waveshaping, VA, Additive, Grain, Particle, ...
-}
-
-// The starting VCA / scale state for a newly adopted engine.
-void reset_exciter_envelope(CowbellUnitState& st) {
-    const bool holds = exciter_envelope(st.exciter_engine) == ENV_HOLDS;
-    st.exciter_env = holds ? 1.0f : 0.0f;
-    st.hold_target = 1.0f;
-    st.tap_gate_frames = 0;
-    st.exciter_tail_quiet = false;
-}
-
-inline float peak_abs(const float* x, int n) {
-    float p = 0.0f;
-    for (int i = 0; i < n; ++i) p = std::fmax(p, std::fabs(x[i]));
-    return p;
-}
 
 // Uniform in [-1, 1), from a 32-bit LCG kept in the unit state (no shared RNG).
 inline float next_noise(uint32_t& seed) {
@@ -160,107 +108,13 @@ inline float next_noise(uint32_t& seed) {
     return (float)(int32_t)seed * (1.0f / 2147483648.0f);
 }
 
-// Renders the exciter into engine->cowbell_exciter_buf, split at each hit and gate edge.
-void render_exciter(OrpheusEngine* engine, CowbellUnitState& st, ExciterHit* hits, int num_hits,
-                    bool gate, bool gate_rose, float note, int num_frames, float sr) {
-    OrpheusVoice& voice = engine->cowbell_exciter;
-    float* ex = engine->cowbell_exciter_buf;
-    const int engine_index = st.exciter_engine;
-    const ExciterEnvelope kind = exciter_envelope(engine_index);
-    st.exciter_note = note;
-    const int tap_frames = std::max(1, (int)std::lround(kTapGateSeconds * sr));
-    const float attack = 1.0f - std::exp(-1.0f / (kVcaAttackSeconds * sr));
-    const float release = 1.0f - std::exp(-1.0f / (kVcaReleaseSeconds * sr));
-
-    // Order by offset (insertion sort: stable and allocation-free).
-    for (int i = 0; i < num_hits; ++i) hits[i].offset = std::min(std::max(hits[i].offset, 0), num_frames - 1);
-    for (int i = 1; i < num_hits; ++i) {
-        const ExciterHit h = hits[i];
-        int j = i - 1;
-        while (j >= 0 && hits[j].offset > h.offset) {
-            hits[j + 1] = hits[j];
-            --j;
-        }
-        hits[j + 1] = h;
-    }
-
-    // Six-op under SYNTH is a VCA engine: the held level, then shut at release until a TAP.
-    if (kind == ENV_HOLDS) {
-        if (gate) {
-            st.hold_target = kHoldsSynthLevel;
-            if (gate_rose) st.exciter_env = kHoldsSynthLevel;  // not a glide down from a TAP's level
-        } else if (st.hold_target == kHoldsSynthLevel) {
-            st.hold_target = 0.0f;
-        }
-    }
-
-    int next = 0;
-    int pos = 0;
-    while (pos < num_frames) {
-        bool retrigger = false;
-        while (next < num_hits && hits[next].offset <= pos) {
-            if (hits[next].tap) {
-                st.tap_gate_frames = tap_frames;
-                st.tap_level = hits[next].velocity;
-                if (!gate) st.hold_target = 1.0f;  // a TAP plays the six-op at its own level
-            }
-            st.accent = hits[next].velocity;
-            retrigger = true;
-            ++next;
-        }
-        // A piece ends at the next hit, the TAP gate's fall, or the block's end.
-        int end = num_frames;
-        if (next < num_hits) end = std::min(end, hits[next].offset);
-        if (st.tap_gate_frames > 0) end = std::min(end, pos + st.tap_gate_frames);
-        const int size = end - pos;
-        const bool tap_on = st.tap_gate_frames > 0;
-        const bool gate_on = gate || tap_on;
-
-        // Old remainder samples would delay the hit up to 23 frames; the voice crossfades instead.
-        if (retrigger) {
-            voice.remainder_count_ = 0;
-            st.exciter_tail_quiet = false;
-        }
-        const bool vca_shut = (kind == ENV_VCA || (kind == ENV_HOLDS && st.hold_target == 0.0f)) &&
-                              st.exciter_env < kVcaFloor;
-        if (!gate_on && !retrigger && (vca_shut || st.exciter_tail_quiet)) {
-            std::memset(ex + pos, 0, sizeof(float) * size);  // shut, or its tail died: skip the render
-            if (vca_shut) st.exciter_env = 0.0f;
-        } else {
-            voice.Render(engine_index, gate_on ? 1 : 0, note, kExciterKnob, kExciterKnob, kExciterKnob,
-                         st.accent, ex + pos, size, LPG_BYPASS, 0.5f, 0.5f, retrigger);
-            if (kind != ENV_DECAYS) {
-                const float target =
-                    kind == ENV_HOLDS ? st.hold_target
-                                      : kVcaLevel * std::max(gate ? 1.0f : 0.0f, tap_on ? st.tap_level : 0.0f);
-                const float coeff = target > st.exciter_env ? attack : release;
-                const float trim = engine_index == kPlaitsSixOp ? kSixOpLevel : 1.0f;
-                float env = st.exciter_env;
-                for (int i = pos; i < end; ++i) {
-                    env += coeff * (target - env);
-                    ex[i] *= env * trim;
-                }
-                st.exciter_env = env;
-            } else if (engine_index == kPlaitsSpeech) {
-                // A spoken word sits at the bell's pitch and builds up like a held tone.
-                for (int i = pos; i < end; ++i) ex[i] *= kSpeechLevel;
-            }
-            // A self-enveloped tail below the floor for a whole sub-block is done until the next hit.
-            if (kind != ENV_VCA && !gate_on && size >= kOrpheusBlockSize && peak_abs(ex + pos, size) < kVcaFloor)
-                st.exciter_tail_quiet = true;
-        }
-        if (tap_on) st.tap_gate_frames -= size;
-        pos = end;
-    }
-}
-
-// SYNTH with no sustaining engine (impulse only, or one whose hit plays out): a steady soft
-// noise keeps the resonator singing, ramped in and out over a few ms. Then the strike gain.
-void finish_exciter(CowbellUnitState& st, float* ex, bool noise_bed, float ring, float gain_target,
-                    int num_frames, float sr) {
+// SYNTH's held note: while the gate is held a steady soft noise keeps the resonator singing,
+// ramped in and out over a few ms, then the strike gain. `ex` arrives zeroed.
+void render_noise_bed(CowbellUnitState& st, float* ex, bool gate, float ring, float gain_target,
+                      int num_frames, float sr) {
     const float noise_level = kSynthNoiseLevel * (1.0f - kNoiseRingTrim * clampf(ring, 0.0f, 1.0f));
-    const float noise_target = noise_bed ? noise_level : 0.0f;
-    if (noise_target > 0.0f || st.noise_env >= kVcaFloor) {
+    const float noise_target = gate ? noise_level : 0.0f;
+    if (noise_target > 0.0f || st.noise_env >= kNoiseFloor) {
         const float ramp = 1.0f - std::exp(-1.0f / (kNoiseRampSeconds * sr));
         const float lp = 1.0f - std::exp(-2.0f * 3.14159265f * kNoiseCutoffHz / sr);
         float env = st.noise_env;
@@ -276,14 +130,14 @@ void finish_exciter(CowbellUnitState& st, float* ex, bool noise_bed, float ring,
         st.noise_env = 0.0f;
     }
 
-    // INTENSITY drives the exciter like the impulse, ramped so a knob turn under SYNTH can't step.
-    const float step = (gain_target - st.exciter_gain) / (float)num_frames;
-    float g = st.exciter_gain;
+    // INTENSITY drives the noise bed like the strike, ramped so a knob turn under SYNTH can't step.
+    const float step = (gain_target - st.input_gain) / (float)num_frames;
+    float g = st.input_gain;
     for (int i = 0; i < num_frames; ++i) {
         g += step;
-        ex[i] *= g * kExciterDrive;
+        ex[i] *= g * kNoiseBedDrive;
     }
-    st.exciter_gain = gain_target;
+    st.input_gain = gain_target;
 }
 
 // Starts a fill's burst at `offset` frames into this block. A full pool gives the quietest burst's
@@ -564,9 +418,21 @@ void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
                                          st.last_drained_words, num_drained, num_frames, fired);
     st.last_fire_count = num_strikes;
 
-    // 2. Knobs. The offsets ride on the macro's structure and on a centred position.
+    // The gate is sampled once per block, so an on/off pulse inside one block is missed. Fine for
+    // a mouse; part 4's touch may need an edge counter.
+    const bool gate = engine->cowbell_gate.load(std::memory_order_relaxed);
+    const bool gate_rose = gate && !st.gate_prev;
+    st.gate_prev = gate;
+
+    // 2. Knobs. The offsets ride on the macro's structure and on a centred position. A new body
+    // arrives whole on a strike, a rising gate or an idle bell: its row must not reach a ringing voice.
+    const int wanted_body = engine->cowbell_body.load(std::memory_order_relaxed);
+    const bool adopt_body = wanted_body != st.sounding_body &&
+                            (st.sounding_body < 0 || st.idle || num_strikes > 0 || gate_rose);
+    if (adopt_body) st.sounding_body = wanted_body;
     const float intensity = engine->cowbell_intensity.load(std::memory_order_relaxed);
-    const CowbellParams p = cowbell_macros(engine->cowbell_metal.load(std::memory_order_relaxed),
+    const CowbellParams p = cowbell_macros(st.sounding_body,
+                                           engine->cowbell_tone.load(std::memory_order_relaxed),
                                            engine->cowbell_ring.load(std::memory_order_relaxed),
                                            intensity);
     const float structure_offset = engine->cowbell_structure_offset.load(std::memory_order_relaxed);
@@ -586,26 +452,20 @@ void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     reso.set_note(note);
 
     // 4. Wake. Any strike, a held gate or a bend wakes it; a rising gate strikes too.
-    // The gate is sampled once per block, so an on/off pulse inside one block is missed. Fine for
-    // a mouse; part 4's touch may need an edge counter.
-    const bool gate = engine->cowbell_gate.load(std::memory_order_relaxed);
-    const bool gate_rose = gate && !st.gate_prev;
-    st.gate_prev = gate;
     const float bend_target = engine->cowbell_bend.load(std::memory_order_relaxed);
     const bool active = num_strikes > 0 || gate || bend_target != 0.0f || bursts_alive(st);
     // From silence the next strike applies p.polyphony, so the width starts there.
     const float wake_width = p.polyphony > 1 ? kPolyWidth : 1.0f;
     if (active && st.idle) st.width = wake_width;
     if (active) st.idle = false;
-    float level_target = clampf(engine->cowbell_level.load(std::memory_order_relaxed), 0.0f, 1.0f);
+    float level_target = clampf(engine->cowbell_level.load(std::memory_order_relaxed), 0.0f, 1.0f) * p.level_trim;
     const float more_target = clampf(engine->cowbell_more.load(std::memory_order_relaxed), 0.0f, 1.0f);
     if (!st.level_started) {
         st.level = level_target;
         st.more = more_target;
         st.bend = bend_target;
-        st.exciter_bend = bent_semitones(bend_curve(bend_target), note);
         st.width = wake_width;
-        st.exciter_gain = p.strike_gain;
+        st.input_gain = p.strike_gain;
         st.level_started = true;
     }
     if (st.idle) {
@@ -615,8 +475,7 @@ void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         st.more = more_target;
         update_duck(st, more_target, 0.0f, num_frames, sr);
         st.bend = bend_target;
-        st.exciter_bend = bent_semitones(bend_curve(bend_target), note);
-        st.exciter_gain = p.strike_gain;
+        st.input_gain = p.strike_gain;
         viz.write(0.0f);
         return;
     }
@@ -627,10 +486,9 @@ void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     const float curve = bend_curve(st.bend);
     const float swell = std::fabs(curve) / 1.5f * clampf(intensity, 0.0f, 1.0f);
     float bend_semitones = bent_semitones(curve, note);
-    // BEND TO SCALE: while Pulsar plays, the bend lands on its scale and glides there. Anything
-    // else leaves the free path above untouched.
-    const bool to_scale = engine->cowbell_bend_scale.load(std::memory_order_relaxed) &&
-                          engine->pulsar_playing.load(std::memory_order_relaxed) != 0;
+    // BEND TO SCALE: while Pulsar plays, the bend lands on its scale and glides there. Stopped,
+    // the free path above stands.
+    const bool to_scale = engine->pulsar_playing.load(std::memory_order_relaxed) != 0;
     if (to_scale) {
         int scale_index = engine->pulsar_scale_index.load(std::memory_order_relaxed);
         scale_index = scale_index < 0 ? 0 : (scale_index >= kNumPulsarScales ? kNumPulsarScales - 1 : scale_index);
@@ -641,66 +499,38 @@ void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     }
     st.scale_active = to_scale;
     reso.set_bend_semitones(bend_semitones);
-    // The exciter's pitch follows the resonator's own glide on top.
-    st.exciter_bend += block_smooth_coeff(sr, num_frames, OrpheusCowbellResonator::kGlideSeconds) *
-                       (bend_semitones - st.exciter_bend);
     reso.set_brightness(clampf(p.brightness + 0.2f * swell, 0.0f, 1.0f));
     level_target *= 1.0f + 0.4f * swell;
+    if (adopt_body) st.level = level_target;  // the hit attacks at its own level, not up a ramp
 
-    // 6. Strikes. An engine change waits for one, then the voice sees a fresh edge.
-    if (num_strikes > 0 || gate_rose) {
-        const int ordinal = engine->cowbell_engine.load(std::memory_order_relaxed);
-        const int want = ordinal == -1 ? -1 : kotlin_engine_ordinal_to_plaits(ordinal);
-        if ((ordinal == -1 || want >= 0) && want != st.exciter_engine) {
-            st.exciter_engine = want;
-            reset_exciter_envelope(st);
-            engine->cowbell_exciter.trigger_state_ = false;
-        }
-    }
-    const bool excited = st.exciter_engine >= 0;
-    // Only hits that fire the engine (TAP strikes, the gate's edge) sit under its sound.
-    const float hit_scale = excited ? kEngineImpulseScale : 1.0f;
-    // Exciter triggers: TAP strikes (kind 0) open a 5 ms gate; the rising gate retriggers.
-    ExciterHit hits[kMaxExciterHits];
-    int num_hits = 0;
-    if (gate_rose) {
-        reso.strike(kGateVelocity * p.strike_gain * hit_scale, 0);
-        hits[num_hits++] = {0, kGateVelocity, false};
-    }
+    // 6. Strikes: the gate's rising edge, then each one that sounds this block.
+    if (gate_rose) reso.strike(kGateVelocity * p.strike_gain, 0);
     for (int i = 0; i < num_strikes; ++i) {
         const CowbellStrike& s = fired[i].strike;
         const int offset = fired[i].offset;
-        const bool fires = s.kind == 0;
         const CowbellFillSpec& fill = cowbell_fill_spec(s.kind);
-        reso.strike(s.velocity * p.strike_gain * (fires ? hit_scale : fill.strike_scale), offset,
+        reso.strike(s.velocity * p.strike_gain * (s.kind == 0 ? 1.0f : fill.strike_scale), offset,
                     cowbell_hit_brightness_offset(s.color));
-        if (fires && num_hits < kMaxExciterHits) hits[num_hits++] = {offset, s.velocity, true};
         spawn_burst(st, fill, s.color, s.velocity, p.strike_gain, offset, sr);
     }
 
-    // 7. Render: the exciter into the resonator's input.
+    // 7. Render: the noise bed into the resonator's input.
     const float* in = nullptr;
-    const bool noise_bed = gate && (!excited || exciter_envelope(st.exciter_engine) == ENV_DECAYS);
-    if (excited || noise_bed || st.noise_env >= kVcaFloor) {
-        float* ex = engine->cowbell_exciter_buf;
-        if (excited) {
-            render_exciter(engine, st, hits, num_hits, gate, gate_rose, note + st.exciter_bend, num_frames, sr);
-        } else {
-            std::memset(ex, 0, sizeof(float) * num_frames);
-        }
-        finish_exciter(st, ex, noise_bed, engine->cowbell_ring.load(std::memory_order_relaxed), p.strike_gain,
-                       num_frames, sr);
+    if (gate || st.noise_env >= kNoiseFloor) {
+        float* ex = engine->cowbell_input_buf;
+        std::memset(ex, 0, sizeof(float) * num_frames);
+        render_noise_bed(st, ex, gate, engine->cowbell_ring.load(std::memory_order_relaxed), p.strike_gain,
+                         num_frames, sr);
         in = ex;
     } else {
-        st.exciter_gain = p.strike_gain;
-        std::memset(engine->cowbell_exciter_buf, 0, sizeof(float) * num_frames);  // nothing feeds the bell
+        st.input_gain = p.strike_gain;
+        std::memset(engine->cowbell_input_buf, 0, sizeof(float) * num_frames);  // nothing feeds the bell
     }
-    if (excited) st.exciter_trigger_count += num_hits;
     // Fill bursts join the resonator's input; their dry share is added to its output below.
     float* dry = engine->cowbell_burst_dry_buf;
     const bool bursting = bursts_alive(st);
     if (bursting) {
-        float* ex = engine->cowbell_exciter_buf;
+        float* ex = engine->cowbell_input_buf;
         if (!in) in = ex;  // zeroed above
         std::memset(dry, 0, sizeof(float) * num_frames);
         render_bursts(st, ex, dry, num_frames);

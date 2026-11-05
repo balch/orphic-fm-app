@@ -324,7 +324,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.cowbell") == 0) {
         // Non-finite values are dropped, so the atomics stay finite (strike's decoder checks its
-        // own). `mode` and `fill` are Kotlin-only.
+        // own). `mode` and `fill` are Kotlin-only; `engine` and `metal` are retired and fall through.
         auto clamp = [](float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); };
         if (std::strcmp(symbol, "strike") == 0) {
             const uint32_t packed = cowbell_strike_from_port(value);
@@ -337,16 +337,18 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->cowbell_gate.store(value > 0.5f, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "grid") == 0)
             engine->cowbell_grid.store(value > 0.5f, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "bend_scale") == 0)
-            engine->cowbell_bend_scale.store(value > 0.5f, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "live") == 0)
             engine->cowbell_live.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "level") == 0)
             engine->cowbell_level.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "more") == 0)
             engine->cowbell_more.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "metal") == 0)
-            engine->cowbell_metal.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "body") == 0) {
+            if (value >= 0.0f && value <= static_cast<float>(kCowbellBodyCount - 1))
+                engine->cowbell_body.store(static_cast<int>(std::lround(value)), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "tone") == 0)
+            engine->cowbell_tone.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "ring") == 0)
             engine->cowbell_ring.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "intensity") == 0)
@@ -359,10 +361,6 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->cowbell_bend.store(clamp(value, -1.0f, 1.0f), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "grid_strength") == 0)
             engine->cowbell_grid_strength.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "engine") == 0) {
-            if (value >= -1.0f && value <= 24.0f)
-                engine->cowbell_engine.store(static_cast<int>(std::lround(value)), std::memory_order_relaxed);
-        }
         else if (std::strcmp(symbol, "octave") == 0)
             engine->cowbell_octave.store(static_cast<int>(std::lround(clamp(value, -2.0f, 2.0f))),
                                          std::memory_order_relaxed);

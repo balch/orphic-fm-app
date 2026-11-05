@@ -59,10 +59,10 @@ class VibePresetPorts(
 
     private val bellLevel = flow(CowbellSymbol.LEVEL.controlId)
     private val bellMore = flow(CowbellSymbol.MORE.controlId)
-    private val bellMetal = flow(CowbellSymbol.METAL.controlId)
+    private val bellBody = flow(CowbellSymbol.BODY.controlId)
+    private val bellTone = flow(CowbellSymbol.TONE.controlId)
     private val bellRing = flow(CowbellSymbol.RING.controlId)
     private val bellIntensity = flow(CowbellSymbol.INTENSITY.controlId)
-    private val bellEngine = flow(CowbellSymbol.ENGINE.controlId)
     private val bellOctave = flow(CowbellSymbol.OCTAVE.controlId)
     private val bellGrid = flow(CowbellSymbol.GRID.controlId)
     private val bellGridStrength = flow(CowbellSymbol.GRID_STRENGTH.controlId)
@@ -111,10 +111,10 @@ class VibePresetPorts(
         PresetField.PULSAR_SCALE to port(scale, intPort(scale)),
         PresetField.BELL_LEVEL to port(bellLevel, floatPort(bellLevel)),
         PresetField.BELL_MORE to port(bellMore, floatPort(bellMore)),
-        PresetField.BELL_METAL to port(bellMetal, floatPort(bellMetal)),
+        PresetField.BELL_BODY to port(bellBody, intPort(bellBody)),
+        PresetField.BELL_TONE to port(bellTone, floatPort(bellTone)),
         PresetField.BELL_RING to port(bellRing, floatPort(bellRing)),
         PresetField.BELL_INTENSITY to port(bellIntensity, floatPort(bellIntensity)),
-        PresetField.BELL_ENGINE to port(bellEngine, intPort(bellEngine)),
         PresetField.BELL_OCTAVE to port(bellOctave, intPort(bellOctave)),
         PresetField.BELL_GRID to port(bellGrid, boolPort(bellGrid)),
         PresetField.BELL_GRID_STRENGTH to port(bellGridStrength, floatPort(bellGridStrength)),
@@ -136,7 +136,7 @@ class VibePresetPorts(
             perc, bass, keys, fx, drive,
             hornSpeed, hornRatio, hornDepth, hornMix, hornBrake,
             energy, complexity, mood, space, deep, root, scale, envelope,
-            bellLevel, bellMore, bellMetal, bellRing, bellIntensity, bellEngine, bellOctave,
+            bellLevel, bellMore, bellBody, bellTone, bellRing, bellIntensity, bellOctave,
             bellGrid, bellGridStrength, bellMode, bellFill,
             pulsar.stateFlow.map { it.bpm }.distinctUntilChanged(),
         ) + if (captureTracks) listOf(tracks.state) else emptyList()

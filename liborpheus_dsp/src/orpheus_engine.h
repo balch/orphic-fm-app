@@ -138,6 +138,7 @@ struct CowbellBurst {
 struct CowbellUnitState {
     bool idle = false;
     int quiet_blocks = 0;  // consecutive silent blocks with no strike, gate or bend
+    int sounding_body = -1;  // the table row in force; a new body waits for a strike, the gate or idle
     bool level_started = false;  // the level smoother snaps to its first target
     float level = 0.0f;
     float more = 0.0f;           // MORE (boost past max), ramped across the block like level
@@ -157,27 +158,16 @@ struct CowbellUnitState {
     CowbellPendingStrike pending[OrpheusCowbellResonator::kMaxStrikes] = {};
     int pending_count = 0;
     int64_t last_fired_slot = -1;
-    // Exciter: the Plaits engine sounding (-1 = impulse only), adopted at a strike.
-    int exciter_engine = -1;
     bool gate_prev = false;      // cowbell_gate last block, for its rising edge
-    int tap_gate_frames = 0;     // frames left on the last TAP strike's 5 ms gate
-    float tap_level = 0.0f;      // that strike's velocity
-    float accent = 0.0f;         // the last trigger's velocity
-    float exciter_env = 0.0f;    // VCA (no envelope) or SYNTH level scale (six-op)
-    float hold_target = 1.0f;    // six-op scale: 1 for TAP, the VCA level under SYNTH, 0 after it
-    bool exciter_tail_quiet = false;  // an enveloped engine's tail fell below the floor
-    float exciter_gain = 0.0f;   // strike gain, ramped across the block
-    float noise_env = 0.0f;      // SYNTH noise level for engines whose hit decays under a held gate
+    float input_gain = 0.0f;     // strike gain on the noise bed, ramped across the block
+    float noise_env = 0.0f;      // SYNTH's noise bed level under a held gate
     float noise_lp = 0.0f;       // its one-pole low-pass state
     uint32_t noise_seed = 1u;
     CowbellBurst bursts[kCowbellMaxBursts] = {};
     uint32_t burst_seed = 1u;    // per-hit random burst centres
-    int exciter_trigger_count = 0;  // exciter hits sent to the engine, ever (tests read it)
     float bend = 0.0f;           // bend amount, smoothed at block rate
-    float exciter_bend = 0.0f;   // semitones, slewed like the resonator's own glide
     float scale_bend = 0.0f;     // BEND TO SCALE: the snapped target's own glide, in semitones
     bool scale_active = false;   // BEND TO SCALE applied last block
-    float exciter_note = 0.0f;   // the note last rendered (tests read it)
     float width = 1.0f;          // stereo width now applied (1 at polyphony 1)
     int last_fire_count = 0;     // strikes that sounded in the last block (tests read it)
 };
@@ -317,25 +307,22 @@ struct OrpheusEngine {
     // Cowbell (UNIT_COWBELL). Strikes arrive through cowbell_push_strike into these slots
     // (0 = empty); the unit drains them each block. Knob atomics are written by routing.
     OrpheusCowbellResonator cowbell_reso;
-    OrpheusVoice cowbell_exciter;  // the picked engine, rendered into the resonator's input
-    uint8_t cowbell_exciter_alloc[kVoiceAllocBytes];
-    float cowbell_exciter_buf[kMaxFrames] = {};
+    float cowbell_input_buf[kMaxFrames] = {};  // the resonator's input: the noise bed and fill bursts
     float cowbell_burst_dry_buf[kMaxFrames] = {};  // the fill bursts' dry share
     std::atomic<uint32_t> cowbell_strike_slots[OrpheusCowbellResonator::kMaxStrikes] = {};
     std::atomic<float> cowbell_level{0.7f};
     std::atomic<float> cowbell_more{0.0f};  // 0..1: a boost past max, and the DJ bus duck
-    std::atomic<float> cowbell_metal{0.84f};
-    std::atomic<float> cowbell_ring{0.0f};
-    std::atomic<float> cowbell_intensity{0.7f};
+    std::atomic<int>   cowbell_body{2};  // 0 STRING, 1 SITAR, 2 METAL, 3 SYNTH
+    std::atomic<float> cowbell_tone{0.0f};
+    std::atomic<float> cowbell_ring{0.48f};
+    std::atomic<float> cowbell_intensity{0.85f};
     std::atomic<float> cowbell_structure_offset{0.0f};  // -0.4..0.4
     std::atomic<float> cowbell_position_offset{0.0f};   // -0.45..0.45
     std::atomic<float> cowbell_bend{0.0f};              // -1..1
     std::atomic<float> cowbell_grid_strength{0.7f};
-    std::atomic<int>   cowbell_engine{-1};               // exciter engine, -1 = impulse only
     std::atomic<int>   cowbell_octave{0};               // -2..2
     std::atomic<bool>  cowbell_gate{false};
     std::atomic<bool>  cowbell_grid{true};
-    std::atomic<bool>  cowbell_bend_scale{false};  // snap the bend to Pulsar's scale while it plays
     CowbellUnitState   cowbell_state;
     PulsarGridExport   pulsar_grid;
 #ifdef ORPHEUS_TESTING

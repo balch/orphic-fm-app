@@ -39,7 +39,6 @@ class CowbellPanelRegistration(
         CowbellPanel(
             feature = feature,
             outLevel = synthEngine.cowbellOutVizFlow,
-            hasNativeEngine = synthEngine.hasNativeEngine,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

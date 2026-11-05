@@ -125,7 +125,8 @@ private class BellClock {
 
 /**
  * Zooms each mode's resting bell until it fills [fraction] of the box. Shake fits a box
- * [shakeInsetY] shorter at top and bottom, leaving room for a label under it.
+ * [shakeInsetY] shorter at top and bottom and rides up half of that, so the bell and the label
+ * under it centre as a pair.
  */
 @Immutable
 internal data class BellFit(val fraction: Float, val shakeInsetY: Dp = 0.dp)
@@ -136,7 +137,8 @@ private fun Density.restingCameras(size: Size, fit: BellFit?): Map<CowbellMode, 
         val base = BellCamera.forMode(mode)
         if (fit == null || size.width < 1f || size.height < 1f) return@associateWith base
         val inset = if (mode == CowbellMode.SHAKE) fit.shakeInsetY.toPx() else 0f
-        fittedCamera(size, base, fit.fraction, Size(size.width, max(1f, size.height - 2f * inset)))
+        val fitted = fittedCamera(size, base, fit.fraction, Size(size.width, max(1f, size.height - 2f * inset)))
+        if (inset > 0f) fitted.copy(shiftY = -inset / 2f) else fitted
     }
 
 /**

@@ -62,7 +62,7 @@ class VibePresetsViewModelTest {
     // Integer ports hold ints in the engine; the controller's 0.5 fallback would round on write-back.
     private val portValues = listOf(
         HornSymbol.BRAKE, PulsarSymbol.ROOT_NOTE, PulsarSymbol.SCALE, PulsarSymbol.ENVELOPE_MODE,
-        CowbellSymbol.ENGINE, CowbellSymbol.OCTAVE, CowbellSymbol.MODE, CowbellSymbol.FILL,
+        CowbellSymbol.BODY, CowbellSymbol.OCTAVE, CowbellSymbol.MODE, CowbellSymbol.FILL,
     ).associateTo(mutableMapOf<String, PortValue>()) { it.controlId.key to IntValue(0) }
 
     private val synth = SynthController().apply {
@@ -583,7 +583,7 @@ class VibePresetsViewModelTest {
     }
 
     private val ringId = CowbellSymbol.RING.controlId
-    private val metalId = CowbellSymbol.METAL.controlId
+    private val toneId = CowbellSymbol.TONE.controlId
 
     private val bellRing = VibePresetSlot(
         presets = listOf(VibePreset(1, "Long Ring", 10L, mapOf(PresetField.BELL_RING.key to 0.9f))),
@@ -614,7 +614,7 @@ class VibePresetsViewModelTest {
         val vm = vm(prefs)
         watch(vm)
         setPort(ringId, 0.3f)
-        setPort(metalId, 0.8f)
+        setPort(toneId, 0.8f)
         pulsar.fireApply(vibe("A"))
         setPort(ringId, 0.6f)
 
@@ -624,7 +624,7 @@ class VibePresetsViewModelTest {
 
         val saved = prefs.prefs.vibePresets.getValue("A").presets.single()
         assertEquals(0.6f, saved.values[PresetField.BELL_RING.key])
-        assertEquals(0.8f, saved.values[PresetField.BELL_METAL.key])
+        assertEquals(0.8f, saved.values[PresetField.BELL_TONE.key])
         assertEquals(mapOf(PresetField.BELL_RING.key to 0.3f), saved.originals)
         assertFalse(vm.stateFlow.value.changed)
     }
@@ -641,6 +641,30 @@ class VibePresetsViewModelTest {
 
         pulsar.fireApply(vibe("B"))
         assertEquals(0.9f, port(ringId))
+        assertFalse(vm.stateFlow.value.changed)
+    }
+
+    @Test
+    fun presetHoldingTheRetiredMetalAndEngineKeysLoadsWithoutAChange() = runTest(dispatcher) {
+        val old = VibePresetSlot(
+            presets = listOf(
+                VibePreset(
+                    1, "Old Bell", 10L,
+                    mapOf("bell.metal" to 0.2f, "bell.engine" to 5f, PresetField.BELL_RING.key to 0.9f),
+                ),
+            ),
+            selectedId = 1,
+            nextId = 2,
+        )
+        val vm = vm(prefsWith("A" to old))
+        watch(vm)
+        setPort(ringId, 0.3f)
+        setPort(toneId, 0.4f)
+
+        pulsar.fireApply(vibe("A"))
+
+        assertEquals(0.9f, port(ringId))
+        assertEquals(0.4f, port(toneId))
         assertFalse(vm.stateFlow.value.changed)
     }
 

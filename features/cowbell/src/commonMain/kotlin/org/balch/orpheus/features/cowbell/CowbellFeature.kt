@@ -43,6 +43,7 @@ import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.COWBELL_URI
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.plugins.cowbell.cowbellStrikeValue
@@ -54,28 +55,26 @@ data class CowbellUiState(
     val level: Float = 0.7f,
     /** The DJ cowbell's boost past max, 0..1: it boosts the bell and ducks the vibe. */
     val more: Float = 0f,
-    val metal: Float = 0.84f,
-    val ring: Float = 0f,
-    val intensity: Float = 0.7f,
-    /** An `OrpheusEngineId` ordinal, or -1 for the bare impulse. */
-    val engine: Int = -1,
+    val body: CowbellBody = CowbellBody.METAL,
+    val tone: Float = 0f,
+    val ring: Float = 0.48f,
+    val intensity: Float = 0.85f,
     val octave: Int = 0,
     val grid: Boolean = true,
     val gridStrength: Float = 0.7f,
     val mode: CowbellMode = CowbellMode.TAP,
     val fill: CowbellFill = CowbellFill.MARBLE,
-    /** The phone's tilt, jolts and shakes play the bell. Off by default: the bender bends, and SHAKE's fill takes taps and flings. */
-    val motion: Boolean = false,
+    /**
+     * The phone's tilt, jolts and shakes play the bell. Off by default: the bender bends, and SHAKE's fill takes taps and flings.
+     * Never saved here or in a preset: the DJ screen's saved state keeps it for the session.
+     */
+    @Transient val motion: Boolean = false,
     /** A SYNTH note is held. */
     @Transient val holding: Boolean = false,
     /** The bell's own bend, -1..1. */
     @Transient val bend: Float = 0f,
     /** The device has motion sensors, so tilt can own STRUCTURE instead of the finger. */
     @Transient val motionAvailable: Boolean = false,
-    /** The bend snaps to the playing vibe's scale. Saved in `AppPreferences`, not a preset. */
-    @Transient val bendScale: Boolean = false,
-    /** The mode chip glows until its menu (with Motion in it) has been opened a few times. */
-    @Transient val modeHint: Boolean = false,
 ) {
     /** The DJ panel's single grid knob, derived from GRID and GRID_STRENGTH so other writers show on it. */
     val lock: Float get() = lockFrom(grid, gridStrength)
@@ -84,12 +83,12 @@ data class CowbellUiState(
 /** `x` and `y` are 0..1 over the bell, `velocity` is 0..1. */
 @Immutable
 data class CowbellPanelActions(
-    val onMetal: (Float) -> Unit,
+    val onBody: (CowbellBody) -> Unit,
+    val onTone: (Float) -> Unit,
     val onRing: (Float) -> Unit,
     val onIntensity: (Float) -> Unit,
     val onLevel: (Float) -> Unit,
     val onGridStrength: (Float) -> Unit,
-    val onEngine: (Int) -> Unit,
     val onOctave: (Int) -> Unit,
     val onGrid: (Boolean) -> Unit,
     val onMode: (CowbellMode) -> Unit,
@@ -110,11 +109,9 @@ data class CowbellPanelActions(
     val onFillStrike: (packed: Float) -> Unit,
     /** LOCK 0..1 onto GRID and GRID_STRENGTH. 0 turns the grid off and keeps the strength. */
     val onLock: (Float) -> Unit,
-    val onBendScale: (Boolean) -> Unit,
     /** MORE 0..1, the DJ cowbell's boost past max. Orpheus's panels never call it. */
     val onMore: (Float) -> Unit,
     val onMotion: (Boolean) -> Unit = {},
-    val onModeMenuOpened: () -> Unit = {},
 ) {
     companion object {
         val EMPTY = CowbellPanelActions(
@@ -131,10 +128,10 @@ data class CowbellPanelActions(
 private sealed interface CowbellIntent {
     data class Level(val value: Float) : CowbellIntent
     data class More(val value: Float) : CowbellIntent
-    data class Metal(val value: Float) : CowbellIntent
+    data class Body(val value: CowbellBody) : CowbellIntent
+    data class Tone(val value: Float) : CowbellIntent
     data class Ring(val value: Float) : CowbellIntent
     data class Intensity(val value: Float) : CowbellIntent
-    data class Engine(val value: Int) : CowbellIntent
     data class Octave(val value: Int) : CowbellIntent
     data class Grid(val value: Boolean) : CowbellIntent
     data class GridStrength(val value: Float) : CowbellIntent
@@ -143,9 +140,7 @@ private sealed interface CowbellIntent {
     data class Holding(val value: Boolean) : CowbellIntent
     data class Bend(val value: Float) : CowbellIntent
     data class MotionAvailable(val value: Boolean) : CowbellIntent
-    data class BendScale(val value: Boolean) : CowbellIntent
     data class Motion(val value: Boolean) : CowbellIntent
-    data class ModeHint(val value: Boolean) : CowbellIntent
 }
 
 interface CowbellFeature : SynthFeature<CowbellUiState, CowbellPanelActions> {
@@ -179,15 +174,15 @@ interface CowbellFeature : SynthFeature<CowbellUiState, CowbellPanelActions> {
             override val markdown = """
                 # Cowbell
 
-                A struck bell voice. A bare strike, or a chosen engine, excites a metal
-                resonator, so every hit rings like a cowbell.
+                A struck bell voice. A bare strike excites a resonator, so every hit rings
+                through the body you pick.
 
                 ## Controls
-                - **BODY**: The resonator the bell plays through, from String to FM.
+                - **BODY**: The resonator the bell plays through: String, Sitar, Metal or Synth.
+                - **TONE**: The spacing of the partials within the body.
                 - **RING**: How long the bell rings after a hit.
                 - **INTENSITY**: Soft to biting. Brightens the tone and hardens the strike.
                 - **LEVEL**: Output level.
-                - **ENGINE**: Which engine excites the bell.
                 - **OCTAVE**: Shifts the bell up or down by octaves.
                 - **GRID / GRID STRENGTH**: Snaps hits to the Pulsar beat grid.
                 - **MODE**: Tap strikes once per touch. Hold sustains a note while touched.
@@ -198,10 +193,10 @@ interface CowbellFeature : SynthFeature<CowbellUiState, CowbellPanelActions> {
             """.trimIndent()
             override val portControlKeys = mapOf(
                 CowbellSymbol.LEVEL.controlId.key to "Output level",
-                CowbellSymbol.METAL.controlId.key to "Resonator body in five steps: String, Sitar, Wire, Modal, FM",
+                CowbellSymbol.BODY.controlId.key to "Resonator body (integer): 0=String, 1=Sitar, 2=Metal, 3=Synth",
+                CowbellSymbol.TONE.controlId.key to "Partial spacing within the body",
                 CowbellSymbol.RING.controlId.key to "How long the bell rings",
                 CowbellSymbol.INTENSITY.controlId.key to "Soft to biting",
-                CowbellSymbol.ENGINE.controlId.key to "Exciter engine (OrpheusEngineId ordinal, -1 is a bare impulse)",
                 CowbellSymbol.OCTAVE.controlId.key to "Octave shift, -2 to 2",
                 CowbellSymbol.GRID.controlId.key to "Snap hits to the Pulsar grid",
                 CowbellSymbol.GRID_STRENGTH.controlId.key to "How strongly hits snap to the grid",
@@ -238,10 +233,10 @@ class CowbellViewModel(
 
     private val levelFlow = synthController.controlFlow(CowbellSymbol.LEVEL.controlId)
     private val moreFlow = synthController.controlFlow(CowbellSymbol.MORE.controlId)
-    private val metalFlow = synthController.controlFlow(CowbellSymbol.METAL.controlId)
+    private val bodyFlow = synthController.controlFlow(CowbellSymbol.BODY.controlId)
+    private val toneFlow = synthController.controlFlow(CowbellSymbol.TONE.controlId)
     private val ringFlow = synthController.controlFlow(CowbellSymbol.RING.controlId)
     private val intensityFlow = synthController.controlFlow(CowbellSymbol.INTENSITY.controlId)
-    private val engineFlow = synthController.controlFlow(CowbellSymbol.ENGINE.controlId)
     private val octaveFlow = synthController.controlFlow(CowbellSymbol.OCTAVE.controlId)
     private val gridFlow = synthController.controlFlow(CowbellSymbol.GRID.controlId)
     private val gridStrengthFlow = synthController.controlFlow(CowbellSymbol.GRID_STRENGTH.controlId)
@@ -257,12 +252,6 @@ class CowbellViewModel(
     // Panels showing the bell. Composition adds and removes on the main thread.
     private var livePanels = 0
 
-    // Saved in AppPreferences like the morph; the port is written at init and on each change.
-    private val bendScale = MutableStateFlow(false)
-
-    // Unknown until the load, so the chip never glows for a user who is past the hint.
-    private val modeMenuOpens = MutableStateFlow(MODE_HINT_OPENS)
-
     // Tilt arrives every frame: only a real move reaches the engine. NaN means nothing sent yet.
     private var lastTilt = Float.NaN
 
@@ -275,12 +264,12 @@ class CowbellViewModel(
     private val io = dispatcherProvider.io
 
     override val actions = CowbellPanelActions(
-        onMetal = metalFlow.floatSetter(),
+        onBody = bodyFlow.enumSetter(),
+        onTone = toneFlow.floatSetter(),
         onRing = ringFlow.floatSetter(),
         onIntensity = intensityFlow.floatSetter(),
         onLevel = levelFlow.floatSetter(),
         onGridStrength = gridStrengthFlow.floatSetter(),
-        onEngine = engineFlow.intSetter(),
         onOctave = octaveFlow.intSetter(),
         onGrid = gridFlow.boolSetter(),
         onMode = modeFlow.enumSetter(),
@@ -296,19 +285,17 @@ class CowbellViewModel(
         onMotionAvailable = ::setMotionAvailable,
         onFillStrike = ::fillStrike,
         onLock = ::setLock,
-        onBendScale = ::setBendScale,
         onMore = moreFlow.floatSetter(),
         onMotion = ::setMotion,
-        onModeMenuOpened = ::modeMenuOpened,
     )
 
     private val controlIntents = merge(
         levelFlow.map { CowbellIntent.Level(it.asFloat()) },
         moreFlow.map { CowbellIntent.More(it.asFloat()) },
-        metalFlow.map { CowbellIntent.Metal(it.asFloat()) },
+        bodyFlow.map { CowbellIntent.Body(it.body()) },
+        toneFlow.map { CowbellIntent.Tone(it.asFloat()) },
         ringFlow.map { CowbellIntent.Ring(it.asFloat()) },
         intensityFlow.map { CowbellIntent.Intensity(it.asFloat()) },
-        engineFlow.map { CowbellIntent.Engine(it.asInt().coerceIn(ENGINE_MIN, ENGINE_MAX)) },
         octaveFlow.map { CowbellIntent.Octave(it.asInt().coerceIn(OCTAVE_MIN, OCTAVE_MAX)) },
         gridFlow.map { CowbellIntent.Grid(it.asBoolean()) },
         gridStrengthFlow.map { CowbellIntent.GridStrength(it.asFloat()) },
@@ -317,9 +304,7 @@ class CowbellViewModel(
         holding.map { CowbellIntent.Holding(it) },
         bend.map { CowbellIntent.Bend(it) },
         motionAvailable.map { CowbellIntent.MotionAvailable(it) },
-        bendScale.map { CowbellIntent.BendScale(it) },
         motion.map { CowbellIntent.Motion(it) },
-        modeMenuOpens.map { CowbellIntent.ModeHint(it < MODE_HINT_OPENS) },
     )
 
     override val stateFlow: StateFlow<CowbellUiState> =
@@ -340,11 +325,6 @@ class CowbellViewModel(
             // A tap that lands before the load wins over the saved style.
             val saved = appPreferences.load()
             morph.compareAndSet(BellMorphStyle.SHARDS, BellMorphStyle.fromName(saved.bellMorph))
-            // A toggle that lands before the load wins over the saved choice.
-            bendScale.compareAndSet(false, saved.cowbellBendScale)
-            modeMenuOpens.compareAndSet(MODE_HINT_OPENS, saved.cowbellModeMenuOpens)
-            // Safe off the main thread: the native side is an atomic store, and the plugin var is written once before any read.
-            send(CowbellSymbol.BEND_SCALE, BoolValue(bendScale.value))
         }
         persistence.bind(
             stateFlow = stateFlow,
@@ -359,16 +339,15 @@ class CowbellViewModel(
     private fun restore(saved: CowbellUiState) {
         levelFlow.value = FloatValue(saved.level)
         moreFlow.value = FloatValue(saved.more)
-        metalFlow.value = FloatValue(saved.metal)
+        toneFlow.value = FloatValue(saved.tone)
+        bodyFlow.value = IntValue(saved.body.ordinal)
         ringFlow.value = FloatValue(saved.ring)
         intensityFlow.value = FloatValue(saved.intensity)
-        engineFlow.value = IntValue(saved.engine.coerceIn(ENGINE_MIN, ENGINE_MAX))
         octaveFlow.value = IntValue(saved.octave.coerceIn(OCTAVE_MIN, OCTAVE_MAX))
         gridFlow.value = BoolValue(saved.grid)
         gridStrengthFlow.value = FloatValue(saved.gridStrength)
         modeFlow.value = IntValue(saved.mode.ordinal)
         fillFlow.value = IntValue(saved.fill.ordinal)
-        setMotion(saved.motion)
         restored.value = true
     }
 
@@ -388,12 +367,6 @@ class CowbellViewModel(
         }
     }
 
-    private fun setBendScale(on: Boolean) {
-        bendScale.value = on
-        send(CowbellSymbol.BEND_SCALE, BoolValue(on))
-        prefsScope.launch(io) { appPreferences.update { it.copy(cowbellBendScale = on) } }
-    }
-
     private fun setLock(lock: Float) {
         val (grid, strength) = lockToGrid(if (lock.isNaN()) 0f else lock)
         if (strength != null) actions.onGridStrength(strength)
@@ -406,6 +379,9 @@ class CowbellViewModel(
         prefsScope.launch(io) { appPreferences.update { it.copy(bellMorph = style.name) } }
     }
 
+    private fun PortValue.body(): CowbellBody =
+        CowbellBody.entries[asInt().coerceIn(0, CowbellBody.entries.lastIndex)]
+
     private fun PortValue.mode(): CowbellMode =
         CowbellMode.entries[asInt().coerceIn(0, CowbellMode.entries.lastIndex)]
 
@@ -413,10 +389,10 @@ class CowbellViewModel(
         when (intent) {
             is CowbellIntent.Level -> state.copy(level = intent.value)
             is CowbellIntent.More -> state.copy(more = intent.value)
-            is CowbellIntent.Metal -> state.copy(metal = intent.value)
+            is CowbellIntent.Body -> state.copy(body = intent.value)
+            is CowbellIntent.Tone -> state.copy(tone = intent.value)
             is CowbellIntent.Ring -> state.copy(ring = intent.value)
             is CowbellIntent.Intensity -> state.copy(intensity = intent.value)
-            is CowbellIntent.Engine -> state.copy(engine = intent.value)
             is CowbellIntent.Octave -> state.copy(octave = intent.value)
             is CowbellIntent.Grid -> state.copy(grid = intent.value)
             is CowbellIntent.GridStrength -> state.copy(gridStrength = intent.value)
@@ -425,9 +401,7 @@ class CowbellViewModel(
             is CowbellIntent.Holding -> state.copy(holding = intent.value)
             is CowbellIntent.Bend -> state.copy(bend = intent.value)
             is CowbellIntent.MotionAvailable -> state.copy(motionAvailable = intent.value)
-            is CowbellIntent.BendScale -> state.copy(bendScale = intent.value)
             is CowbellIntent.Motion -> state.copy(motion = intent.value)
-            is CowbellIntent.ModeHint -> state.copy(modeHint = intent.value)
         }
 
     // Gestures
@@ -489,13 +463,6 @@ class CowbellViewModel(
         if (motionAvailable.value && !tiltOwnsStructure()) send(CowbellSymbol.STRUCTURE_OFFSET, FloatValue(0f))
     }
 
-    private fun modeMenuOpened() {
-        val opens = modeMenuOpens.value
-        if (opens >= MODE_HINT_OPENS) return
-        modeMenuOpens.value = opens + 1
-        prefsScope.launch(io) { appPreferences.update { it.copy(cowbellModeMenuOpens = opens + 1) } }
-    }
-
     /** Tilt writes STRUCTURE with sensors and [CowbellUiState.motion] on; else the finger does. */
     private fun tiltOwnsStructure(): Boolean = motionAvailable.value && motion.value
 
@@ -520,9 +487,6 @@ class CowbellViewModel(
     }
 
     companion object {
-        internal const val MODE_HINT_OPENS = 3
-        private const val ENGINE_MIN = -1
-        private const val ENGINE_MAX = 24
         private const val OCTAVE_MIN = -2
         private const val OCTAVE_MAX = 2
 

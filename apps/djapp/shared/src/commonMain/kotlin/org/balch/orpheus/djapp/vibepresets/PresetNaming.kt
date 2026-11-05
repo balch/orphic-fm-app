@@ -35,7 +35,7 @@ private fun String.titleCase(): String =
 private const val BPM_SPAN = 40f
 
 private val BELL_SWITCHES = setOf(
-    PresetField.BELL_ENGINE, PresetField.BELL_OCTAVE, PresetField.BELL_GRID, PresetField.BELL_MODE, PresetField.BELL_FILL,
+    PresetField.BELL_BODY, PresetField.BELL_OCTAVE, PresetField.BELL_GRID, PresetField.BELL_MODE, PresetField.BELL_FILL,
 )
 
 // Fields that jump between values (switches, note and scale indexes) count as a full move.

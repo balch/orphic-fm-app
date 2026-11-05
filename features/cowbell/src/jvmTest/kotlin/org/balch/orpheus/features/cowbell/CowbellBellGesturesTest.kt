@@ -369,7 +369,9 @@ class CowbellBellGesturesTest {
         val kicks = mutableListOf<Pair<Float, Float>>()
         val calls = mutableListOf<String>()
         val bends = mutableListOf<Float>()
+        var left = 0
         override fun pointerTilt(x: Float, y: Float) { tilts += x to y }
+        override fun pointerLeft() { left++ }
         override fun kick(dx: Float, dy: Float) { kicks += dx to dy }
         override fun plunge(bend: Float) { calls += "plunge"; bends += bend }
         override fun release(bend: Float) { calls += "release"; bends += bend }
@@ -443,6 +445,18 @@ class CowbellBellGesturesTest {
             s.press(s.bell().center)
             assertEquals(1, recording.calls.count { it == "strike" })
             assertTrue(shake.kicks.isEmpty())
+        }
+    }
+
+    @Test
+    fun theMouseLeavingLetsTheLeanGo() {
+        val shake = RecordingShake()
+        shakeScene(RecordingActions(), shake).use { s ->
+            val bell = s.bell()
+            s.move(bell.center)
+            assertEquals(0, shake.left)
+            s.pointer(PointerEventType.Exit, Offset(bell.right + 20f, bell.center.y))
+            assertEquals(1, shake.left)
         }
     }
 

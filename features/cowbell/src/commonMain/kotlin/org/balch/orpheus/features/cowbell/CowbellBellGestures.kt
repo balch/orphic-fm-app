@@ -214,7 +214,7 @@ private class BellGesture(
         // A hovering pointer has no previous position of its own, so keep it here.
         val before = lastMouse
         lastMouse = if (event.type == PointerEventType.Exit) Offset.Unspecified else change.position
-        if (event.type != PointerEventType.Exit) tiltFrom(change.position)
+        if (event.type == PointerEventType.Exit) shake.pointerLeft() else tiltFrom(change.position)
         if (before.isSpecified && change.position != before && mode.value == CowbellMode.SHAKE) {
             val d = change.position - before
             shake.kick(d.x / density.density, d.y / density.density)

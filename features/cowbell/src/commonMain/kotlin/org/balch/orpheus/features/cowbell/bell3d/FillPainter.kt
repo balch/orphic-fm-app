@@ -106,7 +106,7 @@ internal class FillPainter {
         for (i in 1 until rim.size) clip.lineTo(rim[i].x, rim[i].y)
         clip.close()
         val cx = scope.size.width / 2f
-        val cy = scope.size.height / 2f
+        val cy = scope.size.height / 2f + camera.shiftY
         val scale = frame.scale
         with(scope) {
             clipPath(clip) {

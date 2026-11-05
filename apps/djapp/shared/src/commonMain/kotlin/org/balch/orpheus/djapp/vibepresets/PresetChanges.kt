@@ -1,7 +1,7 @@
 package org.balch.orpheus.djapp.vibepresets
 
-import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.cowbell.label
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import kotlin.math.abs
@@ -32,7 +32,9 @@ private fun PresetChange.format(v: Float): String = when {
         field == PresetField.BELL_GRID ||
         field.key.endsWith(".mute") ||
         field.key.endsWith(".solo") -> if (v >= 0.5f) "on" else "off"
-    field == PresetField.BELL_ENGINE -> OrpheusEngineId.entries.getOrNull(v.roundToInt())?.displayName ?: "None"
+    field == PresetField.BELL_BODY ->
+        CowbellBody.entries[v.roundToInt().coerceIn(0, CowbellBody.entries.lastIndex)]
+            .name.lowercase().replaceFirstChar { it.uppercase() }
     field == PresetField.BELL_OCTAVE -> v.roundToInt().let { if (it > 0) "+$it" else "$it" }
     field == PresetField.BELL_MODE ->
         CowbellMode.entries[v.roundToInt().coerceIn(0, CowbellMode.entries.lastIndex)].label

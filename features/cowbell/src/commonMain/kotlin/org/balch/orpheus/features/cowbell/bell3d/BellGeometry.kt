@@ -23,13 +23,20 @@ internal data class Vec3(val x: Float, val y: Float, val z: Float) {
     }
 }
 
-/** View angles in degrees; `zoom` multiplies the fitted scale. */
-internal data class BellCamera(val pitch: Float, val yaw: Float, val roll: Float, val zoom: Float = 1f) {
+/** View angles in degrees; `zoom` multiplies the fitted scale; `shiftY` moves the bell down the box, in px. */
+internal data class BellCamera(
+    val pitch: Float,
+    val yaw: Float,
+    val roll: Float,
+    val zoom: Float = 1f,
+    val shiftY: Float = 0f,
+) {
     fun lerp(to: BellCamera, t: Float): BellCamera = BellCamera(
         pitch = pitch + (to.pitch - pitch) * t,
         yaw = yaw + (to.yaw - yaw) * t,
         roll = roll + (to.roll - roll) * t,
         zoom = zoom + (to.zoom - zoom) * t,
+        shiftY = shiftY + (to.shiftY - shiftY) * t,
     )
 
     companion object
@@ -87,13 +94,13 @@ internal data class Projected(val x: Float, val y: Float, val s: Float)
  * Perspective projection into a box. The scale is px per model unit, fitted so every view of the
  * bell stays inside the box; the divisors (2.4 wide, 3.6 tall) are the plan's, unchanged.
  */
-internal class BellProjector(private val size: Size, camera: BellCamera) {
+internal class BellProjector(private val size: Size, private val camera: BellCamera) {
     val scale: Float = min(size.width / WIDE_UNITS, size.height / TALL_UNITS) * camera.zoom
     val isEmpty: Boolean = !(size.width >= 1f && size.height >= 1f)
 
     fun project(v: Vec3): Projected {
         val s = FOC / (CAMD - v.z)
-        return Projected(size.width / 2f + v.x * s * scale, size.height / 2f - v.y * s * scale, s)
+        return Projected(size.width / 2f + v.x * s * scale, size.height / 2f + camera.shiftY - v.y * s * scale, s)
     }
 
     private companion object {

@@ -3,6 +3,7 @@ package org.balch.orpheus.features.cowbell.dj
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -11,16 +12,14 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -36,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigationevent.DirectNavigationEventInput
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import org.balch.orpheus.features.cowbell.CowbellBodySelector
+import org.balch.orpheus.features.cowbell.CowbellBodyTag
 import org.balch.orpheus.features.cowbell.CowbellPanelActions
 import org.balch.orpheus.features.cowbell.CowbellUiState
 import org.balch.orpheus.features.cowbell.laidOut
@@ -43,6 +44,7 @@ import org.balch.orpheus.features.cowbell.text
 import org.balch.orpheus.features.cowbell.textOverflows
 import org.balch.orpheus.features.cowbell.textWidthShortfall
 import org.balch.orpheus.features.cowbell.walk
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -62,15 +64,13 @@ class CowbellControlsTest {
 
     private class Calls {
         val modes = mutableListOf<CowbellMode>()
-        val engines = mutableListOf<Int>()
+        val bodies = mutableListOf<CowbellBody>()
         val octaves = mutableListOf<Int>()
         val levels = mutableListOf<Float>()
         val mores = mutableListOf<Float>()
         val grids = mutableListOf<Boolean>()
         val locks = mutableListOf<Float>()
-        val bendScales = mutableListOf<Boolean>()
         val motions = mutableListOf<Boolean>()
-        var modeMenuOpens = 0
         val fills = mutableListOf<CowbellFill>()
         val haptics = mutableListOf<HapticFeedbackType>()
         var releases = 0
@@ -83,15 +83,13 @@ class CowbellControlsTest {
 
         val actions = CowbellPanelActions.EMPTY.copy(
             onMode = { modes += it },
-            onEngine = { engines += it },
+            onBody = { bodies += it },
             onOctave = { octaves += it },
             onLevel = { levels += it },
             onMore = { mores += it },
             onGrid = { grids += it },
             onLock = { locks += it },
-            onBendScale = { bendScales += it },
             onMotion = { motions += it },
-            onModeMenuOpened = { modeMenuOpens++ },
             onFill = { fills += it },
             releaseAll = { releases++ },
         )
@@ -114,7 +112,24 @@ class CowbellControlsTest {
             ) {
                 OrpheusTheme {
                     Box(Modifier.size(width.dp, height.dp)) {
-                        CowbellControlColumn(state, calls.actions, hasNativeEngine = true)
+                        CowbellControlColumn(state, calls.actions)
+                    }
+                }
+            }
+        }
+        waitForIdle()
+    }
+
+    /** The selector alone: it sits over the bell, not in this column. */
+    private fun ComposeUiTest.showSelector(calls: Calls, state: CowbellUiState = CowbellUiState()) {
+        setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, 1f),
+                LocalHapticFeedback provides calls.hapticFeedback,
+            ) {
+                OrpheusTheme {
+                    Box(Modifier.size(140.dp, 60.dp)) {
+                        CowbellBodySelector(state.body, calls.actions.onBody)
                     }
                 }
             }
@@ -147,54 +162,87 @@ class CowbellControlsTest {
     }
 
     @Test
-    fun openingTheModeMenuCountsTowardTheHint() = runComposeUiTest {
-        val calls = Calls()
-        show(calls, CowbellUiState(modeHint = true))
-        chip(CowbellCtlModeTag).performClick()
-        assertEquals(1, calls.modeMenuOpens)
-    }
-
-    @Test
-    fun modeMenuHasNoMotionWithoutSensors() = runComposeUiTest {
+    fun noMotionToggleWithoutSensors() = runComposeUiTest {
         show(Calls())
-        chip(CowbellCtlModeTag).performClick()
-        waitForIdle()
         onNodeWithTag(CowbellCtlMotionTag).assertDoesNotExist()
     }
 
     @Test
-    fun modeMenuTurnsMotionOn() = runComposeUiTest {
+    fun motionToggleTurnsOn() = runComposeUiTest {
         val calls = Calls()
         show(calls, CowbellUiState(motionAvailable = true))
+        onNodeWithText("Motion off").performClick()
+        assertEquals(listOf(true), calls.motions)
+    }
+
+    @Test
+    fun theModeMenuNoLongerHoldsMotion() = runComposeUiTest {
+        show(Calls(), CowbellUiState(motionAvailable = true))
         chip(CowbellCtlModeTag).performClick()
         waitForIdle()
-        onNodeWithText("Motion off").performClick()
-        waitForIdle()
-        assertEquals(listOf(true), calls.motions)
-        onNodeWithTag(CowbellCtlMotionTag).assertDoesNotExist()
+        onAllNodesWithText("Motion off").assertCountEquals(1)
     }
 
     @Test
     fun shakeCanTurnMotionOff() = runComposeUiTest {
         val calls = Calls()
         show(calls, CowbellUiState(mode = CowbellMode.SHAKE, motion = true, motionAvailable = true))
-        chip(CowbellCtlModeTag).performClick()
-        waitForIdle()
         onNodeWithText("Motion on").performClick()
         assertEquals(listOf(false), calls.motions)
     }
 
     @Test
-    fun engineTapOpensThePicker() = runComposeUiTest {
+    fun theSelectorListsAllFourBodiesAndPicksOne() = runComposeUiTest {
         val calls = Calls()
-        show(calls)
-        val picker = SemanticsMatcher("the engine picker") { node ->
-            node.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("$CowbellCtlEngineTag-") == true
-        }
-        assertEquals(0, onAllNodes(picker).fetchSemanticsNodes().size, "the picker is open already")
-        chip(CowbellCtlEngineTag).performClick()
+        showSelector(calls)
+        chip(CowbellBodyTag).performClick()
         waitForIdle()
-        assertTrue(onAllNodes(picker).fetchSemanticsNodes().isNotEmpty(), "the picker did not open")
+        for (item in listOf("String", "Sitar", "Synth")) onNodeWithText(item).assertExists()
+        assertEquals(2, onAllNodesWithText("Metal").fetchSemanticsNodes().size, "Metal on the chip and in the menu")
+        onNodeWithText("Sitar").performClick()
+        waitForIdle()
+        assertEquals(listOf(CowbellBody.SITAR), calls.bodies)
+        onNodeWithText("Synth").assertDoesNotExist()
+    }
+
+    @Test
+    fun theSelectorReadsTheLiveBody() = runComposeUiTest {
+        val body = mutableStateOf(CowbellBody.STRING)
+        setContent {
+            OrpheusTheme {
+                Box(Modifier.size(ColumnWidth.dp, 40.dp)) {
+                    CowbellBodySelector(body.value, {})
+                }
+            }
+        }
+        for ((entry, name) in listOf(
+            CowbellBody.STRING to "String",
+            CowbellBody.SITAR to "Sitar",
+            CowbellBody.METAL to "Metal",
+            CowbellBody.SYNTH to "Synth",
+        )) {
+            body.value = entry
+            waitForIdle()
+            onNodeWithText(name).assertExists()
+        }
+    }
+
+    @Test
+    fun okOpensTheSelector() = runComposeUiTest {
+        showSelector(Calls())
+        val selector = chip(CowbellBodyTag)
+        selector.performSemanticsAction(SemanticsActions.RequestFocus)
+        waitForIdle()
+        selector.performKeyInput { pressKey(Key.DirectionCenter) }
+        waitForIdle()
+        onNodeWithText("Sitar").assertExists()
+    }
+
+    @Test
+    fun theColumnHasNeitherTheSelectorNorAnEngineChip() = runComposeUiTest {
+        show(Calls())
+        onNodeWithTag(CowbellBodyTag).assertDoesNotExist()
+        onNodeWithTag("cowbell-ctl-engine").assertDoesNotExist()
     }
 
     @Test
@@ -207,24 +255,6 @@ class CowbellControlsTest {
         onNodeWithText("+1").performClick()
         waitForIdle()
         assertEquals(listOf(1), calls.octaves)
-    }
-
-    @Test
-    fun bendTapFlipsScale() = runComposeUiTest {
-        val calls = Calls()
-        show(calls, CowbellUiState(bendScale = false))
-        onNodeWithText("Bend Free").assertExists()
-        chip(CowbellCtlBendTag).performClick()
-        assertEquals(listOf(true), calls.bendScales)
-    }
-
-    @Test
-    fun bendScaleReadsScale() = runComposeUiTest {
-        val calls = Calls()
-        show(calls, CowbellUiState(bendScale = true))
-        onNodeWithText("Bend Scale").assertExists()
-        chip(CowbellCtlBendTag).performClick()
-        assertEquals(listOf(false), calls.bendScales)
     }
 
     @Test
@@ -510,7 +540,7 @@ class CowbellControlsTest {
         onNodeWithText("Shake").performClick()
         chip(CowbellCtlLevelTag).performClick()
         waitForIdle()
-        chip(CowbellCtlEngineTag).performClick()
+        chip(CowbellCtlOctaveTag).performClick()
         waitForIdle()
         assertEquals(0, calls.releases, "a popup released a held note")
     }
@@ -519,16 +549,19 @@ class CowbellControlsTest {
     fun columnFitsAtFontScale13() = runComposeUiTest {
         // The longest text each chip can show.
         val states = listOf(
-            CowbellUiState(mode = CowbellMode.SHAKE, engine = -1, octave = -2, level = 1f, grid = true, gridStrength = 1f, bendScale = true),
-            CowbellUiState(mode = CowbellMode.SYNTH, engine = 2, octave = 2, level = 0.7f, grid = false, bendScale = false),
+            CowbellUiState(mode = CowbellMode.SHAKE, octave = -2, level = 1f, grid = true, gridStrength = 1f),
+            CowbellUiState(mode = CowbellMode.SYNTH, body = CowbellBody.SITAR, octave = 2, level = 0.7f, grid = false),
+            // All five chips at once.
+            CowbellUiState(mode = CowbellMode.SHAKE, octave = -2, level = 1f, grid = true, gridStrength = 1f, motionAvailable = true),
             // The Vol chip becomes the longest one: "More 200".
-            CowbellUiState(mode = CowbellMode.SHAKE, engine = -1, level = 1f, more = 1f, grid = true, gridStrength = 1f),
+            CowbellUiState(mode = CowbellMode.SHAKE, level = 1f, more = 1f, grid = true, gridStrength = 1f),
         )
         for (state in states) {
             val calls = Calls()
             show(calls, state, width = ColumnWidth, height = 205, fontScale = 1.3f)
             val what = "${ColumnWidth}x205 @1.3 $state"
-            val tags = listOf(CowbellCtlModeTag, CowbellCtlEngineTag, CowbellCtlOctaveTag, CowbellCtlLevelTag, CowbellCtlLockTag, CowbellCtlBendTag)
+            val tags = listOf(CowbellCtlModeTag, CowbellCtlOctaveTag, CowbellCtlLevelTag, CowbellCtlLockTag) +
+                if (state.motionAvailable) listOf(CowbellCtlMotionTag) else emptyList()
             val bounds = tags.map { tag -> tag to onNodeWithTag(tag).fetchSemanticsNode().laidOut }
             for ((tag, b) in bounds) {
                 assertTrue(b.left >= -0.5f && b.top >= -0.5f && b.right <= ColumnWidth + 0.5f && b.bottom <= 205.5f, "$what: $tag $b leaves the column")
@@ -538,7 +571,7 @@ class CowbellControlsTest {
                 assertTrue(a.second.bottom <= b.second.top + 0.5f, "$what: ${a.first} overlaps ${b.first}")
             }
             val texts = onRoot(useUnmergedTree = true).fetchSemanticsNode().walk().filter { it.text().isNotBlank() }
-            assertTrue(texts.size >= 6, "$what: only ${texts.map { it.text() }}")
+            assertTrue(texts.size >= 4, "$what: only ${texts.map { it.text() }}")
             for (node in texts) {
                 assertFalse(node.textOverflows(), "$what: '${node.text()}' wants ${node.textWidthShortfall()}px more than it gets (${node.size.width}px)")
                 val b = node.laidOut

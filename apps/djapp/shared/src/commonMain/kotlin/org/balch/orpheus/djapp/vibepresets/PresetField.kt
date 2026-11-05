@@ -66,10 +66,10 @@ enum class PresetField(val key: String, val module: PresetModule, val label: Str
 
     BELL_LEVEL("bell.level", PresetModule.BELL, "LEVEL"),
     BELL_MORE("bell.more", PresetModule.BELL, "MORE"),
-    BELL_METAL("bell.metal", PresetModule.BELL, "BODY"),
+    BELL_BODY("bell.body", PresetModule.BELL, "BODY"),
+    BELL_TONE("bell.tone", PresetModule.BELL, "TONE"),
     BELL_RING("bell.ring", PresetModule.BELL, "RING"),
     BELL_INTENSITY("bell.intensity", PresetModule.BELL, "INTENSITY"),
-    BELL_ENGINE("bell.engine", PresetModule.BELL, "ENGINE"),
     BELL_OCTAVE("bell.octave", PresetModule.BELL, "OCTAVE"),
     BELL_GRID("bell.grid", PresetModule.BELL, "GRID"),
     BELL_GRID_STRENGTH("bell.gridStrength", PresetModule.BELL, "STRENGTH"),

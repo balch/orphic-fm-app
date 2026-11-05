@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -59,10 +62,12 @@ import org.balch.orpheus.features.cowbell.BellBendFader
 import org.balch.orpheus.features.cowbell.BellFit
 import org.balch.orpheus.features.cowbell.BellMorphStyle
 import org.balch.orpheus.features.cowbell.CowbellBell3D
+import org.balch.orpheus.features.cowbell.CowbellBodySelector
 import org.balch.orpheus.features.cowbell.CowbellFeature
 import org.balch.orpheus.features.cowbell.CowbellKnob
 import org.balch.orpheus.features.cowbell.CowbellPanelActions
 import org.balch.orpheus.features.cowbell.CowbellPanelColor
+import org.balch.orpheus.features.cowbell.CowbellSelectorHeight
 import org.balch.orpheus.features.cowbell.CowbellUiState
 import org.balch.orpheus.features.cowbell.CowbellViewModel
 import org.balch.orpheus.features.cowbell.NoLevel
@@ -74,7 +79,7 @@ internal const val CowbellDjPanelTag = "cowbell-dj-panel"
 internal const val CowbellDjKnobsTag = "cowbell-dj-knobs"
 internal const val CowbellDjBellTag = "cowbell-dj-bell"
 internal const val CowbellDjFaderTag = "cowbell-dj-fader"
-internal const val CowbellDjMetalTag = "cowbell-dj-knob-metal"
+internal const val CowbellDjToneTag = "cowbell-dj-knob-tone"
 internal const val CowbellDjRingTag = "cowbell-dj-knob-ring"
 internal const val CowbellDjIntensityTag = "cowbell-dj-knob-intensity"
 internal const val CowbellDjCollapseTag = "cowbell-dj-collapse"
@@ -103,6 +108,12 @@ private const val COLLAPSED_BELL_ASPECT = 0.6f
 
 private const val COLLAPSE_MILLIS = 320
 
+/** The band over the bell the selector takes. The fader leaves it too, so bell and fader stay level. */
+internal val DjSelectorBand = CollapsePillTop + CowbellSelectorHeight
+
+/** Collapsed, the pill shrinks to its chevron so the selector over the bell clears it on a narrow panel. */
+internal val CollapsePillCollapsedWidth = 34.dp
+
 /** Between the drawn Shake bell and the Fill dropdown under it. */
 private val FILL_GAP = 8.dp
 
@@ -119,20 +130,19 @@ private const val FADER_THUMB_WIDTH = 44
 private val FADER_END_INSET = 8.dp
 
 /**
- * The DJ app's cowbell in four full-height columns: the controls (mode dropdown over small
- * chips), the BODY (the metal port), RING and INTENSITY knobs stacked, the bell (with the Fill dropdown under it
- * in Shake) and the bend fader. Nothing scrolls and nothing opens over the bell, so a hand that is
+ * The DJ app's cowbell in four full-height columns: the controls (a mode dropdown over small
+ * chips), the TONE, RING and INTENSITY knobs stacked, the bell (the body selector centred over it,
+ * and the Fill dropdown under it in Shake) and the bend fader. Nothing scrolls and nothing opens over the bell, so a hand that is
  * playing is not interrupted. When width is short the bell column gives up width first.
  *
- * A handle beside the bell slides the controls and knobs away; the bell and fader then grow into
- * the room and sit centred. It starts expanded.
+ * A handle beside the bell slides the controls and knobs away; the selector, bell and fader then
+ * grow into the room and sit centred. It starts expanded.
  */
 @Composable
 fun CowbellDjPanel(
     feature: CowbellFeature,
     modifier: Modifier = Modifier,
     outLevel: StateFlow<Float> = NoLevel,
-    hasNativeEngine: Boolean = true,
 ) {
     val state = feature.stateFlow.collectAsStateWithLifecycle()
     // Everything but the bend, which moves at drag rate: only the bell's draw phase reads that.
@@ -159,7 +169,7 @@ fun CowbellDjPanel(
     )
     val leftShown by remember { derivedStateOf { open.value > 0f } }
 
-    // Composed in reading order (pill, controls, knobs, bell, fader), so Tab and focus search follow it.
+    // Composed in reading order (pill, controls, knobs, selector, bell, fader), so Tab and focus search follow it.
     Box(modifier.testTag(CowbellDjPanelTag)) {
         CollapsePill(
             expanded = expanded,
@@ -178,17 +188,9 @@ fun CowbellDjPanel(
             horizontalArrangement = Arrangement.spacedBy(COLUMN_GAP, Alignment.CenterHorizontally),
         ) {
             if (leftShown) {
-                Row(
-                    modifier = Modifier.fillMaxHeight().slideAway { open.value },
-                    horizontalArrangement = Arrangement.spacedBy(COLUMN_GAP),
-                ) {
-                    CowbellControlColumn(
-                        state = controls.value,
-                        actions = actions,
-                        hasNativeEngine = hasNativeEngine,
-                        modifier = Modifier.width(DjControlsWidth).fillMaxHeight(),
-                    )
-                    DjKnobs(controls, actions, Modifier.fillMaxHeight())
+                ChipsBesideKnobs(Modifier.fillMaxHeight().slideAway { open.value }) {
+                    CowbellControlColumn(state = controls.value, actions = actions)
+                    DjKnobs(controls, actions)
                 }
             }
             DjBell(
@@ -196,7 +198,7 @@ fun CowbellDjPanel(
                 modifier = Modifier.weight(1f, fill = false).capWhenCollapsed { open.value }.fillMaxHeight(),
             )
             // The track flexes with a short slot up to its cap. Without the arrows the widget is exactly this tall.
-            BoxWithConstraints(Modifier.fillMaxHeight().padding(end = FADER_END_INSET), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(Modifier.fillMaxHeight().padding(top = DjSelectorBand, end = FADER_END_INSET), contentAlignment = Alignment.Center) {
                 BellBendFader(
                     state = state,
                     actions = actions,
@@ -206,6 +208,29 @@ fun CowbellDjPanel(
                     showArrows = false,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The chips and the knobs side by side, the knobs centred. The chips run from TONE's top to the
+ * bottom of the last knob, which also keeps Mode from taking TONE's D-pad Down. In a short slot
+ * they start under the collapse pill instead, and never close up past [ChipsMinHeight].
+ */
+@Composable
+private fun ChipsBesideKnobs(modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { (chips, knobs), constraints ->
+        val height = constraints.maxHeight
+        val knobStack = knobs.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity))
+        val knobTop = (height - knobStack.height) / 2
+        val bottom = knobTop + knobStack.height
+        val span = max(bottom - max(knobTop, ControlsTopClearance.roundToPx()), ChipsMinHeight.roundToPx())
+        val chipWidth = DjControlsWidth.roundToPx()
+        val chipColumn = chips.measure(Constraints.fixed(chipWidth, span))
+        val gap = COLUMN_GAP.roundToPx()
+        layout(chipWidth + gap + knobStack.width, height) {
+            chipColumn.placeRelative(0, min(bottom, height) - span)
+            knobStack.placeRelative(chipWidth + gap, knobTop)
         }
     }
 }
@@ -240,7 +265,10 @@ private fun Modifier.capWhenCollapsed(open: () -> Float): Modifier = layout { me
     layout(w, p.height) { p.placeRelative(0, 0) }
 }
 
-/** A chip-wide pill with a chevron: it points left to tuck the controls away and right to bring them back. */
+/**
+ * A chip-wide pill with a chevron: it points left to tuck the controls away and right to bring them
+ * back. It narrows with [open], read in layout, so the slide recomposes nothing.
+ */
 @Composable
 private fun CollapsePill(
     expanded: Boolean,
@@ -253,7 +281,13 @@ private fun CollapsePill(
         Box(
             Modifier
                 .testTag(CowbellDjCollapseTag)
-                .size(DjControlsWidth, CollapsePillHeight)
+                .height(CollapsePillHeight)
+                .layout { measurable, constraints ->
+                    val narrow = CollapsePillCollapsedWidth.toPx()
+                    val width = (narrow + (DjControlsWidth.toPx() - narrow) * open()).roundToInt()
+                    val p = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                    layout(p.width, p.height) { p.placeRelative(0, 0) }
+                }
                 .clip(shape)
                 .background(CowbellPanelColor.copy(alpha = 0.15f))
                 .border(1.dp, CowbellPanelColor.copy(alpha = 0.45f), shape)
@@ -277,16 +311,7 @@ private fun CollapsePill(
     }
 }
 
-/**
- * The resonator BODY (the metal port) is playing: it steps through five equal segments (cowbell_macros.h), the
- * string twice, its second time with more structure.
- */
-internal fun metalModeName(metal: Float): String =
-    MetalModes[(metal.coerceIn(0f, 1f) * MetalModes.size).toInt().coerceAtMost(MetalModes.lastIndex)]
-
-private val MetalModes = listOf("String", "Sitar", "Wire", "Modal", "FM")
-
-/** BODY, RING and INTENSITY, small and close, centred in their column. */
+/** TONE, RING and INTENSITY, small and close, centred in their column. */
 @Composable
 private fun DjKnobs(
     controls: State<CowbellUiState>,
@@ -303,9 +328,8 @@ private fun DjKnobs(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CowbellKnob(
-            s.metal, actions.onMetal, "BODY", CowbellSymbol.METAL,
-            formatter = ::metalModeName,
-            modifier = Modifier.testTag(CowbellDjMetalTag), size = DjKnobSize,
+            s.tone, actions.onTone, "TONE", CowbellSymbol.TONE,
+            modifier = Modifier.testTag(CowbellDjToneTag), size = DjKnobSize,
             labelStyle = labelStyle, valueStyle = valueStyle,
         )
         CowbellKnob(
@@ -322,8 +346,8 @@ private fun DjKnobs(
 }
 
 /**
- * The bell over the column's full height, so its centre lines up with the other columns. In Shake
- * the bell fits a box one Fill chip shorter top and bottom, and the Fill dropdown sits just under it.
+ * The body selector centred over the bell, which takes the rest of the column. In Shake the bell
+ * fits a box one Fill chip shorter top and bottom, and the Fill dropdown sits just under it.
  */
 @Composable
 private fun DjBell(
@@ -338,27 +362,34 @@ private fun DjBell(
     val latestOpen = rememberUpdatedState(open)
     val fit = remember { { djBellFit(latestOpen.value()) } }
     val bellBounds = remember { mutableStateOf(Rect.Zero) }
-    Box(modifier = modifier.testTag(CowbellDjBellTag)) {
-        CowbellBell3D(
-            mode = mode,
-            actions = actions,
-            bend = { state.value.bend },
-            fill = controls.value.fill,
-            outLevel = outLevel,
-            morphStyle = BellMorphStyle.SHARDS,
-            motionOn = controls.value.motion,
-            modifier = Modifier.fillMaxSize(),
-            fit = fit,
-            onRestingBounds = { bellBounds.value = it },
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        CowbellBodySelector(
+            body = controls.value.body,
+            onBody = actions.onBody,
+            modifier = Modifier.padding(top = CollapsePillTop),
         )
-        if (mode == CowbellMode.SHAKE) {
-            // The wrapper takes the bell's box, so the learn frame spans the chip only.
-            Box(Modifier.underBell { bellBounds.value }) {
-                FillDropdown(
-                    fill = controls.value.fill,
-                    onFill = actions.onFill,
-                    modifier = Modifier.width(DjControlsWidth),
-                )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth().testTag(CowbellDjBellTag)) {
+            CowbellBell3D(
+                mode = mode,
+                actions = actions,
+                bend = { state.value.bend },
+                fill = controls.value.fill,
+                outLevel = outLevel,
+                morphStyle = BellMorphStyle.SHARDS,
+                motionOn = controls.value.motion,
+                modifier = Modifier.fillMaxSize(),
+                fit = fit,
+                onRestingBounds = { bellBounds.value = it },
+            )
+            if (mode == CowbellMode.SHAKE) {
+                // The wrapper takes the bell's box, so the learn frame spans the chip only.
+                Box(Modifier.underBell { bellBounds.value }) {
+                    FillDropdown(
+                        fill = controls.value.fill,
+                        onFill = actions.onFill,
+                        modifier = Modifier.width(DjControlsWidth),
+                    )
+                }
             }
         }
     }

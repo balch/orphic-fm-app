@@ -36,7 +36,7 @@ class CowbellPanelRecompositionTest {
             assertEquals(before, compositions, "the controls recomposed on a bend")
 
             // A knob change still reaches them.
-            state.value = state.value.copy(metal = 0.1f)
+            state.value = state.value.copy(tone = 0.1f)
             s.frame()
             assertEquals(before + 1, compositions)
         }

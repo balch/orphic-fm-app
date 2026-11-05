@@ -337,6 +337,7 @@ if(BUILD_TESTS)
         test/test_cowbell_resonator.cpp
         test/test_cowbell_unit.cpp
         test/test_cowbell_spike.cpp
+        test/test_cowbell_samples.cpp
         test/test_tides.cpp
         test/test_pulsar.cpp
         test/test_pulsar_bus.cpp

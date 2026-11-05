@@ -484,7 +484,6 @@ double bench_fills(volatile float* sink) {
         unit->type = UNIT_COWBELL;
         unit_init(unit.get(), static_cast<float>(kBenchSr));
         const char* uri = "org.balch.orpheus.plugins.cowbell";
-        orpheus_engine_set_port(engine, uri, "engine", -1.0f);
         orpheus_engine_set_port(engine, uri, "level", 0.8f);
         uint32_t seed = 7u;
         auto velocity = [&seed] {
@@ -543,7 +542,7 @@ bool run_cowbell_bench() {
         row(fmt("new model %d (%s) x4, held saw, structure sweep", m, kNewModelNames[m]),
             bench_new(m, 4, true, &sink));
     }
-    // The whole unit under the fill storm (resonator, exciter bookkeeping and 16 bursts).
+    // The whole unit under the fill storm (resonator, noise bed and 16 bursts).
     row("unit, fills (45 SEEDS + 5 body hits per 128 frames)", bench_fills(&sink));
     if (tsv) fclose(tsv);
     (void)sink;

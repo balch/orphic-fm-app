@@ -39,54 +39,74 @@ bool near(float a, float b, float tol) { return std::fabs(a - b) <= tol; }
 
 void test_macros_defaults() {
     printf("\n--- macros_defaults ---\n");
-    const CowbellParams p = cowbell_macros(0.7f, 0.5f, 0.6f);
-    CHECK(p.model == 0);
-    CHECK(p.polyphony == 2);
-    CHECK(near(p.structure, 0.525f, 1e-4f));
-    CHECK(near(p.damping, 0.65f, 1e-4f));
-    CHECK(near(p.brightness, 0.585f, 1e-4f));
-    CHECK(near(p.strike_gain, 0.35f + 0.65f * 0.6f, 1e-4f));
+    // The shipped default: METAL body, TONE 0, RING 0.48, INTENSITY 0.85.
+    const CowbellParams d = cowbell_macros(2, 0.0f, 0.48f, 0.85f);
+    CHECK(d.model == 0 && near(d.structure, 0.25f, 1e-4f) && near(d.damping, 0.5289f, 1e-4f));
+    CHECK(near(d.brightness, 0.44f + 0.40f * 0.85f - 0.15f * 0.48f, 1e-4f));
+    CHECK(near(d.strike_gain, 0.35f + 0.65f * 0.85f, 1e-4f));
+    CHECK(near(d.level_trim, 1.0f, 1e-6f));
+    OrpheusEngine* e = orpheus_engine_create(48000.0f);
+    CHECK(e->cowbell_body.load() == 2);
+    CHECK(near(e->cowbell_tone.load(), 0.0f, 1e-6f));
+    CHECK(near(e->cowbell_ring.load(), 0.48f, 1e-6f));
+    CHECK(near(e->cowbell_intensity.load(), 0.85f, 1e-6f));
+    orpheus_engine_destroy(e);
 }
 
-void test_macros_segments() {
-    printf("\n--- macros_segments ---\n");
-    CHECK(cowbell_macros(0.1f, 0.5f, 0.5f).model == 2);
-    CHECK(cowbell_macros(0.3f, 0.5f, 0.5f).model == 1);
-    CHECK(cowbell_macros(0.5f, 0.5f, 0.5f).model == 2);
-    CHECK(cowbell_macros(0.9f, 0.5f, 0.5f).model == 3);
-    const CowbellParams top = cowbell_macros(1.0f, 0.5f, 0.5f);
-    CHECK(top.model == 3);
-    CHECK(near(top.structure, 0.9f, 1e-4f));
-    CHECK(near(cowbell_macros(0.0f, 0.5f, 0.5f).structure, 0.27f, 1e-4f));
+void test_macros_bodies() {
+    printf("\n--- macros_bodies ---\n");
+    // Model and polyphony per body.
+    CHECK(cowbell_macros(0, .5f, .5f, .5f).model == 2 && cowbell_macros(0, .5f, .5f, .5f).polyphony == 2);
+    CHECK(cowbell_macros(1, .5f, .5f, .5f).model == 1 && cowbell_macros(1, .5f, .5f, .5f).polyphony == 1);
+    CHECK(cowbell_macros(2, .5f, .5f, .5f).model == 0 && cowbell_macros(2, .5f, .5f, .5f).polyphony == 1);
+    CHECK(cowbell_macros(3, .5f, .5f, .5f).model == 3 && cowbell_macros(3, .5f, .5f, .5f).polyphony == 2);
+    // Each body's TONE ends.
+    CHECK(near(cowbell_macros(0, 0.f, .5f, .5f).structure, 0.25f, 1e-4f));
+    CHECK(near(cowbell_macros(1, 1.f, .5f, .5f).structure, 0.70f, 1e-4f));
+    CHECK(near(cowbell_macros(3, 1.f, .5f, .5f).structure, 0.90f, 1e-4f));
+    CHECK(near(cowbell_macros(1, .5f, 1.f, 0.f).damping, 0.95f, 1e-4f));
 }
 
 void test_macros_ring_polyphony() {
     printf("\n--- macros_ring_polyphony ---\n");
-    CHECK(cowbell_macros(0.5f, 0.39f, 0.5f).polyphony == 1);
-    CHECK(cowbell_macros(0.5f, 0.5f, 0.5f).polyphony == 2);
-    CHECK(cowbell_macros(0.5f, 0.85f, 0.5f).polyphony == 4);
+    // RING no longer changes polyphony.
+    for (int body = 0; body < kCowbellBodyCount; ++body)
+        CHECK(cowbell_macros(body, .5f, 0.f, .5f).polyphony == cowbell_macros(body, .5f, 1.f, .5f).polyphony);
 }
 
 void test_macros_grid_in_range() {
     printf("\n--- macros_grid_in_range ---\n");
-    // -1 and 2 are out-of-range inputs that must clamp.
-    for (int a = -1; a <= 11; ++a)
-        for (int b = -1; b <= 11; ++b)
-            for (int c = -1; c <= 11; ++c) {
-                const CowbellParams p = cowbell_macros(a / 10.0f, b / 10.0f, c / 10.0f);
-                const bool finite = std::isfinite(p.structure) && std::isfinite(p.brightness) &&
-                                    std::isfinite(p.damping) && std::isfinite(p.strike_gain);
-                const bool ranged = p.structure >= 0.0f && p.structure <= 0.9995f &&
-                                    p.brightness >= 0.0f && p.brightness <= 0.9995f &&
-                                    p.damping >= 0.0f && p.damping <= 0.9995f;
-                const bool poly = p.polyphony == 1 || p.polyphony == 2 || p.polyphony == 4;
-                const bool model = p.model >= 0 && p.model <= 3;
-                if (!(finite && ranged && poly && model)) {
-                    CHECK(finite && ranged && poly && model);
-                    printf("    at metal=%d ring=%d intensity=%d (tenths)\n", a, b, c);
-                    return;
+    // -1 and 11 tenths are out-of-range inputs that must clamp.
+    for (int body = 0; body < kCowbellBodyCount; ++body)
+        for (int a = -1; a <= 11; ++a)
+            for (int b = -1; b <= 11; ++b)
+                for (int c = -1; c <= 11; ++c) {
+                    const CowbellParams p = cowbell_macros(body, a / 10.0f, b / 10.0f, c / 10.0f);
+                    const bool finite = orpheus_is_finite(p.structure) && orpheus_is_finite(p.brightness) &&
+                                        orpheus_is_finite(p.damping) && orpheus_is_finite(p.strike_gain) &&
+                                        orpheus_is_finite(p.level_trim);
+                    const bool ranged = p.structure >= 0.0f && p.structure <= 0.9995f &&
+                                        p.brightness >= 0.0f && p.brightness <= 0.9995f &&
+                                        p.damping >= 0.0f && p.damping <= 0.95f + 1e-6f;
+                    const bool poly = p.polyphony == 1 || p.polyphony == 2;
+                    const bool model = p.model >= 0 && p.model <= 3;
+                    if (!(finite && ranged && poly && model)) {
+                        CHECK(finite && ranged && poly && model);
+                        printf("    at body=%d tone=%d ring=%d intensity=%d (tenths)\n", body, a, b, c);
+                        return;
+                    }
                 }
-            }
+}
+
+void test_macros_monotonic() {
+    printf("\n--- macros_monotonic ---\n");
+    // Structure rises with TONE and damping rises with RING, on every body.
+    for (int body = 0; body < kCowbellBodyCount; ++body)
+        for (int i = 0; i < 10; ++i) {
+            const float lo = i / 10.0f, hi = (i + 1) / 10.0f;
+            CHECK(cowbell_macros(body, hi, .5f, .5f).structure > cowbell_macros(body, lo, .5f, .5f).structure);
+            CHECK(cowbell_macros(body, .5f, hi, .5f).damping > cowbell_macros(body, .5f, lo, .5f).damping);
+        }
 }
 
 void test_strike_round_trip() {
@@ -125,17 +145,26 @@ void test_strike_bad_port_values() {
 
 void test_macros_boundaries() {
     printf("\n--- macros_boundaries ---\n");
-    // Each segment starts at its own model and From structure.
-    const struct { float metal; int model; float structure; } starts[] = {
-        {0.2f, 1, 0.15f}, {0.4f, 2, 0.55f}, {0.6f, 0, 0.30f}, {0.8f, 3, 0.30f}};
-    for (const auto& c : starts) {
-        const CowbellParams p = cowbell_macros(c.metal, 0.5f, 0.5f);
-        CHECK(p.model == c.model);
-        CHECK(near(p.structure, c.structure, 1e-4f));
+    // Bad bodies clamp to the table.
+    CHECK(cowbell_macros(-1, .5f, .5f, .5f).model == 2);
+    CHECK(cowbell_macros(99, .5f, .5f, .5f).model == 3);
+    // NaN knobs read as 0 and stay in range.
+    const CowbellParams n = cowbell_macros(2, std::nanf(""), std::nanf(""), std::nanf(""));
+    CHECK(near(n.structure, 0.25f, 1e-4f) && near(n.damping, 0.3156f, 1e-4f) && near(n.brightness, 0.44f, 1e-4f));
+}
+
+void test_body_port_validates() {
+    printf("\n--- body_port_validates ---\n");
+    OrpheusEngine* e = orpheus_engine_create(48000.0f);
+    orpheus_engine_set_port(e, "org.balch.orpheus.plugins.cowbell", "body", 3.0f);
+    CHECK(e->cowbell_body.load() == 3);
+    for (float bad : {std::nanf(""), 99.0f, -1.0f, INFINITY, -INFINITY}) {
+        orpheus_engine_set_port(e, "org.balch.orpheus.plugins.cowbell", "body", bad);
+        CHECK(e->cowbell_body.load() == 3);
     }
-    CHECK(near(cowbell_macros(0.5f, 0.5f, 0.5f).structure, 0.725f, 1e-4f));  // mid segment 2
-    CHECK(cowbell_macros(0.5f, 0.4f, 0.5f).polyphony == 2);
-    CHECK(cowbell_macros(0.5f, 0.8f, 0.5f).polyphony == 4);
+    orpheus_engine_set_port(e, "org.balch.orpheus.plugins.cowbell", "body", 1.4f);
+    CHECK(e->cowbell_body.load() == 1);
+    orpheus_engine_destroy(e);
 }
 
 void test_strike_clamps() {
@@ -154,6 +183,7 @@ void test_strike_clamps() {
 // ── UNIT_COWBELL ────────────────────────────────────────────────
 
 constexpr const char* kUri = "org.balch.orpheus.plugins.cowbell";
+const char* const kBodyNames[kCowbellBodyCount] = {"STRING", "SITAR", "METAL", "SYNTH"};
 
 // In-place radix-2 FFT, n a power of two (copied from test_cowbell_resonator.cpp).
 void fft(std::vector<std::complex<float>>& a) {
@@ -274,16 +304,16 @@ struct Rig {
     std::unique_ptr<GraphUnit> u;
     int last_block = 0;  // frames in render()'s final block
 
-    // The mechanism tests pin the Modal voicing, whose fundamental sits on the root; the shipped
-    // FM default is inharmonic. test_default_voicing renders the default with `pin_voicing` off.
+    // The mechanism tests pin the METAL body (modal, one voice) at a fixed TONE; the shipped
+    // default is TONE 0.3 and RING 0.1. test_default_voicing renders it with `pin_voicing` off.
     explicit Rig(float sample_rate = 48000.0f, bool pin_voicing = true)
         : sr(sample_rate), e(orpheus_engine_create(sample_rate)), u(std::make_unique<GraphUnit>()) {
-        stmlib::Random::Seed(kRigSeed);  // the HH and SD draw from the shared generator
+        stmlib::Random::Seed(kRigSeed);  // the resonator's strings draw from the shared generator
         u->type = UNIT_COWBELL;
         unit_init(u.get(), sr);
-        set("engine", -1.0f);  // internal impulse: no exciter
         if (pin_voicing) {
-            set("metal", 0.7f);
+            set("body", 2.0f);
+            set("tone", 0.55f);
             set("ring", 0.5f);
             set("intensity", 0.6f);
         }
@@ -588,16 +618,10 @@ void test_unit_bad_ports() {
     r.set("strike", 0.0f);
     CHECK(r.slots_empty());
 
-    r.set("engine", 5.0f);
-    r.set("engine", 99.0f);
-    r.set("engine", -2.0f);
-    r.set("engine", std::nanf(""));
-    CHECK(r.e->cowbell_engine.load() == 5);
-
     r.set("level", std::nanf(""));
-    r.set("metal", INFINITY);
+    r.set("tone", INFINITY);
     CHECK(r.e->cowbell_level.load() == 0.7f);
-    CHECK(r.e->cowbell_metal.load() == 0.7f);
+    CHECK(r.e->cowbell_tone.load() == 0.55f);
 
     r.set("structure_offset", 5.0f);
     r.set("position_offset", -5.0f);
@@ -666,12 +690,7 @@ void test_unit_offsets_sweep_glides() {
     CHECK(clicked_ratio >= 4.0f);
 }
 
-// ── Exciter, SYNTH gate and bend ────────────────────────────────
-
-constexpr float kEngineHH = 2.0f;  // Kotlin ordinals
-constexpr float kEngineVA = 7.0f;
-constexpr float kEngineSixOp = 19.0f;
-constexpr float kEngineSpeech = 16.0f;
+// ── SYNTH gate and bend ─────────────────────────────────────────
 
 float rms(const std::vector<float>& x, size_t begin, size_t end) {
     double sum = 0.0;
@@ -681,38 +700,15 @@ float rms(const std::vector<float>& x, size_t begin, size_t end) {
 
 bool all_finite(const std::vector<float>& x) {
     for (float v : x) {
-        if (!std::isfinite(v)) return false;
+        if (!orpheus_is_finite(v)) return false;  // -ffast-math folds std::isfinite
     }
     return true;
 }
 
-float first_50ms_rms(float engine, bool* finite) {
+// The bare strike rings, then falls quiet on its own.
+void test_tap_releases() {
+    printf("\n--- tap_releases ---\n");
     Rig r;
-    r.set("engine", engine);
-    r.strike(1.0f);
-    Take t;
-    r.render(2400, t);
-    const std::vector<float> m = t.mono();
-    *finite = all_finite(m);
-    return rms(m, 0, m.size());
-}
-
-void test_exciter_engine_colours_the_hit() {
-    printf("\n--- exciter_engine_colours_the_hit ---\n");
-    bool hh_finite = false, none_finite = false;
-    const float hh = first_50ms_rms(kEngineHH, &hh_finite);
-    const float none = first_50ms_rms(-1.0f, &none_finite);
-    const float diff = std::fabs(hh - none) / std::max(hh, none);
-    printf("  first 50 ms RMS: HH %.4f, impulse only %.4f (%.0f%% apart)\n", hh, none, 100.0f * diff);
-    CHECK(hh_finite && none_finite);
-    CHECK(hh > 1e-4f && none > 1e-4f);
-    CHECK(diff > 0.2f);
-}
-
-void test_exciter_tap_releases() {
-    printf("\n--- exciter_tap_releases ---\n");
-    Rig r;
-    r.set("engine", kEngineHH);
     r.set("ring", 0.5f);
     r.strike(1.0f);
     Take t;
@@ -725,77 +721,87 @@ void test_exciter_tap_releases() {
     CHECK(tail < 1e-3f * kCowbellOutputGain);
 }
 
-// VA follows the gate, so the 5 ms TAP gate and the VCA are what end its hit.
-void test_exciter_tap_releases_vca() {
-    printf("\n--- exciter_tap_releases_vca ---\n");
-    Rig r;
-    r.set("engine", kEngineVA);
-    r.strike(1.0f);
-    Take t;
-    float first = 0.0f, late_max = 0.0f;
-    for (int b = 0; b < 3 * 375; ++b) {
-        r.render(128, t);
-        const float p = peak_abs(r.e->cowbell_exciter_buf, 0, 128);
-        if (b == 0) first = p;           // 0-2.7 ms, inside the 5 ms gate
-        if (b >= 29) late_max = std::max(late_max, p);  // from 77 ms on
-    }
-    const float tail = t.peak(t.left.size() - 4800, t.left.size());
-    printf("  exciter first block %.4f, max from 77 ms %.2e; first 100 ms peak %.4f, last 100 ms %.1f dBFS\n",
-           first, late_max, t.peak(0, 4800), 20.0f * std::log10(tail + 1e-12f));
-    CHECK(first > 1e-3f);
-    CHECK(late_max == 0.0f);
-    CHECK(tail < 1e-3f * kCowbellOutputGain);
-}
-
 // Gate on for 2 s, then off, at RING 0.3: at 0.5 a held note's fundamental still rings near
-// -36 dBFS 2 s on (about 8 dB/s), so the exciter is also checked directly.
-void synth_gate_case(const char* name, float engine) {
+// -36 dBFS 2 s on (about 8 dB/s), so the noise bed's buffer is also checked directly.
+void test_synth_gate_sustains() {
+    printf("\n--- synth_gate_sustains ---\n");
     Rig r;
-    r.set("engine", engine);
     r.set("ring", 0.3f);
     r.set("gate", 1.0f);
     Take t;
     r.render(2 * 48000, t);
     r.set("gate", 0.0f);
     r.render(4800, t);
-    const float exciter_after = peak_abs(r.e->cowbell_exciter_buf, 0, (size_t)r.last_block);  // 100 ms on
+    const float bed_after = peak_abs(r.e->cowbell_input_buf, 0, (size_t)r.last_block);  // 100 ms on
     r.render(48000 * 2, t);
     const std::vector<float> m = t.mono();
     const float early = rms(m, 9600, 33600);   // 0.2-0.7 s
     const float late = rms(m, 72000, 96000);   // 1.5-2.0 s
     const float after = t.peak(4 * 48000, 4 * 48000 + 4800);  // 2 s after release
-    printf("  %s: RMS 0.2-0.7 s %.4f, 1.5-2.0 s %.4f (ratio %.2f); 2 s after release %.1f dBFS; "
-           "exciter 100 ms after release %.2e\n", name, early, late, early > 0 ? late / early : 0.0f,
-           20.0f * std::log10(after + 1e-12f), exciter_after);
-    CHECK(exciter_after == 0.0f);
+    printf("  RMS 0.2-0.7 s %.4f, 1.5-2.0 s %.4f (ratio %.2f); 2 s after release %.1f dBFS; "
+           "noise bed 100 ms after release %.2e\n", early, late, early > 0 ? late / early : 0.0f,
+           20.0f * std::log10(after + 1e-12f), bed_after);
+    CHECK(bed_after == 0.0f);
     CHECK(early > 1e-3f);
     CHECK(late > 0.3f * early);
     CHECK(after < 0.00316f);
     CHECK(all_finite(m));
-}
-
-void test_synth_gate_sustains() {
-    printf("\n--- synth_gate_sustains ---\n");
-    synth_gate_case("HH (default, decays: noise)", kEngineHH);
-    synth_gate_case("VA (VCA)", kEngineVA);
-    synth_gate_case("six-op (holds)", kEngineSixOp);
-    synth_gate_case("none (impulse only: noise)", -1.0f);
-    synth_gate_case("Speech (one word: noise)", kEngineSpeech);
 
     // At full INTENSITY a held note stays under Rings' limiter at any RING: its output reaches
-    // about 0.68 (0.47 after LEVEL 0.7, before the makeup gain) when it engages.
+    // about 0.68 (0.47 after LEVEL 0.7, before the makeup gain) when it engages. The ceiling would
+    // hide that in the output, so this reads the level before it.
     for (float ring : {0.3f, 0.6f, 0.8f, 1.0f}) {
-        for (float engine : {kEngineHH, kEngineVA, kEngineSixOp, -1.0f}) {
-            Rig r;
-            r.set("engine", engine);
+        Rig h;
+        h.set("intensity", 1.0f);
+        h.set("ring", ring);
+        h.set("gate", 1.0f);
+        Take ht;
+        h.render(48000, ht);
+        float steady = 0.0f;
+        for (int b = 0; b < 2 * 48000 / 128; ++b) {
+            h.block(128);
+            steady = std::max(steady, h.e->cowbell_state.last_pre_ceiling_peak);
+        }
+        printf("  INTENSITY 1, RING %.1f: held pre-ceiling peak 1-3 s %.4f\n", ring, steady);
+        CHECK(steady < 0.42f * kCowbellOutputGain);
+    }
+}
+
+// kCeiling in orpheus_unit_cowbell.cpp, plus the rounding of its gain x sample.
+constexpr float kTestCeiling = 0.98f + 1e-5f;
+
+// A held SYNTH note on every body at full INTENSITY, at the shortest, middle and longest RING:
+// it sounds, stays under the ceiling and, once released, only decays to under -50 dBFS within
+// 8 s. METAL at RING 1 gets 9 s: it reads -48.5 dBFS at 8 s and crosses -50 at 8.4 s.
+void test_synth_held_note_every_body() {
+    printf("\n--- synth_held_note_every_body ---\n");
+    const char* names[4] = {"STRING", "SITAR", "METAL", "SYNTH"};
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        for (float ring : {0.0f, 0.5f, 1.0f}) {
+            Rig r(48000.0f, false);
+            r.set("body", (float)body);
             r.set("intensity", 1.0f);
             r.set("ring", ring);
             r.set("gate", 1.0f);
-            Take t;
-            r.render(3 * 48000, t);
-            const float steady = t.peak(48000, t.left.size());
-            printf("  engine %2.0f at INTENSITY 1, RING %.1f: held peak 1-3 s %.4f\n", engine, ring, steady);
-            CHECK(steady < 0.42f * kCowbellOutputGain);
+            Take held;
+            r.render(2 * 48000, held);
+            r.set("gate", 0.0f);
+            Take rel;
+            const int wait_seconds = (body == 2 && ring == 1.0f) ? 9 : 8;
+            r.render((size_t)wait_seconds * 48000, rel);
+            const size_t n = rel.left.size();
+            const float sounding = held.peak(24000, held.left.size());  // 0.5-2 s
+            const float top = std::max(held.peak(), rel.peak());
+            const float soon = rel.peak(4800, 9600);  // 0.1-0.2 s after release
+            const float quiet = rel.peak(n - 4800, n);
+            printf("  %-6s RING %.1f: held peak %.4f (%.1f dBFS), highest %.4f, after release %.1f dBFS at 0.1 s, "
+                   "%.1f at %d s\n", names[body], ring, sounding, 20.0f * std::log10(sounding + 1e-12f), top,
+                   20.0f * std::log10(soon + 1e-12f), 20.0f * std::log10(quiet + 1e-12f), wait_seconds);
+            CHECK(sounding > 0.001f);  // above -60 dBFS
+            CHECK(top <= kTestCeiling);
+            CHECK(quiet <= soon);
+            CHECK(quiet < 0.00316f);
+            CHECK(all_finite(held.mono()) && all_finite(rel.mono()));
         }
     }
 }
@@ -829,13 +835,12 @@ void test_bend_bends_ringing_voices() {
 }
 
 // Bend -1 to 1 to 0 over 1 s after a long-ringing strike, stepping every `step` frames. With
-// `held_va`, a VA note is held through it instead.
-std::vector<float> render_bend_sweep(int step, bool held_va = false) {
+// `held`, a SYNTH note is held through it instead.
+std::vector<float> render_bend_sweep(int step, bool held = false) {
     Rig r;
     r.set("ring", 0.9f);
     r.set("bend", -1.0f);
-    if (held_va) {
-        r.set("engine", kEngineVA);
+    if (held) {
         r.set("gate", 1.0f);
     } else {
         r.strike(1.0f);
@@ -868,39 +873,20 @@ void test_bend_sweep_glides() {
     const std::vector<float> held_fine = render_bend_sweep(32, true);
     const float held_ratio = worst_click_ratio(held, 4800, held.size());
     const float held_fine_ratio = worst_click_ratio(held_fine, 4800, held_fine.size());
-    printf("  held VA: click ratio 60 Hz=%.2f per-32=%.2f, peak %.4f\n", held_ratio, held_fine_ratio,
+    printf("  held: click ratio 60 Hz=%.2f per-32=%.2f, peak %.4f\n", held_ratio, held_fine_ratio,
            peak_abs(held.data(), 4800, held.size()));
     CHECK(all_finite(held));
     CHECK(peak_abs(held.data(), held.size() - 4800, held.size()) > 1e-3f);
-    // A held saw's edges land in some 32-frame windows and not others, so only the relative
-    // check applies: the 60 Hz steps add nothing a near-continuous sweep lacks.
+    // The held noise bed's peaks land in some 32-frame windows and not others, so only the
+    // relative check applies: the 60 Hz steps add nothing a near-continuous sweep lacks.
     CHECK(held_ratio <= 1.25f * held_fine_ratio);
-
-    // The held note's pitch follows the resonator's glided bend, block by block.
-    {
-        Rig r;
-        r.set("engine", kEngineVA);
-        r.set("gate", 1.0f);
-        r.set("ring", 0.9f);
-        Take t;
-        float worst = 0.0f;
-        for (int i = 0; i < 375; ++i) {
-            const float x = (float)i / 374.0f;
-            r.set("bend", x < 0.5f ? -1.0f + 4.0f * x : 2.0f - 2.0f * x);
-            r.render(128, t);
-            const float exciter_bend = r.e->cowbell_state.exciter_note - 72.0f;  // root C, octave 0
-            worst = std::max(worst, std::fabs(exciter_bend - r.e->cowbell_reso.bend_semitones()));
-        }
-        printf("  held VA: exciter pitch vs resonator bend, worst %.3f st\n", worst);
-        CHECK(worst < 0.3f);
-    }
+    CHECK(held_ratio < 4.0f);
 
     // The highest note bent fully up (MIDI 143 uncapped) and the lowest fully down.
     for (float bend : {1.0f, -1.0f}) {
         Rig r;
         r.e->pulsar_root_note.store(bend > 0 ? 11 : 0);
         r.set("octave", bend > 0 ? 2.0f : -2.0f);
-        r.set("engine", kEngineHH);
         r.set("bend", bend);
         r.set("gate", 1.0f);
         r.strike(1.0f);
@@ -917,7 +903,7 @@ void test_bend_sweep_glides() {
 
 constexpr int kMajor = 1;  // kPulsarScales[1]
 
-// Holds a VA note on the bend for `blocks` and returns the resonator's bend in semitones.
+// Holds a SYNTH note on the bend for `blocks` and returns the resonator's bend in semitones.
 float held_bend(Rig& r, int blocks) {
     Take t;
     for (int i = 0; i < blocks; ++i) r.render(128, t);
@@ -943,32 +929,28 @@ void test_bend_scale_snaps_held_note() {
     r.e->pulsar_root_note.store(0);
     r.e->pulsar_scale_index.store(kMajor);
     r.e->pulsar_playing.store(1);
-    r.set("engine", kEngineVA);
     r.set("gate", 1.0f);
-    r.set("bend_scale", 1.0f);
     r.set("bend", 0.05f);
     const float snapped = held_bend(r, 375);
     printf("  free 1.23 st -> %.3f st\n", snapped);
     CHECK(std::fabs(snapped - 2.0f) <= 0.05f);
 
+    // The same note with Pulsar stopped bends free.
     Rig f;
     f.e->pulsar_root_note.store(0);
     f.e->pulsar_scale_index.store(kMajor);
-    f.e->pulsar_playing.store(1);
-    f.set("engine", kEngineVA);
     f.set("gate", 1.0f);
     f.set("bend", 0.05f);
     const float freebend = held_bend(f, 375);
     CHECK(std::fabs(freebend - 1.23f) <= 0.05f);
 }
 
-Take bend_take(bool bend_scale, bool playing, float bend_to) {
+Take bend_take(bool playing, float bend_to) {
     Rig r;
     r.e->pulsar_root_note.store(2);
     r.e->pulsar_scale_index.store(kMajor);
     r.e->pulsar_playing.store(playing ? 1 : 0);
     r.set("ring", 0.7f);
-    r.set("bend_scale", bend_scale ? 1.0f : 0.0f);
     r.strike(1.0f);
     Take t;
     r.render(4800, t);
@@ -977,33 +959,11 @@ Take bend_take(bool bend_scale, bool playing, float bend_to) {
     return t;
 }
 
-void test_bend_scale_off_write_is_a_no_op() {
-    printf("\n--- bend_scale_off_write_is_a_no_op ---\n");
-    // Pulsar playing, bend_scale never raised: writing 0 must equal never writing it. This does
-    // not pin the free path itself, which rests on the diff.
-    Rig r;
-    r.e->pulsar_root_note.store(2);
-    r.e->pulsar_scale_index.store(kMajor);
-    r.e->pulsar_playing.store(1);
-    r.set("ring", 0.7f);
-    r.strike(1.0f);
-    Take ref;
-    r.render(4800, ref);
-    r.set("bend", 0.05f);
-    r.render(9600, ref);
-    const Take off = bend_take(false, true, 0.05f);
-    CHECK(ref.left == off.left);
-    CHECK(ref.right == off.right);
-}
-
 void test_bend_scale_free_while_pulsar_stopped() {
     printf("\n--- bend_scale_free_while_pulsar_stopped ---\n");
-    const Take on = bend_take(true, false, 0.05f);
-    const Take off = bend_take(false, false, 0.05f);
-    CHECK(on.left == off.left);
-    CHECK(on.right == off.right);
-    const Take playing = bend_take(true, true, 0.05f);
-    CHECK(playing.left != off.left);  // the port really does something while playing
+    const Take stopped = bend_take(false, 0.05f);
+    const Take playing = bend_take(true, 0.05f);
+    CHECK(playing.left != stopped.left);
 }
 
 void test_bend_scale_respects_note_cap() {
@@ -1013,9 +973,7 @@ void test_bend_scale_respects_note_cap() {
     r.e->pulsar_scale_index.store(kMajor);
     r.e->pulsar_playing.store(1);
     r.set("octave", 2.0f);
-    r.set("engine", kEngineVA);
     r.set("gate", 1.0f);
-    r.set("bend_scale", 1.0f);
     r.set("bend", 1.0f);
     const float bend = held_bend(r, 375);
     const float note = 72.0f + 11.0f + 24.0f;
@@ -1026,14 +984,13 @@ void test_bend_scale_respects_note_cap() {
     CHECK(((offset % 12) + 12) % 12 == 0);  // 12: Major has no degree 13 under the cap
 }
 
-// A long-ringing strike with the bend swept 0 to 1 over 0.5 s, with or without BEND TO SCALE.
-std::vector<float> scale_sweep(bool bend_scale) {
+// A long-ringing strike with the bend swept 0 to 1 over 0.5 s: snapped while Pulsar plays, else free.
+std::vector<float> scale_sweep(bool playing) {
     Rig r;
     r.e->pulsar_root_note.store(0);
     r.e->pulsar_scale_index.store(kMajor);
-    r.e->pulsar_playing.store(1);
+    r.e->pulsar_playing.store(playing ? 1 : 0);
     r.set("ring", 0.9f);
-    r.set("bend_scale", bend_scale ? 1.0f : 0.0f);
     r.strike(1.0f);
     Take t;
     const int blocks = 188;  // 0.5 s in 128-frame blocks
@@ -1056,60 +1013,144 @@ void test_bend_scale_glide_has_no_click() {
     CHECK(ratio <= 1.25f * free_ratio);
 }
 
-// VA strike, 200 ms, then (optionally) pick HH, 200 ms more, then strike again and play 50 ms.
-Take engine_change_take(bool change, int* engine_before_strike, int* engine_after_strike) {
+// A body change mid-ring waits for the next strike: the ringing bell keeps its model, unbroken.
+void test_body_change_waits_for_strike() {
+    printf("\n--- body_change_waits_for_strike ---\n");
     Rig r;
-    r.set("ring", 0.8f);
-    r.set("engine", kEngineVA);
     r.strike(1.0f);
+    Take warm;
+    r.render(2400, warm);
+    CHECK(r.e->cowbell_reso.model() == 0);
+    r.set("body", 3.0f);
+    bool silent = false;
+    bool kept_model = true;
+    for (int i = 0; i < 20; ++i) {
+        r.block(128);
+        silent = silent || r.block_peak(128) < 1e-6f;
+        kept_model = kept_model && r.e->cowbell_reso.model() == 0;
+    }
+    CHECK(!silent);
+    CHECK(kept_model);
+    r.strike(0.8f);
+    r.block(128);
+    CHECK(r.e->cowbell_reso.model() == 3);
+    CHECK(r.block_peak(128) > 1e-6f);
+}
+
+// A tap on `from` at a voicing; `to` is picked 50 ms in unless it is negative. Ends 550 ms in.
+Take ring_out_picking(Rig& r, int from, int to, float ring) {
+    r.e->pulsar_root_note.store(0);
+    r.set("body", (float)from);
+    r.set("tone", 0.5f);
+    r.set("ring", ring);
+    r.set("intensity", 0.7f);
+    r.strike(0.9f);
     Take t;
-    r.render(9600, t);
-    if (change) r.set("engine", kEngineHH);
-    r.render(9600, t);
-    *engine_before_strike = r.e->cowbell_state.exciter_engine;
-    r.strike(1.0f);
     r.render(2400, t);
-    *engine_after_strike = r.e->cowbell_state.exciter_engine;
+    if (to >= 0) r.set("body", (float)to);
+    r.render(24000, t);
     return t;
 }
 
-void test_engine_change_mid_ring_no_click() {
-    printf("\n--- engine_change_mid_ring_no_click ---\n");
-    int before = 0, after = 0, kept_before = 0, kept_after = 0;
-    const Take changed = engine_change_take(true, &before, &after);
-    const Take kept = engine_change_take(false, &kept_before, &kept_after);
-    const int va = kotlin_engine_ordinal_to_plaits((int)kEngineVA);
-    const int hh = kotlin_engine_ordinal_to_plaits((int)kEngineHH);
-    CHECK(before == va);  // not until the next strike
-    CHECK(after == hh);
-    CHECK(kept_after == va);
-
-    // Up to the next strike the change is inaudible: the output matches a bell that never changed.
-    const size_t at = 19200;
-    bool identical = true;
-    for (size_t i = 0; i < at; ++i) {
-        identical = identical && changed.left[i] == kept.left[i] && changed.right[i] == kept.right[i];
+// Picking a body mid-ring changes nothing until the next strike: left and right stay bit-identical
+// to a bell left alone, from every body to every other, and the strike then brings the new model.
+void test_body_change_mid_ring_identical() {
+    printf("\n--- body_change_mid_ring_identical ---\n");
+    for (int from = 0; from < kCowbellBodyCount; ++from) {
+        for (int to = 0; to < kCowbellBodyCount; ++to) {
+            if (to == from) continue;
+            Rig alone(48000.0f, false);
+            const Take same = ring_out_picking(alone, from, -1, 0.5f);
+            Rig picked(48000.0f, false);
+            const Take t = ring_out_picking(picked, from, to, 0.5f);
+            const bool identical = t.left == same.left && t.right == same.right;
+            if (!identical) {
+                size_t first = 0;
+                while (first < t.left.size() && t.left[first] == same.left[first] && t.right[first] == same.right[first]) ++first;
+                const float ring_db = 20.0f * std::log10((t.peak(first, t.left.size()) + 1e-12f) /
+                                                         (same.peak(first, same.left.size()) + 1e-12f));
+                printf("  %s to %s: differs from frame %zu, tail %+.1f dB against the unchanged bell\n",
+                       kBodyNames[from], kBodyNames[to], first, ring_db);
+            }
+            CHECK(t.peak() > 1e-3f);
+            CHECK(identical);
+            picked.strike(0.9f);
+            picked.block(128);
+            CHECK(picked.e->cowbell_reso.model() == cowbell_macros(to, 0.5f, 0.5f, 0.7f).model);
+        }
     }
-    const std::vector<float> m = changed.mono();
-    const float ratio = worst_click_ratio(m, 4800, at);
-    CHECK(identical);
-    CHECK(ratio < 4.0f);
-
-    // The next strike sounds the new engine.
-    const std::vector<float> km = kept.mono();
-    const float hh_rms = rms(m, at, at + 2400);
-    const float va_rms = rms(km, at, at + 2400);
-    const float diff = std::fabs(hh_rms - va_rms) / std::max(hh_rms, va_rms);
-    printf("  before the strike: identical %d, click ratio %.2f; next strike 50 ms RMS HH %.4f vs VA %.4f "
-           "(%.0f%% apart)\n", (int)identical, ratio, hh_rms, va_rms, 100.0f * diff);
-    CHECK(diff > 0.2f);
 }
 
-// Eight TAP strikes and the gate's rising edge in one block: every exciter hit slot in use.
-void test_exciter_full_block_of_hits() {
-    printf("\n--- exciter_full_block_of_hits ---\n");
+// The worst case for a tail: RING 1 and SITAR's damping of 0.95, which an FM or modal voice would
+// hold as a drone. A body picked mid-ring leaves the tap to fall under -50 dBFS within 8 s.
+void test_body_change_ring_top_falls_quiet() {
+    printf("\n--- body_change_ring_top_falls_quiet ---\n");
+    for (int from : {0, 2, 3}) {
+        Rig r(48000.0f, false);
+        Take t = ring_out_picking(r, from, 1, 1.0f);
+        r.render(8 * 48000 - t.left.size(), t);
+        const float tail = t.peak(t.left.size() - 4800, t.left.size());
+        printf("  %-6s to SITAR at RING 1: %.1f dBFS at 8 s\n", kBodyNames[from], 20.0f * std::log10(tail + 1e-12f));
+        CHECK(tail < 0.00316f);
+    }
+}
+
+// What ends the wait: the gate's rising edge, or the bell going idle. A held gate does not.
+void test_body_change_adopted_by_gate_or_idle() {
+    printf("\n--- body_change_adopted_by_gate_or_idle ---\n");
+    {
+        Rig r(48000.0f, false);
+        ring_out_picking(r, 2, 3, 0.5f);
+        CHECK(r.e->cowbell_reso.model() == 0);
+        r.set("gate", 1.0f);
+        r.block(128);
+        CHECK(r.e->cowbell_reso.model() == 3);
+        r.set("body", 0.0f);
+        for (int i = 0; i < 20; ++i) r.block(128);
+        CHECK(r.e->cowbell_reso.model() == 3);  // still held, no new edge
+    }
+    {
+        Rig r(48000.0f, false);
+        r.set("ring", 0.0f);
+        r.strike(0.9f);
+        Take t;
+        r.render(4800, t);
+        r.set("body", 3.0f);
+        CHECK(r.e->cowbell_state.sounding_body == 2);
+        for (int i = 0; i < 48000 * 10 / 128 && !r.e->cowbell_state.idle; ++i) r.block(128);
+        CHECK(r.e->cowbell_state.idle);
+        r.block(128);
+        CHECK(r.e->cowbell_state.sounding_body == 3);
+    }
+}
+
+// Picking a louder body and striking at once: the hit reaches its full level in its first block,
+// not at the end of a ramp up from the old body's trim.
+void test_body_change_hit_attacks_at_full_level() {
+    printf("\n--- body_change_hit_attacks_at_full_level ---\n");
+    Rig fresh(48000.0f, false);
+    fresh.set("body", 0.0f);
+    fresh.set("tone", 0.5f);
+    fresh.set("ring", 0.5f);
+    fresh.set("intensity", 0.7f);
+    fresh.strike(0.9f);
+    fresh.block(128);
+    const float want = fresh.e->cowbell_state.last_pre_ceiling_peak;
+    Rig r(48000.0f, false);
+    ring_out_picking(r, 2, 0, 0.5f);
+    r.strike(0.9f);
+    r.block(128);
+    const float got = r.e->cowbell_state.last_pre_ceiling_peak;
+    printf("  METAL to STRING: first block %.4f, fresh STRING %.4f (%+.1f dB)\n", got, want,
+           20.0f * std::log10((got + 1e-12f) / (want + 1e-12f)));
+    CHECK(want > 1e-3f);
+    CHECK(got > want);  // measures 1.47 against 0.88; ramping up from METAL's trim reads 0.70
+}
+
+// Eight strikes and the gate's rising edge in one block.
+void test_full_block_of_hits() {
+    printf("\n--- full_block_of_hits ---\n");
     Rig r;
-    r.set("engine", kEngineVA);
     for (int i = 0; i < 8; ++i) r.strike(0.3f + 0.08f * (float)i);
     r.set("gate", 1.0f);
     Take t;
@@ -1118,30 +1159,6 @@ void test_exciter_full_block_of_hits() {
     r.render(4800, t);
     CHECK(all_finite(t.mono()));
     CHECK(t.peak() > 1e-3f && t.peak() <= 1.0f);
-}
-
-// Fills (kind >= 1) don't fire the engine, so their impulse is the full one with or without it.
-void test_fill_impulse_unscaled() {
-    printf("\n--- fill_impulse_unscaled ---\n");
-    auto fill_take = [](float engine) {
-        Rig r;
-        r.set("engine", engine);
-        r.strike(1.0f, 3);
-        Take t;
-        r.render(4800, t);
-        return t;
-    };
-    const Take with_engine = fill_take(kEngineHH);
-    const Take bare = fill_take(-1.0f);
-    float worst = 0.0f;
-    for (size_t i = 0; i < bare.left.size(); ++i) {
-        worst = std::max(worst, std::max(std::fabs(with_engine.left[i] - bare.left[i]),
-                                         std::fabs(with_engine.right[i] - bare.right[i])));
-    }
-    printf("  fill peak with HH %.4f, impulse only %.4f, worst difference %.2e\n", with_engine.peak(),
-           bare.peak(), worst);
-    CHECK(bare.peak() > 1e-3f);
-    CHECK(worst < 1e-3f * bare.peak());
 }
 
 // ── Fill bursts and hit colour ──────────────────────────────────
@@ -1186,20 +1203,6 @@ Take fill_take(int kind, float velocity, size_t frames, int color = 0) {
     Take t;
     r.render(frames, t);
     return t;
-}
-
-void test_fill_kinds_skip_engine() {
-    printf("\n--- fill_kinds_skip_engine ---\n");
-    Rig r;
-    r.set("engine", kEngineHH);
-    strike_coloured(r, 0.8f, 3, 0);
-    r.block(128);
-    printf("  after a kind-3 strike: %d exciter triggers\n", r.e->cowbell_state.exciter_trigger_count);
-    CHECK(r.e->cowbell_state.exciter_trigger_count == 0);
-    strike_coloured(r, 0.8f, 0, 0);
-    r.block(128);
-    printf("  after a kind-0 strike: %d\n", r.e->cowbell_state.exciter_trigger_count);
-    CHECK(r.e->cowbell_state.exciter_trigger_count == 1);
 }
 
 void test_fill_kinds_differ() {
@@ -1276,7 +1279,7 @@ StormResult run_storm(Rig& r, int seconds) {
         res.pre_ceiling_peak = std::max(res.pre_ceiling_peak, r.e->cowbell_state.last_pre_ceiling_peak);
         for (int i = 0; i < 128; ++i) {
             const float l = r.u->output_buffers[OPORT_OUT][i], rr = r.u->output_buffers[OPORT_OUT_RIGHT][i];
-            res.finite = res.finite && std::isfinite(l) && std::isfinite(rr);
+            res.finite = res.finite && orpheus_is_finite(l) && orpheus_is_finite(rr);
             res.peak = std::max(res.peak, std::max(std::fabs(l), std::fabs(rr)));
             res.mean_l += l;
             res.mean_r += rr;
@@ -1289,40 +1292,214 @@ StormResult run_storm(Rig& r, int seconds) {
 
 void test_fill_burst_storm_bounded() {
     printf("\n--- fill_burst_storm_bounded ---\n");
-    Rig r;
-    const StormResult s = run_storm(r, 5);
-    printf("  peak %.4f (%.4f before the ceiling), mean L %.2e R %.2e\n", s.peak, s.pre_ceiling_peak, s.mean_l, s.mean_r);
-    CHECK(s.finite);
-    CHECK(s.peak > 1e-3f && s.peak < 1.0f);
     // The ceiling alone keeps any pile-up under 1.0; the pre-ceiling peak shows the storm itself
-    // is bounded (the resonator's own limiter times the makeup gain), not just squashed. It
-    // measures about 2.0, so a runaway or a doubled gain stage trips this.
-    CHECK(s.pre_ceiling_peak < 2.5f);
-    CHECK(std::fabs(s.mean_l) < 1e-3 && std::fabs(s.mean_r) < 1e-3);
+    // is bounded (the resonator's own limiter times the makeup gain and each body's trim), not just
+    // squashed. Bounds sit just over the measures, 2.93, 2.26, 2.77 and 0.96, so a doubled gain
+    // trips them. SITAR's DC is its own: under this storm it measures -4.1e-3 on the left.
+    const float pre_ceiling_bound[kCowbellBodyCount] = {3.2f, 2.5f, 3.0f, 1.1f};
+    const double mean_bound[kCowbellBodyCount] = {1e-3, 6e-3, 1e-3, 1e-3};
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        Rig r;
+        r.set("body", (float)body);
+        const StormResult s = run_storm(r, 5);
+        printf("  %-6s peak %.4f (%.4f before the ceiling), mean L %.2e R %.2e\n", kBodyNames[body], s.peak,
+               s.pre_ceiling_peak, s.mean_l, s.mean_r);
+        CHECK(s.finite);
+        CHECK(s.peak > 1e-3f && s.peak < 1.0f);
+        CHECK(s.pre_ceiling_peak < pre_ceiling_bound[body]);
+        CHECK(std::fabs(s.mean_l) < mean_bound[body] && std::fabs(s.mean_r) < mean_bound[body]);
+    }
 }
 
 constexpr float kTapKnee = 0.8f;  // the soft ceiling's knee in orpheus_unit_cowbell.cpp
+constexpr float kMaxKneeSeconds = 0.020f;  // the longest a tap anywhere on a sweep leans on the ceiling
 
-// A full-velocity tap at the default LEVEL sounds below the ceiling's knee, whatever the exciter:
-// the ceiling is for pile-ups, not for a normal hit. Six-op (19) is the known exception: its TAP
-// saturates the resonator's limiter (about 1.1 before the ceiling, 0.97 after), and it stays under
-// the ceiling. Trimming it would change how it sounds, so that is left for the ear test.
+// A full-velocity tap at the default LEVEL sounds below the ceiling's knee: the ceiling is for
+// pile-ups, not for a normal hit. The shipped default strikes harder and may touch it, but only for
+// the first few milliseconds.
 void test_tap_peaks_below_knee() {
     printf("\n--- tap_peaks_below_knee ---\n");
-    // 19, 23 and 24 are the three six-op banks.
-    for (const float engine : {-1.0f, 2.0f, 7.0f, 19.0f, 23.0f, 24.0f}) {
-        Rig r;
-        r.set("engine", engine);
-        r.strike(1.0f);
-        Take t;
-        float pre = 0.0f;
-        for (int b = 0; b < 375; ++b) {
-            r.render(128, t);
-            pre = std::max(pre, r.e->cowbell_state.last_pre_ceiling_peak);
+    Rig r;
+    r.strike(1.0f);
+    Take t;
+    float pre = 0.0f;
+    for (int b = 0; b < 375; ++b) {
+        r.render(128, t);
+        pre = std::max(pre, r.e->cowbell_state.last_pre_ceiling_peak);
+    }
+    printf("  peak %.4f (%.4f before the ceiling)\n", t.peak(), pre);
+    CHECK(t.peak() > 1e-3f);
+    CHECK(t.peak() < kTapKnee);
+
+    Rig shipped(48000.0f, false);
+    shipped.strike(1.0f);
+    Take d;
+    shipped.render(36000, d);
+    size_t over = 0;
+    for (size_t i = 0; i < d.left.size(); ++i) {
+        if (std::max(std::fabs(d.left[i]), std::fabs(d.right[i])) > kTapKnee) ++over;
+    }
+    printf("  shipped default: peak %.4f, above the knee %.2f ms\n", d.peak(), (float)over * 1000.0f / 48000.0f);
+    CHECK(over < 192);  // 4 ms
+}
+
+// One tap at velocity 0.9 on a body, root C, rendered in the unit's 128-frame blocks.
+struct BodyTap {
+    Take take;
+    float knee_seconds = 0.0f;  // time either channel spends above the ceiling's knee
+};
+
+BodyTap body_tap(int body, float tone, float ring, float intensity, size_t frames) {
+    Rig r(48000.0f, false);
+    r.e->pulsar_root_note.store(0);
+    r.set("body", (float)body);
+    r.set("tone", tone);
+    r.set("ring", ring);
+    r.set("intensity", intensity);
+    r.strike(0.9f);
+    BodyTap tap;
+    r.render(frames, tap.take);
+    size_t over = 0;
+    for (size_t i = 0; i < tap.take.left.size(); ++i) {
+        if (std::max(std::fabs(tap.take.left[i]), std::fabs(tap.take.right[i])) > kTapKnee) ++over;
+    }
+    tap.knee_seconds = (float)over / 48000.0f;
+    return tap;
+}
+
+float stereo_rms(const Take& t, size_t begin, size_t end) {
+    const float l = rms(t.left, begin, end), r = rms(t.right, begin, end);
+    return std::sqrt(0.5f * (l * l + r * r));
+}
+
+float mean_of(const std::vector<float>& x) {
+    double sum = 0.0;
+    for (float v : x) sum += v;
+    return x.empty() ? 0.0f : (float)(sum / (double)x.size());
+}
+
+// T60 estimate: 1.5 x the time a tap's backward-integrated energy takes to fall 40 dB. The integral
+// rides over the beating of SITAR's strings, which makes a first crossing of -60 dB jump around.
+float decay_seconds(const Take& t) {
+    const size_t bin = 240;  // 5 ms
+    std::vector<double> energy;
+    for (size_t s = 0; s + bin <= t.left.size(); s += bin) {
+        double e = 0.0;
+        for (size_t i = s; i < s + bin; ++i) e += (double)t.left[i] * t.left[i] + (double)t.right[i] * t.right[i];
+        energy.push_back(e);
+    }
+    double total = 0.0;
+    for (double e : energy) total += e;
+    double remaining = total;
+    for (size_t i = 0; i < energy.size(); ++i) {
+        remaining -= energy[i];
+        if (remaining < 1e-4 * total) return 1.5f * (float)(i + 1) * 0.005f;
+    }
+    return 1.5f * (float)energy.size() * 0.005f;
+}
+
+// Every corner and middle of TONE, RING and INTENSITY: no silent stretch, no DC, nothing
+// non-finite. The ceiling makes a peak over it impossible, so time above the knee is what
+// catches a clipping stretch.
+void test_sweep_tap_health() {
+    printf("\n--- sweep_tap_health ---\n");
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        float lowest = 1.0f, highest = 0.0f, worst_dc = 0.0f, worst_knee = 0.0f;
+        for (float tone : {0.0f, 0.5f, 1.0f}) {
+            for (float ring : {0.0f, 0.5f, 1.0f}) {
+                for (float intensity : {0.0f, 0.5f, 1.0f}) {
+                    const BodyTap tap = body_tap(body, tone, ring, intensity, 2 * 48000);
+                    const float peak = tap.take.peak();
+                    const float dc = std::max(std::fabs(mean_of(tap.take.left)), std::fabs(mean_of(tap.take.right)));
+                    lowest = std::min(lowest, peak);
+                    highest = std::max(highest, peak);
+                    worst_dc = std::max(worst_dc, dc);
+                    worst_knee = std::max(worst_knee, tap.knee_seconds);
+                    const bool sound = peak <= kTestCeiling && peak > 0.00398f;  // -48 dBFS
+                    const bool clean = dc < 1e-3f && tap.knee_seconds < kMaxKneeSeconds &&
+                                       all_finite(tap.take.left) && all_finite(tap.take.right);
+                    if (!sound || !clean) {
+                        printf("  %s T%.1f R%.1f I%.1f: peak %.4f dc %.1e above knee %.1f ms\n", kBodyNames[body], tone,
+                               ring, intensity, peak, dc, tap.knee_seconds * 1000.0f);
+                    }
+                    CHECK(sound);
+                    CHECK(clean);
+                }
+            }
         }
-        printf("  engine %2.0f: peak %.4f (%.4f before the ceiling)\n", engine, t.peak(), pre);
-        CHECK(t.peak() > 1e-3f);
-        CHECK(t.peak() < kTapKnee);
+        printf("  %-6s peak %.4f..%.4f (%.1f dBFS at the lowest), dc %.1e, above knee %.1f ms\n", kBodyNames[body],
+               lowest, highest, 20.0f * std::log10(lowest), worst_dc, worst_knee * 1000.0f);
+    }
+}
+
+// RING is the tail on every body: a clearly shorter tap at 0 than at 0.5 (20% at least), and
+// longer again at 1.
+void test_sweep_ring_is_the_tail() {
+    printf("\n--- sweep_ring_is_the_tail ---\n");
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        const float t0 = decay_seconds(body_tap(body, 0.5f, 0.0f, 0.7f, 14 * 48000).take);
+        const float t5 = decay_seconds(body_tap(body, 0.5f, 0.5f, 0.7f, 14 * 48000).take);
+        const float t1 = decay_seconds(body_tap(body, 0.5f, 1.0f, 0.7f, 14 * 48000).take);
+        printf("  %-6s T60 RING 0 %.2f s, 0.5 %.2f s, 1 %.2f s\n", kBodyNames[body], t0, t5, t1);
+        CHECK(t0 < 0.8f * t5);
+        CHECK(t5 < t1);
+    }
+}
+
+// No drone: a tap at RING 1 is under -50 dBFS within 8 s on every body, and the far corners of
+// TONE and INTENSITY, longer because brightness holds the high partials, are under -30.
+void test_sweep_ring_top_falls_quiet() {
+    printf("\n--- sweep_ring_top_falls_quiet ---\n");
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        const Take t = body_tap(body, 0.5f, 1.0f, 0.7f, 8 * 48000).take;
+        const float quiet = t.peak(t.left.size() - 4800, t.left.size());
+        float worst = 0.0f, at_07_worst = 0.0f;
+        for (float tone : {0.0f, 0.5f, 1.0f}) {
+            for (float intensity : {0.7f, 1.0f}) {
+                const Take c = body_tap(body, tone, 1.0f, intensity, 8 * 48000).take;
+                const float tail = c.peak(c.left.size() - 4800, c.left.size());
+                worst = std::max(worst, tail);
+                if (intensity == 0.7f) at_07_worst = std::max(at_07_worst, tail);
+            }
+        }
+        printf("  %-6s %.1f dBFS at 8 s; any TONE at INTENSITY 0.7 %.1f; any corner %.1f\n", kBodyNames[body],
+               20.0f * std::log10(quiet + 1e-12f), 20.0f * std::log10(at_07_worst + 1e-12f),
+               20.0f * std::log10(worst + 1e-12f));
+        CHECK(quiet < 0.00316f);
+        CHECK(worst < 0.0316f);
+    }
+}
+
+// TONE reads on METAL: its three sweep points differ by at least 5% in spectral centroid.
+void test_sweep_metal_tone_distinct() {
+    printf("\n--- sweep_metal_tone_distinct ---\n");
+    const auto centroid = [](float tone) {
+        const std::vector<float> m = body_tap(2, tone, 0.3f, 0.7f, 9600).take.mono();
+        return centroid_hz(m, 0, 9600, 48000.0f);
+    };
+    const float low = centroid(0.0f), mid = centroid(0.5f), high = centroid(1.0f);
+    printf("  centroid TONE 0 %.0f Hz, 0.5 %.0f Hz, 1 %.0f Hz\n", low, mid, high);
+    CHECK(std::fabs(mid - low) >= 0.05f * low);
+    CHECK(std::fabs(high - mid) >= 0.05f * mid);
+    CHECK(std::fabs(high - low) >= 0.05f * low);
+}
+
+// Switching bodies keeps the level: a tap's first 700 ms on each body, at its default and its
+// middle position, is within 3 dB of METAL at the default.
+void test_level_trim_spread() {
+    printf("\n--- level_trim_spread ---\n");
+    const auto level = [](int body, float tone, float ring, float intensity) {
+        return stereo_rms(body_tap(body, tone, ring, intensity, 33600).take, 0, 33600);
+    };
+    const float metal = level(2, 0.3f, 0.1f, 0.7f);
+    CHECK(near(cowbell_macros(2, 0.3f, 0.1f, 0.7f).level_trim, 1.0f, 1e-6f));
+    for (int body = 0; body < kCowbellBodyCount; ++body) {
+        const float at_default = 20.0f * std::log10(level(body, 0.3f, 0.1f, 0.7f) / metal);
+        const float at_mid = 20.0f * std::log10(level(body, 0.5f, 0.5f, 0.5f) / metal);
+        printf("  %-6s trim %.2f: default %+.1f dB, mid %+.1f dB against METAL's default (RMS %.4f)\n",
+               kBodyNames[body], cowbell_macros(body, 0.5f, 0.5f, 0.5f).level_trim, at_default, at_mid, metal);
+        CHECK(std::fabs(at_default) <= 3.0f);
+        CHECK(std::fabs(at_mid) <= 3.0f);
     }
 }
 
@@ -1367,15 +1544,15 @@ float side_db(const Take& t, size_t begin, size_t end) {
 // the two-pickup spread of a single voice.
 void test_stereo_width() {
     printf("\n--- stereo_width ---\n");
-    Rig poly;  // RING 0.5: two voices
+    Rig poly;
+    poly.set("body", 0.0f);  // STRING: two voices
     poly.strike(1.0f);
     Take tp;
     poly.render(24000, tp);
     const float poly_db = side_db(tp, 0, tp.left.size());
 
     Rig mono;
-    mono.set("ring", 0.3f);  // one voice
-    mono.strike(1.0f);
+    mono.strike(1.0f);  // METAL: one voice
     Take tm;
     mono.render(24000, tm);
     std::vector<float> diff(tm.left.size()), sum(tm.left.size());
@@ -1384,12 +1561,13 @@ void test_stereo_width() {
         sum[i] = tm.left[i] + tm.right[i];
     }
     const float spread = rms(diff, 0, diff.size()) / std::max(rms(sum, 0, sum.size()), 1e-12f);
-    printf("  RING 0.5 lone tap: L/R %.2f dB apart; RING 0.3: side/mid %.3f\n", poly_db, spread);
+    printf("  STRING lone tap: L/R %.2f dB apart; METAL: side/mid %.3f\n", poly_db, spread);
     CHECK(poly_db < 3.0f);
     CHECK(spread > 0.05f);
 
-    // Two quick hits at RING 0.5 still land on opposite sides.
+    // Two quick hits on a two-voice body still land on opposite sides.
     Rig fast;
+    fast.set("body", 0.0f);
     fast.strike(1.0f);
     Take tf;
     fast.render(2400, tf);
@@ -1401,34 +1579,39 @@ void test_stereo_width() {
     CHECK(first_lr * second_lr < 0.0f);
 }
 
-void test_engine_bad_ordinal_ignored() {
-    printf("\n--- engine_bad_ordinal_ignored ---\n");
+// The ordinal map still serves the drum-voice engine port in the shared routing.
+void test_kotlin_engine_ordinal_mapping() {
+    printf("\n--- kotlin_engine_ordinal_mapping ---\n");
     CHECK(kotlin_engine_ordinal_to_plaits(-1) == -1);
     CHECK(kotlin_engine_ordinal_to_plaits(99) == -1);
     CHECK(kotlin_engine_ordinal_to_plaits(25) == -1);
     CHECK(kotlin_engine_ordinal_to_plaits(2) == 23);
     CHECK(kotlin_engine_ordinal_to_plaits(3) == 10);
     CHECK(kotlin_engine_ordinal_to_plaits(24) == 4);
-
-    Rig r;
-    r.set("engine", 5.0f);  // Noise
-    r.strike(1.0f);
-    r.block(128);
-    const int noise = kotlin_engine_ordinal_to_plaits(5);
-    CHECK(r.e->cowbell_state.exciter_engine == noise);
-    r.set("engine", 99.0f);
-    r.strike(1.0f);
-    r.block(128);
-    CHECK(r.e->cowbell_state.exciter_engine == noise);
-    r.e->cowbell_engine.store(99);  // past the port's range check
-    r.strike(1.0f);
-    Take t;
-    r.render(4800, t);
-    CHECK(r.e->cowbell_state.exciter_engine == noise);
-    CHECK(all_finite(t.mono()));
-    CHECK(t.peak() > 1e-3f);
 }
 
+// A stale writer may still send the retired `engine` and `metal`: the unit ignores them, and a tap
+// rings the same.
+void test_removed_ports_are_no_ops() {
+    printf("\n--- removed_ports_are_no_ops ---\n");
+    auto tap = [](bool write_ports) {
+        Rig r;
+        if (write_ports) {
+            for (float v : {99.0f, -1.0f, std::nanf(""), 5.0f}) r.set("engine", v);
+            r.set("metal", 1.0f);
+        }
+        r.strike(1.0f);
+        Take t;
+        r.render(24000, t);
+        return t;
+    };
+    const Take plain = tap(false);
+    const Take written = tap(true);
+    printf("  peak %.4f with the ports written, %.4f without\n", written.peak(), plain.peak());
+    CHECK(written.peak() > 1e-3f);
+    CHECK(written.left == plain.left);
+    CHECK(written.right == plain.right);
+}
 
 // ── GRID ────────────────────────────────────────────────────────
 
@@ -1768,14 +1951,13 @@ void side_f0s(const Take& t, size_t begin, float expected, float* left, float* r
     *right = lowest_partial_hz(t.right.data() + begin, 16384, 48000.0f, 0.3f * expected, 3.0f * expected);
 }
 
-// Two strikes 100 frames apart, from silence, at RING 0.5 (two voices, one per side). The first
+// Two strikes 100 frames apart, from silence, on STRING (two voices, one per side). The first
 // voice must keep the root, not the note the resonator was primed on.
 void test_wake_two_strikes_keep_pitch() {
     printf("\n--- wake_two_strikes_keep_pitch ---\n");
-    constexpr float kExpected = 587.33f;  // D5
-    {
-        // The resonator alone, both strikes in one block at offsets 0 and 100.
-        const CowbellParams p = cowbell_macros(0.7f, 0.5f, 0.6f);
+    constexpr float kD5 = 587.33f;  // the string model's lowest partial sits near, not on, the root
+    const CowbellParams p = cowbell_macros(0, 0.55f, 0.5f, 0.6f);  // STRING: a pair of voices
+    auto render_resonator = [&p](bool both_strikes) {
         OrpheusCowbellResonator reso;
         reso.init(48000.0f);
         reso.set_model(p.model);
@@ -1786,7 +1968,7 @@ void test_wake_two_strikes_keep_pitch() {
         reso.set_position(0.5f);
         reso.set_note(74.0f);
         reso.strike(1.0f, 0);
-        reso.strike(1.0f, 100);
+        if (both_strikes) reso.strike(1.0f, 100);
         Take t;
         float l[128], r[128];
         for (int b = 0; b < 375; ++b) {
@@ -1794,17 +1976,28 @@ void test_wake_two_strikes_keep_pitch() {
             t.left.insert(t.left.end(), l, l + 128);
             t.right.insert(t.right.end(), r, r + 128);
         }
+        return t;
+    };
+    // One lone strike is voice 0 on the note: the pitch both voices must then share.
+    const Take lone = render_resonator(false);
+    const std::vector<float> lone_mono = lone.mono();  // a lone strike sounds on one side only
+    const float expected = lowest_partial_hz(lone_mono.data() + 2400, 16384, 48000.0f, 0.3f * kD5, 3.0f * kD5);
+    printf("  lone voice: %.2f Hz\n", expected);
+    {
+        // The resonator alone, both strikes in one block at offsets 0 and 100.
+        const Take t = render_resonator(true);
         float fl = 0.0f, fr = 0.0f;
-        side_f0s(t, 2400, kExpected, &fl, &fr);
+        side_f0s(t, 2400, kD5, &fl, &fr);
         printf("  resonator, one block: left %.2f Hz (%.1f cents), right %.2f Hz (%.1f cents)\n", fl,
-               cents(fl, kExpected), fr, cents(fr, kExpected));
-        CHECK(std::fabs(cents(fl, kExpected)) <= 10.0f);
-        CHECK(std::fabs(cents(fr, kExpected)) <= 10.0f);
+               cents(fl, expected), fr, cents(fr, expected));
+        CHECK(std::fabs(cents(fl, expected)) <= 10.0f);
+        CHECK(std::fabs(cents(fr, expected)) <= 10.0f);
     }
     {
         // The unit, woken from idle after the root moved from C to D: a 100-frame block, then
         // the second strike.
         Rig r;
+        r.set("body", 0.0f);  // STRING: a pair of voices
         Take idle;
         r.render(48000, idle);
         CHECK(r.e->cowbell_state.idle);
@@ -1815,27 +2008,26 @@ void test_wake_two_strikes_keep_pitch() {
         r.strike(1.0f);
         r.render(48000, t);
         float fl = 0.0f, fr = 0.0f;
-        side_f0s(t, 2400, kExpected, &fl, &fr);
+        side_f0s(t, 2400, kD5, &fl, &fr);
         printf("  unit after idle, 100 frames apart: left %.2f Hz (%.1f cents), right %.2f Hz (%.1f cents)\n", fl,
-               cents(fl, kExpected), fr, cents(fr, kExpected));
-        CHECK(std::fabs(cents(fl, kExpected)) <= 10.0f);
-        CHECK(std::fabs(cents(fr, kExpected)) <= 10.0f);
+               cents(fl, expected), fr, cents(fr, expected));
+        CHECK(std::fabs(cents(fl, expected)) <= 10.0f);
+        CHECK(std::fabs(cents(fr, expected)) <= 10.0f);
     }
 }
 
-// The first strike after idle at RING 0.5 is narrowed from its first frame, not ramped in from
+// The first strike after idle on a two-voice body is narrowed from its first frame, not ramped in from
 // full width over the block.
 void test_wake_width_from_strike_polyphony() {
     printf("\n--- wake_width_from_strike_polyphony ---\n");
     for (bool from_idle : {false, true}) {
         Rig r;
         if (from_idle) {
-            r.set("ring", 0.3f);  // idles at one voice
-            Take idle;
+            Take idle;  // METAL idles at one voice
             r.render(48000, idle);
             CHECK(r.e->cowbell_state.idle);
-            r.set("ring", 0.5f);
         }
+        r.set("body", 0.0f);  // STRING: two voices
         r.strike(1.0f);
         Take t;
         r.render(128, t);
@@ -1928,17 +2120,14 @@ void test_more_zero_is_bit_identical() {
     printf("  render hash %016llx\n", (unsigned long long)h);
 }
 
-// The shipped default is an acoustic cowbell: the FM body, a dry ring, a bare strike.
+// The shipped default is an acoustic cowbell: the METAL body, ringing on, struck hard.
 void test_default_voicing() {
     printf("\n--- default_voicing ---\n");
     Rig r(48000.0f, false);
-    CHECK(r.e->cowbell_metal.load() == 0.84f);
-    CHECK(r.e->cowbell_ring.load() == 0.0f);
-    CHECK(r.e->cowbell_intensity.load() == 0.7f);
-    CHECK(r.e->cowbell_engine.load() == -1);
-    OrpheusEngine* fresh = orpheus_engine_create(48000.0f);
-    CHECK(fresh->cowbell_engine.load() == -1);
-    orpheus_engine_destroy(fresh);
+    CHECK(r.e->cowbell_body.load() == 2);
+    CHECK(r.e->cowbell_tone.load() == 0.0f);
+    CHECK(r.e->cowbell_ring.load() == 0.48f);
+    CHECK(r.e->cowbell_intensity.load() == 0.85f);
     r.e->pulsar_root_note.store(2);
     r.strike(1.0f);
     Take t;
@@ -1948,7 +2137,7 @@ void test_default_voicing() {
     const float late = rms(m, 57600, 72000);
     printf("  first 100 ms RMS %.4f, 1.2-1.5 s RMS %.6f\n", early, late);
     CHECK(early > 1e-3f);
-    CHECK(late < 1e-3f * early);  // down 60 dB well inside 1.5 s, as a cowbell is
+    CHECK(late < 1e-2f * early);  // down 40 dB by 1.2 s: it rings, then it is gone
 }
 
 void test_more_boosts_the_bell_9db() {
@@ -1972,7 +2161,7 @@ void test_more_ceiling_still_tames_peaks() {
     printf("\n--- more_ceiling_still_tames_peaks ---\n");
     const Take loud = more_take(1.0f, 1.0f, 1.0f);
     printf("  full level, full more: peak %.4f\n", loud.peak());
-    CHECK(loud.peak() < 0.98f);
+    CHECK(loud.peak() <= kTestCeiling);
 }
 
 void test_more_zero_never_ducks() {
@@ -2006,9 +2195,11 @@ bool run_cowbell_unit_tests() {
     g_pass = g_fail = 0;
     printf("\n########## Cowbell unit tests ##########\n");
     test_macros_defaults();
-    test_macros_segments();
+    test_macros_bodies();
     test_macros_ring_polyphony();
     test_macros_grid_in_range();
+    test_macros_monotonic();
+    test_body_port_validates();
     test_strike_round_trip();
     test_strike_parity_constants();
     test_strike_bad_port_values();
@@ -2025,30 +2216,36 @@ bool run_cowbell_unit_tests() {
     test_unit_disabled_zeroes();
     test_unit_bad_ports();
     test_unit_offsets_sweep_glides();
-    test_exciter_engine_colours_the_hit();
-    test_exciter_tap_releases();
-    test_exciter_tap_releases_vca();
+    test_tap_releases();
     test_synth_gate_sustains();
+    test_synth_held_note_every_body();
     test_bend_bends_ringing_voices();
     test_bend_sweep_glides();
     test_snap_to_scale_major();
     test_bend_scale_snaps_held_note();
-    test_bend_scale_off_write_is_a_no_op();
     test_bend_scale_free_while_pulsar_stopped();
     test_bend_scale_respects_note_cap();
     test_bend_scale_glide_has_no_click();
-    test_engine_change_mid_ring_no_click();
-    test_exciter_full_block_of_hits();
-    test_fill_impulse_unscaled();
-    test_fill_kinds_skip_engine();
+    test_body_change_waits_for_strike();
+    test_body_change_mid_ring_identical();
+    test_body_change_ring_top_falls_quiet();
+    test_body_change_adopted_by_gate_or_idle();
+    test_body_change_hit_attacks_at_full_level();
+    test_full_block_of_hits();
     test_fill_kinds_differ();
     test_marble_rings_like_a_tap();
     test_colour_shapes_brightness();
     test_fill_burst_storm_bounded();
     test_tap_peaks_below_knee();
+    test_sweep_tap_health();
+    test_sweep_ring_is_the_tail();
+    test_sweep_ring_top_falls_quiet();
+    test_sweep_metal_tone_distinct();
+    test_level_trim_spread();
     test_burst_pool_full_replaces_quietest();
     test_stereo_width();
-    test_engine_bad_ordinal_ignored();
+    test_kotlin_engine_ordinal_mapping();
+    test_removed_ports_are_no_ops();
     test_grid_off_plays_now();
     test_grid_full_pull_lands_on_line();
     test_grid_partial_pull();

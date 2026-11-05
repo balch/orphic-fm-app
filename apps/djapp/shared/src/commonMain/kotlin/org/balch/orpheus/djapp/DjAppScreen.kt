@@ -188,6 +188,9 @@ fun DjAppScreen(
         mutableStateOf<DjRoute?>(null)
     }
 
+    // Here and not in the tab: it must outlive a tab switch and process death, and end with a quit.
+    var cowbellMotion by rememberSaveable { mutableStateOf(false) }
+
     // A shared tab opens the AI sheet; the marker is saved so rotation doesn't reopen it, and
     // carries the inbox session so a count from before process death is ignored.
     var handledShares by rememberSaveable { mutableStateOf<String?>(null) }
@@ -374,6 +377,8 @@ fun DjAppScreen(
                                 modifier = panelModifier,
                                 docked = docked,
                                 lift = hornPillLift(layout, docked, barShown = presetChrome.available && presetChrome.barShown),
+                                savedMotion = cowbellMotion,
+                                onSaveMotion = { cowbellMotion = it },
                             )
                             VibeInfoTab -> VibeInfoPanel(
                                 pulsar = pulsarFeature,

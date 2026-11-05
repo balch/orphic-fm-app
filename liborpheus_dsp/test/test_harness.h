@@ -522,6 +522,7 @@ bool run_cowbell_reso_tests();
 bool run_cowbell_unit_tests();
 bool run_cowbell_spike();
 bool run_cowbell_bench();
+bool run_cowbell_samples();
 bool run_tides_tests();
 bool run_preset_voice_tests();
 bool run_pulsar_tests();

@@ -9,15 +9,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,10 +65,8 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.withTimeoutOrNull
-import org.balch.orpheus.core.audio.EngineCatalog
-import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
-import org.balch.orpheus.features.cowbell.CowbellEnginePicker
+import org.balch.orpheus.features.cowbell.CowbellChoiceMenu
 import org.balch.orpheus.features.cowbell.CowbellPanelActions
 import org.balch.orpheus.features.cowbell.CowbellPanelColor
 import org.balch.orpheus.features.cowbell.CowbellUiState
@@ -81,32 +75,32 @@ import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.Learnable
-import org.balch.orpheus.ui.widgets.engine.enginePickerTestTag
 
 internal const val CowbellCtlModeTag = "cowbell-ctl-mode"
-internal const val CowbellCtlEngineTag = "cowbell-ctl-engine"
 internal const val CowbellCtlOctaveTag = "cowbell-ctl-octave"
 internal const val CowbellCtlLevelTag = "cowbell-ctl-level"
 internal const val CowbellCtlLockTag = "cowbell-ctl-lock"
-internal const val CowbellCtlBendTag = "cowbell-ctl-bend"
 internal const val CowbellCtlMotionTag = "cowbell-ctl-motion"
 internal const val CowbellCtlSliderTag = "cowbell-ctl-slider"
 internal const val CowbellFillDropdownTag = "cowbell-fill-dropdown"
 
-/** Every chip is this tall: six of them and the collapse pill still fit the 205dp Duo slot at 1.3. */
+/** Every chip is this tall: five of them and the collapse pill still fit the 205dp Duo slot at 1.3. */
 internal val ControlChipHeight = 26.dp
 
 /** The press-and-slide rail. Its labels sit inside it, so the rail is the whole track. */
 internal val SliderRailWidth = 48.dp
 internal val SliderRailHeight = 140.dp
 
-/** Tight, so the closed Duo at 1.3 still has room for the collapse pill over the mode chip. */
+/** The most the five chips can close up, so the closed Duo at 1.3 still has room for the collapse pill over them. */
 private val ChipGap = 2.dp
 
-/** The collapse pill over the chips, as wide as they are: its top margin and height. The chips start under it. */
+/** The shortest the chips can run, gaps included. */
+internal val ChipsMinHeight = ControlChipHeight * 5 + ChipGap * 4
+
+/** The collapse pill over the chips, as wide as they are: its top margin and height. The chips clear it. */
 internal val CollapsePillTop = 6.dp
 internal val CollapsePillHeight = 22.dp
-private val ControlsTopPadding = CollapsePillTop + CollapsePillHeight + 4.dp
+internal val ControlsTopClearance = CollapsePillTop + CollapsePillHeight + 4.dp
 
 /** Beside the chip, clear of the finger that holds it. */
 private val SliderGap = 6.dp
@@ -157,10 +151,6 @@ internal fun levelChipText(level: Float, more: Float): String =
 
 private fun octaveText(octave: Int): String = if (octave > 0) "+$octave" else "$octave"
 
-/** The engine's short code, or NONE for the bare impulse. */
-private fun engineCode(engine: Int): String =
-    OrpheusEngineId.entries.getOrNull(engine)?.let { EngineCatalog.codeFor(it) } ?: "NONE"
-
 private fun CowbellFill.title(): String = name.lowercase().replaceFirstChar { it.uppercase() }
 
 private enum class Menu { Mode, Octave }
@@ -180,15 +170,14 @@ private class SlideTrack {
 }
 
 /**
- * The DJ cowbell's first column: a mode dropdown over small Engine, Octave, Level, Lock and Bend
- * chips. On a phone with sensors the mode dropdown ends in a Motion toggle. Level and Lock also open a vertical slider (see [slideOnLongPress]). The popups sit over
- * this column and never over the bell, so a hand that is playing is not interrupted.
+ * The DJ cowbell's first column: a mode dropdown over small Octave, Level and Lock chips, then a Motion toggle on a phone with sensors. Level and Lock also open a vertical slider (see [slideOnLongPress]). The popups sit over
+ * this column and never over the bell, so a hand that is playing is not interrupted. The chips
+ * spread evenly over the height they are given.
  */
 @Composable
 internal fun CowbellControlColumn(
     state: CowbellUiState,
     actions: CowbellPanelActions,
-    hasNativeEngine: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var menu by remember { mutableStateOf<Menu?>(null) }
@@ -202,43 +191,24 @@ internal fun CowbellControlColumn(
             slider = null
         },
     )
-    // Centred, so a tall slot puts room above the mode chip; the closed Duo at 1.3 has none to give.
-    Column(modifier.padding(top = ControlsTopPadding), verticalArrangement = Arrangement.spacedBy(ChipGap, Alignment.CenterVertically)) {
+    Column(modifier, verticalArrangement = Arrangement.SpaceBetween) {
         Learnable(CowbellSymbol.MODE.controlId.key) {
             ControlChip(
                 text = "${state.mode.label} ▾",
                 tag = CowbellCtlModeTag,
-                // Lit until the menu has been opened a few times, so Motion in it gets found.
-                highlighted = menu == Menu.Mode || state.modeHint,
-                onClick = {
-                    actions.onModeMenuOpened()
-                    menu = Menu.Mode
-                },
+                highlighted = menu == Menu.Mode,
+                onClick = { menu = Menu.Mode },
             ) {
-                ChoiceMenu(
+                CowbellChoiceMenu(
+                    style = ChipText,
                     expanded = menu == Menu.Mode,
                     entries = CowbellMode.entries,
                     selected = state.mode,
                     label = { it.label },
                     onPick = { actions.onMode(it) },
                     onDismiss = { menu = null },
-                    footer = if (state.motionAvailable) {
-                        { MotionItem(state, actions.onMotion) { menu = null } }
-                    } else {
-                        null
-                    },
                 )
             }
-        }
-        Learnable(CowbellSymbol.ENGINE.controlId.key) {
-            CowbellEnginePicker(
-                engine = state.engine,
-                onEngine = actions.onEngine,
-                hasNativeEngine = hasNativeEngine,
-                modifier = Modifier.fillMaxWidth().enginePickerTestTag(CowbellCtlEngineTag),
-                label = "Eng ${engineCode(state.engine)}",
-                labelStyle = ChipText,
-            )
         }
         Learnable(CowbellSymbol.OCTAVE.controlId.key) {
             ControlChip(
@@ -247,7 +217,8 @@ internal fun CowbellControlColumn(
                 highlighted = menu == Menu.Octave,
                 onClick = { menu = Menu.Octave },
             ) {
-                ChoiceMenu(
+                CowbellChoiceMenu(
+                    style = ChipText,
                     expanded = menu == Menu.Octave,
                     entries = OCTAVES,
                     selected = state.octave,
@@ -300,13 +271,14 @@ internal fun CowbellControlColumn(
                 onTap = { actions.onGrid(!state.grid) },
             )
         }
-        // The VM does not watch a CC-driven BEND_SCALE, so Bend stays out of MIDI learn.
-        ControlChip(
-            text = "Bend ${if (state.bendScale) "Scale" else "Free"}",
-            tag = CowbellCtlBendTag,
-            highlighted = state.bendScale,
-            onClick = { actions.onBendScale(!state.bendScale) },
-        )
+        if (state.motionAvailable) {
+            ControlChip(
+                text = "Motion ${if (state.motion) "on" else "off"}",
+                tag = CowbellCtlMotionTag,
+                highlighted = state.motion,
+                onClick = { actions.onMotion(!state.motion) },
+            )
+        }
     }
 }
 
@@ -332,7 +304,8 @@ internal fun FillDropdown(
             highlighted = expanded,
             onClick = { expanded = true },
         ) {
-            ChoiceMenu(
+            CowbellChoiceMenu(
+                style = ChipText,
                 expanded = expanded,
                 entries = CowbellFill.entries,
                 selected = fill,
@@ -378,64 +351,6 @@ private fun ControlChip(
         }
         popups()
     }
-}
-
-/** A dropdown of [entries] under its chip. */
-@Composable
-private fun <T> ChoiceMenu(
-    expanded: Boolean,
-    entries: List<T>,
-    selected: T,
-    label: (T) -> String,
-    onPick: (T) -> Unit,
-    onDismiss: () -> Unit,
-    footer: (@Composable ColumnScope.() -> Unit)? = null,
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        containerColor = OrpheusColors.deepPurple,
-    ) {
-        for (entry in entries) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = label(entry),
-                        style = ChipText,
-                        color = CowbellPanelColor,
-                        fontWeight = if (entry == selected) FontWeight.Bold else FontWeight.Normal,
-                    )
-                },
-                onClick = {
-                    onPick(entry)
-                    onDismiss()
-                },
-            )
-        }
-        footer?.invoke(this)
-    }
-}
-
-/** The phone's tilt, jolts and shakes, for every mode. */
-@Composable
-private fun ColumnScope.MotionItem(state: CowbellUiState, onMotion: (Boolean) -> Unit, onDismiss: () -> Unit) {
-    val on = state.motion
-    HorizontalDivider(color = CowbellPanelColor.copy(alpha = 0.3f))
-    DropdownMenuItem(
-        text = {
-            Text(
-                text = "Motion ${if (on) "on" else "off"}",
-                style = ChipText,
-                color = CowbellPanelColor,
-                fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-            )
-        },
-        onClick = {
-            onMotion(!state.motion)
-            onDismiss()
-        },
-        modifier = Modifier.testTag(CowbellCtlMotionTag),
-    )
 }
 
 /**

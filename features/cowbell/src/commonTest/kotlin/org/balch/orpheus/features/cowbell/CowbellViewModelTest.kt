@@ -26,6 +26,7 @@ import org.balch.orpheus.core.plugin.symbols.COWBELL_URI
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.BaseAppPreferencesRepository
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.plugins.cowbell.cowbellStrikeValue
@@ -53,10 +54,10 @@ class CowbellViewModelTest {
     private val knobPorts = mutableMapOf<String, PortValue>(
         "level" to FloatValue(0.7f),
         "more" to FloatValue(0f),
-        "metal" to FloatValue(0.84f),
-        "ring" to FloatValue(0f),
-        "intensity" to FloatValue(0.7f),
-        "engine" to IntValue(-1),
+        "body" to IntValue(2),
+        "tone" to FloatValue(0f),
+        "ring" to FloatValue(0.48f),
+        "intensity" to FloatValue(0.85f),
         "octave" to IntValue(0),
         "grid" to BoolValue(true),
         "grid_strength" to FloatValue(0.7f),
@@ -68,13 +69,12 @@ class CowbellViewModelTest {
     private val prefs = MemoryPrefs()
     private val hostHold = AudioHostHold()
     private lateinit var scope: FeatureCoroutineScope
+    private lateinit var controller: SynthController
 
-    /** [keepInitWrite] false drops the one bend_scale write init makes, so gesture tests start empty. */
     private fun makeViewModel(
-        keepInitWrite: Boolean = false,
         restoreStrategy: RestoreStrategy = RestoreStrategy.USER_PREFERENCES,
     ): CowbellViewModel {
-        val controller = SynthController().apply {
+        controller = SynthController().apply {
             setDelegates(
                 setter = { id, value ->
                     if (id.symbol == "grid") gridWrites += value
@@ -94,7 +94,7 @@ class CowbellViewModelTest {
             // The test dispatcher, so the 2 s save debounce runs on virtual time.
             persistence = FeatureStatePersistence(prefs, TestIoDispatchers(testDispatcher), scope),
             restoreStrategy = restoreStrategy,
-        ).also { if (!keepInitWrite) engine.writes.removeAll { (_, symbol, _) -> symbol == "bend_scale" } }
+        )
     }
 
     /** Collects the state so the WhileSubscribed projection runs. */
@@ -440,10 +440,9 @@ class CowbellViewModelTest {
         observe(vm)
 
         vm.actions.onLevel(0.31f)
-        vm.actions.onMetal(0.32f)
+        vm.actions.onTone(0.32f)
         vm.actions.onRing(0.33f)
         vm.actions.onIntensity(0.34f)
-        vm.actions.onEngine(7)
         vm.actions.onOctave(-1)
         vm.actions.onGrid(true)
         vm.actions.onGridStrength(0.35f)
@@ -452,10 +451,9 @@ class CowbellViewModelTest {
         advanceUntilIdle()
 
         assertEquals(FloatValue(0.31f), knobPorts["level"])
-        assertEquals(FloatValue(0.32f), knobPorts["metal"])
+        assertEquals(FloatValue(0.32f), knobPorts["tone"])
         assertEquals(FloatValue(0.33f), knobPorts["ring"])
         assertEquals(FloatValue(0.34f), knobPorts["intensity"])
-        assertEquals(IntValue(7), knobPorts["engine"])
         assertEquals(IntValue(-1), knobPorts["octave"])
         assertEquals(BoolValue(true), knobPorts["grid"])
         assertEquals(FloatValue(0.35f), knobPorts["grid_strength"])
@@ -464,13 +462,63 @@ class CowbellViewModelTest {
 
         assertEquals(
             CowbellUiState(
-                level = 0.31f, metal = 0.32f, ring = 0.33f, intensity = 0.34f,
-                engine = 7, octave = -1, grid = true, gridStrength = 0.35f,
-                mode = CowbellMode.SYNTH, fill = CowbellFill.SEEDS, modeHint = true,
+                level = 0.31f, tone = 0.32f, ring = 0.33f, intensity = 0.34f,
+                octave = -1, grid = true, gridStrength = 0.35f,
+                mode = CowbellMode.SYNTH, fill = CowbellFill.SEEDS,
             ),
             vm.stateFlow.value,
         )
         assertTrue(engine.writes.isEmpty(), "knobs go through the controller, not setPluginPort")
+    }
+
+    @Test
+    fun onBodyWritesTheOrdinalAndStateFollows() = runTest(testDispatcher) {
+        val vm = makeViewModel()
+        observe(vm)
+
+        vm.actions.onBody(CowbellBody.SYNTH)
+        advanceUntilIdle()
+
+        assertEquals(IntValue(CowbellBody.SYNTH.ordinal), knobPorts["body"])
+        assertEquals(CowbellBody.SYNTH, vm.stateFlow.value.body)
+        assertTrue(engine.writes.isEmpty(), "BODY goes through the controller, not setPluginPort")
+    }
+
+    @Test
+    fun onToneWritesTheTonePort() = runTest(testDispatcher) {
+        val vm = makeViewModel()
+        observe(vm)
+
+        vm.actions.onTone(0.62f)
+        advanceUntilIdle()
+
+        assertEquals(FloatValue(0.62f), knobPorts["tone"])
+        assertEquals(0.62f, vm.stateFlow.value.tone)
+    }
+
+    @Test
+    fun anOutOfRangeBodyClampsIntoTheEnum() = runTest(testDispatcher) {
+        knobPorts["body"] = IntValue(9)
+        val vm = makeViewModel()
+        observe(vm)
+        assertEquals(CowbellBody.SYNTH, vm.stateFlow.value.body)
+
+        knobPorts["body"] = IntValue(-3)
+        val low = makeViewModel()
+        observe(low)
+        assertEquals(CowbellBody.STRING, low.stateFlow.value.body)
+    }
+
+    @Test
+    fun aBodySetByThePortDirectlyUpdatesTheBody() = runTest(testDispatcher) {
+        val vm = makeViewModel()
+        observe(vm)
+
+        // What a preset or MIDI does: write the controller's flow, not the action.
+        controller.controlFlow(CowbellSymbol.BODY.controlId).value = IntValue(CowbellBody.SITAR.ordinal)
+        advanceUntilIdle()
+
+        assertEquals(CowbellBody.SITAR, vm.stateFlow.value.body)
     }
 
     @Test
@@ -558,63 +606,23 @@ class CowbellViewModelTest {
     }
 
     @Test
-    fun theModeChipGlowsUntilItsMenuOpensThreeTimes() = runTest(testDispatcher) {
-        val vm = makeViewModel()
-        observe(vm)
-        advanceUntilIdle()
-        assertTrue(vm.stateFlow.value.modeHint)
-        repeat(3) { vm.actions.onModeMenuOpened() }
-        advanceUntilIdle()
-        assertFalse(vm.stateFlow.value.modeHint)
-        assertEquals(3, prefs.saved.cowbellModeMenuOpens)
-        vm.actions.onModeMenuOpened()
-        advanceUntilIdle()
-        assertEquals(3, prefs.saved.cowbellModeMenuOpens, "counting stops once the hint is gone")
-
-        val next = makeViewModel()
-        observe(next)
-        advanceUntilIdle()
-        assertFalse(next.stateFlow.value.modeHint, "the next launch remembers")
-    }
-
-    @Test
-    fun bendScalePersistsAndSetsPort() = runTest(testDispatcher) {
-        val vm = makeViewModel(keepInitWrite = true)
-        observe(vm)
-        assertEquals(false, prefs.saved.cowbellBendScale)
-        assertEquals(listOf("bend_scale" to BoolValue(false)), writes(), "init writes the saved value once")
-
-        vm.actions.onBendScale(true)
-        advanceUntilIdle()
-        assertEquals("bend_scale" to BoolValue(true), writes().last())
-        assertEquals(true, prefs.saved.cowbellBendScale)
-        assertTrue(vm.stateFlow.value.bendScale)
-
-        val second = makeViewModel(keepInitWrite = true)
-        observe(second)
-        assertEquals("bend_scale" to BoolValue(true), writes().last(), "a new view model writes the saved value")
-        assertTrue(second.stateFlow.value.bendScale)
-    }
-
-    @Test
     fun stateStartsAtThePluginDefaults() = runTest(testDispatcher) {
         val vm = makeViewModel()
         observe(vm)
-        // A first launch: the mode chip's hint is on.
-        assertEquals(CowbellUiState(modeHint = true), vm.stateFlow.value)
+        assertEquals(CowbellUiState(), vm.stateFlow.value)
     }
 
     @Test
     fun badPortValuesStayInRange() = runTest(testDispatcher) {
         knobPorts["mode"] = IntValue(9)
         knobPorts["fill"] = IntValue(-4)
-        knobPorts["engine"] = IntValue(99)
+        knobPorts["body"] = IntValue(99)
         val vm = makeViewModel()
         observe(vm)
         val state = vm.stateFlow.value
         assertEquals(CowbellMode.SYNTH, state.mode)
         assertEquals(CowbellFill.MARBLE, state.fill)
-        assertEquals(24, state.engine)
+        assertEquals(CowbellBody.SYNTH, state.body)
     }
 
     @Test
@@ -657,16 +665,15 @@ class CowbellViewModelTest {
         prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(
             CowbellUiState.serializer(),
             CowbellUiState(
-                level = 0.4f, more = 0.3f, metal = 0.65f, ring = 0.2f, intensity = 0.9f, engine = 5,
+                level = 0.4f, more = 0.3f, body = CowbellBody.SITAR, tone = 0.65f, ring = 0.2f, intensity = 0.9f,
                 octave = -1, grid = false, gridStrength = 0.4f, mode = CowbellMode.SHAKE, fill = CowbellFill.BEADS,
-                motion = true,
             ),
         ))
         val vm = makeViewModel()
         observe(vm)
 
-        assertEquals(IntValue(5), knobPorts["engine"], "the picked engine must survive a relaunch")
-        assertEquals(FloatValue(0.65f), knobPorts["metal"])
+        assertEquals(IntValue(CowbellBody.SITAR.ordinal), knobPorts["body"], "the picked body must survive a relaunch")
+        assertEquals(FloatValue(0.65f), knobPorts["tone"])
         assertEquals(FloatValue(0.2f), knobPorts["ring"])
         assertEquals(FloatValue(0.9f), knobPorts["intensity"])
         assertEquals(FloatValue(0.4f), knobPorts["level"])
@@ -676,23 +683,60 @@ class CowbellViewModelTest {
         assertEquals(FloatValue(0.4f), knobPorts["grid_strength"])
         assertEquals(CowbellMode.SHAKE, vm.stateFlow.value.mode)
         assertEquals(CowbellFill.BEADS, vm.stateFlow.value.fill)
-        assertTrue(vm.stateFlow.value.motion)
     }
 
     @Test
-    fun aPickedEngineIsSavedForTheNextLaunch() = runTest(testDispatcher) {
+    fun anOldSaveWithMotionOnStillStartsOff() = runTest(testDispatcher) {
+        prefs.saved = AppPreferences(lastCowbellJson = """{"level":0.4,"motion":true}""")
+        val vm = makeViewModel()
+        observe(vm)
+        assertEquals(FloatValue(0.4f), knobPorts["level"])
+        assertFalse(vm.stateFlow.value.motion)
+    }
+
+    @Test
+    fun savedBodyAndToneComeBack() = runTest(testDispatcher) {
+        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(
+            CowbellUiState.serializer(),
+            CowbellUiState(body = CowbellBody.METAL, tone = 0.6f),
+        ))
+        val vm = makeViewModel()
+        observe(vm)
+
+        assertEquals(IntValue(CowbellBody.METAL.ordinal), knobPorts["body"])
+        assertEquals(FloatValue(0.6f), knobPorts["tone"])
+        assertEquals(CowbellBody.METAL, vm.stateFlow.value.body)
+        assertEquals(0.6f, vm.stateFlow.value.tone)
+    }
+
+    @Test
+    fun oldSavedJsonRestoresToMetalAtTheDefaultTone() = runTest(testDispatcher) {
+        prefs.saved = AppPreferences(lastCowbellJson = """{"metal":0.2,"engine":5,"ring":0.4}""")
+        val vm = makeViewModel()
+        observe(vm)
+
+        assertEquals(IntValue(CowbellBody.METAL.ordinal), knobPorts["body"])
+        assertEquals(FloatValue(0f), knobPorts["tone"])
+        assertEquals(FloatValue(0.4f), knobPorts["ring"])
+        assertEquals(CowbellBody.METAL, vm.stateFlow.value.body)
+        assertEquals(0f, vm.stateFlow.value.tone)
+        assertEquals(0.4f, vm.stateFlow.value.ring)
+    }
+
+    @Test
+    fun aPickedBodyIsSavedForTheNextLaunch() = runTest(testDispatcher) {
         val vm = makeViewModel()
         observe(vm)
         assertFalse(vm.stateFlow.value.motion, "motion starts off: the bender bends")
-        vm.actions.onEngine(7)
-        vm.actions.onMetal(0.62f)
+        vm.actions.onBody(CowbellBody.SYNTH)
+        vm.actions.onTone(0.62f)
         vm.actions.onMotion(true)
         advanceUntilIdle()
 
         val saved = Json.decodeFromString(CowbellUiState.serializer(), assertNotNull(prefs.saved.lastCowbellJson))
-        assertEquals(7, saved.engine)
-        assertEquals(0.62f, saved.metal)
-        assertTrue(saved.motion)
+        assertEquals(CowbellBody.SYNTH, saved.body)
+        assertEquals(0.62f, saved.tone)
+        assertFalse(prefs.saved.lastCowbellJson!!.contains("motion"), "motion starts off every launch")
         // Gestures and the bend never persist: a relaunch must not wake holding a note.
         assertFalse(prefs.saved.lastCowbellJson!!.contains("holding"))
         assertFalse(prefs.saved.lastCowbellJson!!.contains("\"bend\""))
@@ -700,10 +744,10 @@ class CowbellViewModelTest {
 
     @Test
     fun orpheusSavesButLeavesTheRestoreToItsPresets() = runTest(testDispatcher) {
-        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(engine = 5)))
+        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(body = CowbellBody.SITAR)))
         val vm = makeViewModel(restoreStrategy = RestoreStrategy.PRESET)
         advanceUntilIdle()
-        assertEquals(IntValue(-1), knobPorts["engine"])
+        assertEquals(IntValue(CowbellBody.METAL.ordinal), knobPorts["body"])
         assertFalse(vm.stateRestored.value)
     }
 
@@ -713,10 +757,10 @@ class CowbellViewModelTest {
         advanceUntilIdle()
         assertFalse(untouched.stateRestored.value)
 
-        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(engine = 5)))
+        prefs.saved = AppPreferences(lastCowbellJson = Json.encodeToString(CowbellUiState.serializer(), CowbellUiState(body = CowbellBody.SITAR)))
         val vm = makeViewModel()
         advanceUntilIdle()
-        assertEquals(IntValue(5), knobPorts["engine"])
+        assertEquals(IntValue(CowbellBody.SITAR.ordinal), knobPorts["body"])
         assertTrue(vm.stateRestored.value)
     }
 }

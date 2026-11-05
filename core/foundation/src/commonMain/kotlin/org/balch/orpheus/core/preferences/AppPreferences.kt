@@ -82,12 +82,8 @@ data class AppPreferences(
     val recentEngines: List<String> = emptyList(),
     /** The cowbell's mode-change morph by `BellMorphStyle` name: "SHARDS" or "LIQUID". */
     val bellMorph: String = "SHARDS",
-    /** Whether the cowbell's bend snaps to the playing vibe's scale. */
-    val cowbellBendScale: Boolean = false,
     /** The cowbell's knobs, engine, mode and fill, restored at launch where the app restores. */
     val lastCowbellJson: String? = null,
-    /** How often the cowbell's mode menu was opened; its chip glows until the first few. */
-    val cowbellModeMenuOpens: Int = 0,
 )
 
 

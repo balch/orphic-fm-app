@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.features.cowbell.motion.JoltWindow
@@ -46,14 +47,15 @@ internal class RecordingActions {
     val bends = mutableListOf<Float>()
     val modes = mutableListOf<CowbellMode>()
     val fills = mutableListOf<CowbellFill>()
+    val bodies = mutableListOf<CowbellBody>()
     val motionAvailable = mutableListOf<Boolean>()
     val tilts = mutableListOf<Float>()
     val locks = mutableListOf<Float>()
     val mores = mutableListOf<Float>()
 
     val actions = CowbellPanelActions(
-        onMetal = {}, onRing = {}, onIntensity = {}, onLevel = {}, onGridStrength = {},
-        onEngine = {}, onOctave = {}, onGrid = {},
+        onBody = { bodies += it; calls += "body" }, onTone = {}, onRing = {}, onIntensity = {}, onLevel = {}, onGridStrength = {},
+        onOctave = {}, onGrid = {},
         onMode = { modes += it; calls += "mode" },
         onFill = { fills += it; calls += "fill" },
         onStrike = { v, x, y -> strikes += v; strikePoints += Offset(x, y); calls += "strike" },
@@ -67,7 +69,6 @@ internal class RecordingActions {
         onMotionAvailable = { motionAvailable += it },
         onFillStrike = { calls += "fillStrike" },
         onLock = { locks += it; calls += "lock" },
-        onBendScale = { calls += "bendScale" },
         onMore = { mores += it },
     )
 

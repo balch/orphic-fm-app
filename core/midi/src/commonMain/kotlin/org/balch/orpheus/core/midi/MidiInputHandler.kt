@@ -11,6 +11,7 @@ import org.balch.orpheus.core.audio.isDrumModControl
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import kotlin.math.roundToInt
 
@@ -35,6 +36,7 @@ class MidiInputHandler(
     // Track last CC values for button toggle detection
     private val lastCcValues = mutableMapOf<String, Float>()
     private val lastRawCcValues = mutableMapOf<String, Float>()
+    private val cowbellBodyKey = CowbellSymbol.BODY.controlId.key
 
     // ═══════════════════════════════════════════════════════════
     // MidiEventListener Implementation
@@ -59,7 +61,7 @@ class MidiInputHandler(
         stateHolder.getControlForNote(note)?.let { controlId ->
             if (velocity > 0) {
                 if (isCycleControl(controlId)) {
-                    cycleControl(controlId, 3)
+                    cycleControl(controlId, if (controlId == cowbellBodyKey) COWBELL_BODY_COUNT else 3)
                 } else {
                     toggleControl(controlId)
                 }
@@ -149,19 +151,30 @@ class MidiInputHandler(
     }
 
     private fun isCycleControl(controlId: String): Boolean {
-        return controlId == DuoLfoSymbol.MODE.controlId.key
+        return controlId == DuoLfoSymbol.MODE.controlId.key || controlId == cowbellBodyKey
     }
 
     private fun dispatchControlChange(controlId: String, value: Float) {
+        // A float body truncates in Kotlin and rounds in C++, so a CC would reach only String and Sitar.
+        val portValue = if (controlId == cowbellBodyKey) {
+            PortValue.IntValue((value.coerceIn(0f, 1f) * (COWBELL_BODY_COUNT - 1)).roundToInt())
+        } else {
+            PortValue.FloatValue(value)
+        }
         // Try to route through the typed plugin control system first
         val routed = synthController.setPluginControlByKey(
             controlId,
-            PortValue.FloatValue(value),
+            portValue,
             ControlEventOrigin.MIDI
         )
         // Fall back to legacy event emission for non-plugin controls
         if (!routed) {
             synthController.emitControlChange(controlId, value, ControlEventOrigin.MIDI)
         }
+    }
+
+    private companion object {
+        /** CowbellBody's size; this module cannot see the enum. */
+        const val COWBELL_BODY_COUNT = 4
     }
 }

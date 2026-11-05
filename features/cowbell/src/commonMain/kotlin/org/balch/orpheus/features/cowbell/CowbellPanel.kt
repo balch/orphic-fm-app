@@ -60,13 +60,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
-import org.balch.orpheus.core.audio.EngineCatalog
-import org.balch.orpheus.core.audio.EngineCategory
-import org.balch.orpheus.core.audio.EngineChoice
-import org.balch.orpheus.core.audio.EngineSlotKind
-import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
-import org.balch.orpheus.features.cowbell.dj.metalModeName
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellFill
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -76,8 +71,6 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.DefaultValueFormatter
 import org.balch.orpheus.ui.widgets.Learnable
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.engine.EnginePicker
-import org.balch.orpheus.ui.widgets.engine.NoEngineOption
 
 internal val CowbellPanelColor = OrpheusColors.bellBrass
 internal const val CowbellMoreTag = "cowbell-more"
@@ -105,9 +98,6 @@ internal fun bellWidthFraction(rowWidth: Dp, fontScale: Float): Float {
     return minOf(BELL_WIDTH_FRACTION, room).coerceAtLeast(MIN_BELL_FRACTION)
 }
 
-/** The engine's pill label when the engine is -1, the bare impulse. */
-private const val NO_ENGINE_LABEL = "NONE"
-
 private val FILL_ROW_HEIGHT = 22.dp
 
 /** Four pills share the controls' width, and JINGLES is seven letters. */
@@ -118,7 +108,6 @@ fun CowbellPanel(
     feature: CowbellFeature,
     modifier: Modifier = Modifier,
     outLevel: StateFlow<Float> = NoLevel,
-    hasNativeEngine: Boolean = true,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
@@ -128,7 +117,6 @@ fun CowbellPanel(
         feature = feature,
         modifier = modifier,
         outLevel = outLevel,
-        hasNativeEngine = hasNativeEngine,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         showCollapsedHeader = showCollapsedHeader,
@@ -142,7 +130,6 @@ internal fun CowbellPanelContent(
     feature: CowbellFeature,
     modifier: Modifier = Modifier,
     outLevel: StateFlow<Float> = NoLevel,
-    hasNativeEngine: Boolean = true,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
@@ -187,27 +174,35 @@ internal fun CowbellPanelContent(
             horizontalArrangement = Arrangement.spacedBy(BELL_CONTROLS_GAP),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(bellFraction).fillMaxHeight()) {
-                CowbellBell3D(
-                    mode = controls.mode,
-                    actions = actions,
-                    bend = { state.value.bend },
-                    fill = controls.fill,
-                    motionOn = controls.motion,
-                    outLevel = outLevel,
-                    morphStyle = morphStyle,
-                    modifier = Modifier.fillMaxSize(),
+            Column(
+                Modifier.weight(bellFraction).fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CowbellBodySelector(
+                    body = controls.body,
+                    onBody = actions.onBody,
                 )
-                // The look of a mode change is an extra: it shows with MORE, under the bell, where
-                // it costs the controls no height (a 260 dp slot has none to spare).
-                if (moreOpen) {
-                    MorphStylePill(morphStyle, feature::setMorphStyle, Modifier.align(Alignment.BottomCenter))
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    CowbellBell3D(
+                        mode = controls.mode,
+                        actions = actions,
+                        bend = { state.value.bend },
+                        fill = controls.fill,
+                        motionOn = controls.motion,
+                        outLevel = outLevel,
+                        morphStyle = morphStyle,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // The look of a mode change is an extra: it shows with MORE, under the bell, where
+                    // it costs the controls no height (a 260 dp slot has none to spare).
+                    if (moreOpen) {
+                        MorphStylePill(morphStyle, feature::setMorphStyle, Modifier.align(Alignment.BottomCenter))
+                    }
                 }
             }
             CowbellControls(
                 state = controls,
                 actions = actions,
-                hasNativeEngine = hasNativeEngine,
                 moreOpen = moreOpen,
                 onMoreToggle = { moreOpen = !moreOpen },
                 modifier = Modifier.weight(1f - bellFraction),
@@ -220,7 +215,6 @@ internal fun CowbellPanelContent(
 private fun CowbellControls(
     state: CowbellUiState,
     actions: CowbellPanelActions,
-    hasNativeEngine: Boolean,
     moreOpen: Boolean,
     onMoreToggle: () -> Unit,
     modifier: Modifier = Modifier,
@@ -237,22 +231,16 @@ private fun CowbellControls(
             FillRow(fill = state.fill, enabled = state.mode == CowbellMode.SHAKE, onFill = actions.onFill)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CowbellKnob(state.metal, actions.onMetal, "BODY", CowbellSymbol.METAL, formatter = ::metalModeName)
+            CowbellKnob(state.tone, actions.onTone, "TONE", CowbellSymbol.TONE)
             CowbellKnob(state.ring, actions.onRing, "RING", CowbellSymbol.RING)
             CowbellKnob(state.intensity, actions.onIntensity, "INTENSITY", CowbellSymbol.INTENSITY)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GridPill(on = state.grid, onToggle = actions.onGrid)
-            CowbellEnginePicker(
-                engine = state.engine,
-                onEngine = actions.onEngine,
-                hasNativeEngine = hasNativeEngine,
-                modifier = Modifier.weight(1f),
-            )
             MoreToggle(open = moreOpen, onToggle = onMoreToggle)
         }
         AnimatedVisibility(
@@ -285,7 +273,7 @@ private fun MoreRow(state: CowbellUiState, actions: CowbellPanelActions) {
 
 /** The pills' colours. A selection set by MIDI, AI or a preset still reads while its row is dimmed. */
 @Composable
-private fun cowbellPillColors() = SegmentedButtonDefaults.colors(
+internal fun cowbellPillColors() = SegmentedButtonDefaults.colors(
     activeContainerColor = CowbellPanelColor,
     activeContentColor = OrpheusColors.deepPurple,
     activeBorderColor = CowbellPanelColor,
@@ -425,37 +413,6 @@ private fun GridPill(on: Boolean, onToggle: (Boolean) -> Unit) {
     }
 }
 
-/** Bare engines from the drum slot's list, and NONE for the bare strike; no patch bank. [label] replaces the pill's text. */
-@Composable
-internal fun CowbellEnginePicker(
-    engine: Int,
-    onEngine: (Int) -> Unit,
-    hasNativeEngine: Boolean,
-    modifier: Modifier = Modifier,
-    label: String? = null,
-    labelStyle: TextStyle? = null,
-) {
-    val choices = remember(hasNativeEngine) {
-        EngineCatalog.choices(EngineSlotKind.DRUM, hasNativeEngine).filterIsInstance<EngineChoice.Engine>()
-    }
-    val current = remember(engine) {
-        EngineChoice.Engine(OrpheusEngineId.entries.getOrNull(engine) ?: OrpheusEngineId.HH)
-    }
-    EnginePicker(
-        current = current,
-        choices = choices,
-        onPick = { onEngine(it.engine.ordinal) },
-        color = CowbellPanelColor,
-        startCategory = EngineCategory.DRUMS,
-        compact = true,
-        pillHeight = 28.dp,
-        pillLabel = label ?: if (engine < 0) NO_ENGINE_LABEL else null,
-        labelStyle = labelStyle,
-        modifier = modifier,
-        none = remember(engine, onEngine) { NoEngineOption(NO_ENGINE_LABEL, selected = engine < 0) { onEngine(-1) } },
-    )
-}
-
 /** A 28dp chip with a 40dp hit area. */
 @Composable
 private fun MoreToggle(open: Boolean, onToggle: () -> Unit) {
@@ -515,12 +472,12 @@ private fun CowbellPanelSynthPreview() {
     }
 }
 
-@Preview(widthDp = 320, heightDp = 330, name = "Engine NONE (-1)")
+@Preview(widthDp = 320, heightDp = 330, name = "Sitar")
 @Composable
-private fun CowbellPanelNoEnginePreview() {
+private fun CowbellPanelSitarPreview() {
     OrpheusTheme {
         CowbellPanel(
-            feature = CowbellViewModel.previewFeature(CowbellUiState(engine = -1)),
+            feature = CowbellViewModel.previewFeature(CowbellUiState(body = CowbellBody.SITAR)),
             isExpanded = true,
             showCollapsedHeader = false,
         )

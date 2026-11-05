@@ -23,6 +23,9 @@ internal interface ShakeInput {
     /** The mouse over the bell box, each axis -1..1 from its centre. */
     fun pointerTilt(x: Float, y: Float)
 
+    /** The mouse left the bell box, so the lean eases back to centre. */
+    fun pointerLeft()
+
     /** Pointer movement, or a press's push: the bell is shoved by this much. */
     fun kick(dx: Float, dy: Float)
 
@@ -35,6 +38,7 @@ internal interface ShakeInput {
 
 internal object NoShakeInput : ShakeInput {
     override fun pointerTilt(x: Float, y: Float) {}
+    override fun pointerLeft() {}
     override fun kick(dx: Float, dy: Float) {}
     override fun plunge(bend: Float) {}
     override fun release(bend: Float) {}
@@ -71,7 +75,7 @@ private const val STILL_KICK_MS2 = 1.5f
 /** A phone that never holds still takes its angle anyway after this long, as it did before the wait. */
 private const val STILL_WAIT_SECONDS = 1.5
 
-/** The view's lean eases in this fast (full in 1/4 s) after a morph, so it never pops. */
+/** The view's lean eases in this fast (full in 1/4 s) after a morph, and out when the mouse leaves, so it never pops. */
 private const val SWAY_PER_SECOND = 4f
 
 /** The bell flash decays by this per 60 fps frame, as the prototype's. */
@@ -118,6 +122,8 @@ internal class ShakeRig(private val motion: MotionSource, private val random: Ra
 
     private var pointerX = 0f
     private var pointerY = 0f
+    private var pointerGone = false
+    private var pointerGain = 1f
     private var kickDpX = 0f
     private var kickDpY = 0f
 
@@ -133,6 +139,12 @@ internal class ShakeRig(private val motion: MotionSource, private val random: Ra
     override fun pointerTilt(x: Float, y: Float) {
         pointerX = x.coerceIn(-1f, 1f)
         pointerY = y.coerceIn(-1f, 1f)
+        pointerGone = false
+        pointerGain = 1f
+    }
+
+    override fun pointerLeft() {
+        pointerGone = true
     }
 
     override fun kick(dx: Float, dy: Float) {
@@ -222,8 +234,9 @@ internal class ShakeRig(private val motion: MotionSource, private val random: Ra
             kickX += sample.kickX * MOTION_KICK_PER_MS2
             kickY += sample.kickY * MOTION_KICK_PER_MS2
         } else {
-            tiltX = pointerX
-            tiltY = pointerY
+            if (pointerGone) pointerGain = max(0f, pointerGain - dt.toFloat() * SWAY_PER_SECOND)
+            tiltX = pointerX * pointerGain
+            tiltY = pointerY * pointerGain
         }
 
         // 4: the camera. A morph owns it, and the lean eases back in after.

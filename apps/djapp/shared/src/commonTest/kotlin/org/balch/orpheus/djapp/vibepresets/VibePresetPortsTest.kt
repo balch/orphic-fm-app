@@ -107,10 +107,10 @@ class VibePresetPortsTest {
             PresetField.PULSAR_BPM.key to 128f,
             PresetField.BELL_LEVEL.key to 0.61f,
             PresetField.BELL_MORE.key to 0.25f,
-            PresetField.BELL_METAL.key to 0.84f,
+            PresetField.BELL_BODY.key to 2f,
+            PresetField.BELL_TONE.key to 0.3f,
             PresetField.BELL_RING.key to 0.35f,
             PresetField.BELL_INTENSITY.key to 0.7f,
-            PresetField.BELL_ENGINE.key to -1f,
             PresetField.BELL_OCTAVE.key to -2f,
             PresetField.BELL_GRID.key to 1f,
             PresetField.BELL_GRID_STRENGTH.key to 0.55f,
@@ -157,7 +157,7 @@ class VibePresetPortsTest {
     fun bellSwitchesWriteTheirPortTypes() {
         ports().write(
             mapOf(
-                PresetField.BELL_ENGINE.key to -1f,
+                PresetField.BELL_BODY.key to 3f,
                 PresetField.BELL_OCTAVE.key to 1f,
                 PresetField.BELL_GRID.key to 0f,
                 PresetField.BELL_MODE.key to 1f,
@@ -165,11 +165,35 @@ class VibePresetPortsTest {
             ),
         )
 
-        assertEquals(IntValue(-1), portOf(CowbellSymbol.ENGINE.controlId))
+        assertEquals(IntValue(3), portOf(CowbellSymbol.BODY.controlId))
         assertEquals(IntValue(1), portOf(CowbellSymbol.OCTAVE.controlId))
         assertEquals(BoolValue(false), portOf(CowbellSymbol.GRID.controlId))
         assertEquals(IntValue(1), portOf(CowbellSymbol.MODE.controlId))
         assertEquals(IntValue(2), portOf(CowbellSymbol.FILL.controlId))
+    }
+
+    @Test
+    fun bodyAndToneReadBackAndNoRetiredKeysAppear() {
+        ports().write(mapOf(PresetField.BELL_BODY.key to 2f, PresetField.BELL_TONE.key to 0.3f))
+
+        val read = ports().read(TrackTuning())
+
+        assertEquals(2f, read["bell.body"])
+        assertEquals(0.3f, read["bell.tone"])
+        assertFalse(read.containsKey("bell.metal"))
+        assertFalse(read.containsKey("bell.engine"))
+    }
+
+    @Test
+    fun retiredMetalAndEngineKeysWriteNothing() {
+        ports().write(mapOf(PresetField.BELL_BODY.key to 1f, PresetField.BELL_TONE.key to 0.6f))
+        setterWrites.clear()
+
+        ports().write(mapOf("bell.metal" to 0.2f, "bell.engine" to 5f, "bell.ring" to 0.4f))
+
+        assertEquals(listOf<Pair<String, PortValue>>(CowbellSymbol.RING.controlId.key to FloatValue(0.4f)), setterWrites)
+        assertEquals(IntValue(1), portOf(CowbellSymbol.BODY.controlId))
+        assertEquals(FloatValue(0.6f), portOf(CowbellSymbol.TONE.controlId))
     }
 
     @Test

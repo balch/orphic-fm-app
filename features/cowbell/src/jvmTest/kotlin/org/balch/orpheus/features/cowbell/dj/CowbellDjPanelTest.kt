@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
@@ -24,6 +27,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.features.cowbell.CowbellBodyTag
+import org.balch.orpheus.features.cowbell.CowbellSelectorHeight
 import org.balch.orpheus.features.cowbell.CowbellFeature
 import org.balch.orpheus.features.cowbell.CowbellPanelActions
 import org.balch.orpheus.features.cowbell.CowbellScene
@@ -33,8 +38,10 @@ import org.balch.orpheus.features.cowbell.laidOut
 import org.balch.orpheus.features.cowbell.text
 import org.balch.orpheus.features.cowbell.textOverflows
 import org.balch.orpheus.features.cowbell.textWidthShortfall
+import org.balch.orpheus.plugins.cowbell.CowbellBody
 import org.balch.orpheus.plugins.cowbell.CowbellMode
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -120,11 +127,48 @@ class CowbellDjPanelTest {
                 val bell = s.tagged(CowbellDjBellTag).laidOut
                 // The scene's density is 1, so px are dp.
                 assertEquals(DjFaderMaxTrack.value, fader.height, 1f, "$mode: the fader track")
-                assertEquals(panel.center.y, fader.center.y, 2f, "$mode: the fader is centred")
-                assertTrue(bell.height >= panel.height * 0.9f, "$mode: the bell column is ${bell.height} of ${panel.height}")
-                // Every column centres on one line, Shake's Fill dropdown included.
+                // Bell and fader share the room under the selector, on one line, Shake's Fill dropdown included.
+                assertEquals(panel.bottom - DjSelectorBand.value - 2f, bell.height, 1f, "$mode: the bell column")
+                assertEquals(bell.center.y, fader.center.y, 2f, "$mode: the fader is centred on the bell's box")
                 assertEquals(fader.center.y, s.bell().center.y, 3f, "$mode: the bell is centred with the fader")
-                assertEquals(fader.center.y, s.tagged(CowbellDjKnobsTag).laidOut.center.y, 3f, "$mode: the knobs")
+                assertEquals(panel.center.y, s.tagged(CowbellDjKnobsTag).laidOut.center.y, 3f, "$mode: the knobs")
+            }
+        }
+    }
+
+    /** Reads the drawn pixels: the box and its Fill chip centre as a pair in the room under the selector. */
+    @Test
+    fun theShakerAndItsFillCentreInTheColumn() {
+        scene(412, 290, state = CowbellUiState(mode = CowbellMode.SHAKE)).use { s ->
+            s.frames(64)
+            val column = s.tagged(CowbellDjBellTag).laidOut
+            val fill = s.tagged(CowbellFillDropdownTag).laidOut
+            val pixels = s.scene.render(s.now * 1_000_000).toComposeImageBitmap().toPixelMap()
+            val blank = pixels[column.left.toInt() + 1, column.top.toInt() + 1]
+            val xs = column.left.toInt() until column.right.toInt()
+            val ys = column.top.toInt() until fill.top.toInt()
+            fun Color.drawn() = abs(red - blank.red) + abs(green - blank.green) + abs(blue - blank.blue) > 0.15f
+            val rows = ys.filter { y -> xs.any { x -> pixels[x, y].drawn() } }
+            val cols = xs.filter { x -> ys.any { y -> pixels[x, y].drawn() } }
+            assertEquals(column.bottom - fill.bottom, rows.first() - column.top, 6f, "the gap over the box against the gap under Fill")
+            assertEquals(column.center.x, (cols.first() + cols.last()) / 2f, 2f, "the box across the column")
+            assertEquals(column.center.x, fill.center.x, 2f, "the Fill chip across the column")
+        }
+    }
+
+    @Test
+    fun theChipsSpanTheKnobsEvenly() {
+        for (sensors in listOf(false, true)) {
+            scene(412, 290, state = CowbellUiState(motionAvailable = sensors)).use { s ->
+                s.frames(32)
+                val tags = listOf(CowbellCtlModeTag, CowbellCtlOctaveTag, CowbellCtlLevelTag, CowbellCtlLockTag) +
+                    if (sensors) listOf(CowbellCtlMotionTag) else emptyList()
+                val chips = tags.map { s.tagged(it).laidOut }
+                val what = "sensors $sensors"
+                assertEquals(s.tagged(CowbellDjToneTag).laidOut.top, chips.first().top, 1f, "$what: the top chip against TONE")
+                assertEquals(s.tagged(CowbellDjIntensityTag).laidOut.bottom, chips.last().bottom, 1f, "$what: the bottom chip against INTENSITY")
+                val gaps = chips.zipWithNext { a, b -> b.top - a.bottom }
+                assertTrue(gaps.max() - gaps.min() <= 1f, "$what: uneven gaps $gaps")
             }
         }
     }
@@ -155,7 +199,8 @@ class CowbellDjPanelTest {
             assertTrue(tags.none { it.startsWith("cowbell-settings-") }, "settings left over: $tags")
             val column = s.tagged(CowbellDjKnobsTag).laidOut
             val knobs = tags.filter { it.startsWith("cowbell-dj-knob-") }
-            assertEquals(setOf(CowbellDjMetalTag, CowbellDjRingTag, CowbellDjIntensityTag), knobs.toSet(), "knobs: $knobs")
+            assertEquals(setOf(CowbellDjToneTag, CowbellDjRingTag, CowbellDjIntensityTag), knobs.toSet(), "knobs: $knobs")
+            assertTrue(tags.none { "engine" in it }, "an engine control is left: $tags")
             for (tag in knobs) {
                 val b = s.tagged(tag).laidOut
                 assertTrue(b.left >= column.left - 0.5f && b.right <= column.right + 0.5f && b.top >= column.top - 0.5f && b.bottom <= column.bottom + 0.5f, "$tag $b is outside the knobs column $column")
@@ -241,11 +286,11 @@ class CowbellDjPanelTest {
         }
     }
 
-    /** Tab and focus search walk the tree in this order: controls, knobs, bell, fader. */
+    /** Tab and focus search walk the tree in this order: controls, knobs, selector, bell, fader. */
     @Test
     fun composesInReadingOrder() {
         scene(412, 290).use { s ->
-            val wanted = listOf(CowbellCtlModeTag, "BODY", "RING", "INTENSITY", BellTag, CowbellDjFaderTag)
+            val wanted = listOf(CowbellCtlModeTag, "TONE", "RING", "INTENSITY", CowbellBodyTag, BellTag, CowbellDjFaderTag)
             val order = s.nodes().mapNotNull { n ->
                 n.text().takeIf { it in wanted } ?: n.config.getOrNull(SemanticsProperties.TestTag)?.takeIf { it in wanted }
             }
@@ -258,7 +303,7 @@ class CowbellDjPanelTest {
         for (fontScale in listOf(1f, 1.3f)) {
             scene(412, 290, fontScale).use { s ->
                 s.frames(32)
-                val knobs = listOf(CowbellDjMetalTag, CowbellDjRingTag, CowbellDjIntensityTag).map { s.tagged(it).laidOut }
+                val knobs = listOf(CowbellDjToneTag, CowbellDjRingTag, CowbellDjIntensityTag).map { s.tagged(it).laidOut }
                 val gaps = knobs.zipWithNext().map { (a, b) -> b.top - a.bottom }
                 assertTrue(gaps.all { it in -0.5f..6.5f }, "@$fontScale: the knob gaps are $gaps, over 6dp")
             }
@@ -283,7 +328,7 @@ class CowbellDjPanelTest {
                 assertTrue(b.width > 4f && b.height > 4f, "$what: '$label' is squeezed to $b")
             }
             val labelled = s.nodes().filter { it.text().isNotBlank() }
-            for (label in listOf("BODY", "RING", "INTENSITY")) {
+            for (label in listOf("TONE", "RING", "INTENSITY", "Metal")) {
                 assertTrue(labelled.any { it.text() == label }, "$what: no '$label'")
             }
             for (node in labelled) {
@@ -294,10 +339,10 @@ class CowbellDjPanelTest {
                 )
                 assertFalse(node.textOverflows(), "$what: '${node.text()}' wants ${node.textWidthShortfall()}px more than it gets")
             }
-            for (tag in listOf(CowbellDjFaderTag, CowbellDjKnobsTag, CowbellDjBellTag, BellTag, CowbellCtlModeTag, CowbellCtlBendTag)) {
+            for (tag in listOf(CowbellDjFaderTag, CowbellDjKnobsTag, CowbellDjBellTag, BellTag, CowbellBodyTag, CowbellCtlModeTag, CowbellCtlLockTag)) {
                 inside(tag, s.tagged(tag))
             }
-            for (tag in listOf(CowbellDjMetalTag, CowbellDjRingTag, CowbellDjIntensityTag)) inside(tag, s.tagged(tag))
+            for (tag in listOf(CowbellDjToneTag, CowbellDjRingTag, CowbellDjIntensityTag)) inside(tag, s.tagged(tag))
             val bell = s.bell()
             assertTrue(bell.width >= 64f, "$what: the bell is only ${bell.width}dp wide")
             assertTrue(bell.height >= 64f, "$what: the bell is only ${bell.height}dp tall")
@@ -327,18 +372,79 @@ class CowbellDjPanelTest {
     }
 
     @Test
-    fun bodyNamesTheResonatorItPlays() {
-        // The segment edges of cowbell_macros.h: five 0.2-wide steps.
-        assertEquals("String", metalModeName(0f))
-        assertEquals("String", metalModeName(0.19f))
-        assertEquals("Sitar", metalModeName(0.2f))
-        assertEquals("Wire", metalModeName(0.5f))
-        assertEquals("Modal", metalModeName(0.7f))
-        assertEquals("FM", metalModeName(0.8f))
-        assertEquals("FM", metalModeName(1f))
-        scene(412, 290, state = CowbellUiState(metal = 0.7f)).use { s ->
+    fun theSelectorPicksTheBodyFromThePanel() {
+        val recording = RecordingActions()
+        scene(412, 290, state = CowbellUiState(body = CowbellBody.SYNTH), recording = recording).use { s ->
             s.frames(32)
-            assertTrue(s.has("Modal"), "the BODY knob does not name its mode")
+            assertFalse(s.has("Sitar"), "the menu is open before a tap")
+            val at = s.tagged(CowbellBodyTag).laidOut.center
+            s.press(at)
+            s.release(at)
+            s.frames(32)
+            val item = s.nodes().first { it.text() == "Sitar" }.laidOut.center
+            s.press(item)
+            s.release(item)
+            s.frames(32)
+            assertEquals(listOf(CowbellBody.SITAR), recording.bodies)
+        }
+    }
+
+    /** Over the bell, centred and no chip-sized target, with the controls open and tucked away. */
+    @Test
+    fun theSelectorSitsCentredOverTheBellOpenAndCollapsed() {
+        scene(412, 290).use { s ->
+            s.frames(32)
+            fun check(what: String) {
+                val selector = s.tagged(CowbellBodyTag).laidOut
+                val box = s.tagged(CowbellDjBellTag).laidOut
+                assertEquals(s.bell().center.x, selector.center.x, 3f, "$what: not centred over the bell")
+                assertTrue(selector.bottom <= box.top + 0.5f, "$what: the selector $selector runs into the bell's box $box")
+                assertEquals(CowbellSelectorHeight.value, selector.height, 0.5f, "$what: the selector's height")
+            }
+            check("open")
+            val at = s.tagged(CowbellDjCollapseTag).laidOut.center
+            s.press(at)
+            s.release(at)
+            s.frames(600)
+            check("collapsed")
+        }
+    }
+
+    /** The Fold cover and a Portrait pair's half are the narrow cases: the group's centring leaves the least room. */
+    @Test
+    fun theCollapsedSelectorClearsTheShrunkenPill() {
+        for ((width, height) in listOf(320 to 330, 350 to 290, 412 to 205, 412 to 520)) {
+            scene(width, height, 1.3f).use { s ->
+                s.frames(32)
+                val at = s.tagged(CowbellDjCollapseTag).laidOut.center
+                s.press(at)
+                s.release(at)
+                s.frames(600)
+                val pill = s.tagged(CowbellDjCollapseTag).laidOut
+                val selector = s.tagged(CowbellBodyTag).laidOut
+                assertEquals(CollapsePillCollapsedWidth.value, pill.width, 0.5f, "${width}x$height: the pill's width")
+                assertTrue(pill.right <= selector.left + 0.5f, "${width}x$height: the pill $pill runs into the selector $selector")
+            }
+        }
+    }
+
+    /** Every body's name on the chip, at font scale 1.3. */
+    @Test
+    fun theSelectorFitsAtFontScale13() {
+        for ((body, name) in listOf(
+            CowbellBody.STRING to "String",
+            CowbellBody.SITAR to "Sitar",
+            CowbellBody.METAL to "Metal",
+            CowbellBody.SYNTH to "Synth",
+        )) {
+            scene(350, 290, 1.3f, CowbellUiState(body = body)).use { s ->
+                s.frames(32)
+                val selector = s.tagged(CowbellBodyTag).laidOut
+                assertEquals(CowbellSelectorHeight.value, selector.height, 0.5f, "$body: the selector's height")
+                val node = s.nodes().first { it.text() == name }
+                assertFalse(node.textOverflows(), "$body: '$name' wants ${node.textWidthShortfall()}px more than it gets")
+                assertTrue(node.laidOut.height <= selector.height + 0.5f, "$body: '$name' is ${node.laidOut.height} tall")
+            }
         }
     }
 }

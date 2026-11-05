@@ -2,7 +2,6 @@ package org.balch.orpheus.djapp.vibepresets
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PresetChangesTest {
@@ -99,10 +98,16 @@ class PresetChangesTest {
     }
 
     @Test
-    fun chipNamesTheBareBellEngineNone() {
-        val chip = PresetChange(PresetField.BELL_ENGINE, -1f, 0f).chipText()
+    fun chipNamesTheBellBodies() {
+        val chip = PresetChange(PresetField.BELL_BODY, 2f, 1f).chipText()
 
-        assertTrue(chip.startsWith("BELL: ENGINE None→"), chip)
-        assertFalse(chip.endsWith("None"), chip)
+        assertTrue(chip.contains("Metal→Sitar"), chip)
+        assertEquals("BELL: TONE 30%→60%", PresetChange(PresetField.BELL_TONE, 0.3f, 0.6f).chipText())
+    }
+
+    @Test
+    fun aBodyOutOfRangeClampsToTheNearestName() {
+        assertTrue(PresetChange(PresetField.BELL_BODY, 2f, 9f).chipText().endsWith("→Synth"))
+        assertTrue(PresetChange(PresetField.BELL_BODY, 2f, -3f).chipText().endsWith("→String"))
     }
 }

@@ -16,6 +16,9 @@ import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
 
 enum class CowbellMode { TAP, SHAKE, SYNTH }
 
+/** The resonator body; the ordinals match the C++ per-body table. */
+enum class CowbellBody { STRING, SITAR, METAL, SYNTH }
+
 enum class CowbellFill { MARBLE, BEADS, SEEDS, JINGLES }
 
 /** The `kind` a fill's rattle strikes carry on the strike port; kind 0 is the body. */
@@ -47,15 +50,14 @@ class CowbellPlugin : DspPlugin {
     }
 
     private var _level = 0.7f
-    // An acoustic cowbell: the FM body, a short dry ring, struck by the bare impulse.
-    private var _metal = 0.84f
-    private var _ring = 0f
-    private var _intensity = 0.7f
-    private var _engine = -1 // impulse only; otherwise an OrpheusEngineId ordinal
+    // An acoustic cowbell: the metal body at its darkest, ringing on, struck hard.
+    private var _body = CowbellBody.METAL.ordinal
+    private var _tone = 0f
+    private var _ring = 0.48f
+    private var _intensity = 0.85f
     private var _octave = 0
     // LOCK starts on: hits land on the beat while a vibe plays, and free when it is stopped.
     private var _grid = true
-    private var _bendScale = false
     private var _live = false
     private var _more = 0f
     private var _gridStrength = 0.7f
@@ -74,17 +76,26 @@ class CowbellPlugin : DspPlugin {
             }
         }
 
-        controlPort(CowbellSymbol.METAL) {
+        controlPort(CowbellSymbol.BODY) {
+            intType {
+                default = CowbellBody.METAL.ordinal; min = 0; max = CowbellBody.entries.lastIndex
+                options = CowbellBody.entries.map { it.displayName() }
+                get { _body }
+                set { _body = it.coerceIn(0, CowbellBody.entries.lastIndex) }
+            }
+        }
+
+        controlPort(CowbellSymbol.TONE) {
             floatType {
-                default = 0.84f
-                get { _metal }
-                set { _metal = it.coerceIn(0f, 1f) }
+                default = 0f
+                get { _tone }
+                set { _tone = it.coerceIn(0f, 1f) }
             }
         }
 
         controlPort(CowbellSymbol.RING) {
             floatType {
-                default = 0f
+                default = 0.48f
                 get { _ring }
                 set { _ring = it.coerceIn(0f, 1f) }
             }
@@ -92,17 +103,9 @@ class CowbellPlugin : DspPlugin {
 
         controlPort(CowbellSymbol.INTENSITY) {
             floatType {
-                default = 0.7f
+                default = 0.85f
                 get { _intensity }
                 set { _intensity = it.coerceIn(0f, 1f) }
-            }
-        }
-
-        controlPort(CowbellSymbol.ENGINE) {
-            intType {
-                default = -1; min = -1; max = 24
-                get { _engine }
-                set { _engine = it.coerceIn(-1, 24) }
             }
         }
 
@@ -191,15 +194,6 @@ class CowbellPlugin : DspPlugin {
                 excludeFromPresets = true
                 get { _positionOffset }
                 set { _positionOffset = it.coerceIn(-0.45f, 0.45f) }
-            }
-        }
-
-        // Snaps the bend to the playing vibe's scale while Pulsar plays; free otherwise.
-        controlPort(CowbellSymbol.BEND_SCALE) {
-            boolType {
-                excludeFromPresets = true
-                get { _bendScale }
-                set { _bendScale = it }
             }
         }
 

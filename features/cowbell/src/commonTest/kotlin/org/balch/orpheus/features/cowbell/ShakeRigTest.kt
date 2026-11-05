@@ -260,6 +260,22 @@ class ShakeRigTest {
     }
 
     @Test
+    fun theLeanEasesBackWhenTheMouseLeaves() {
+        val h = Harness(Phone(available = false))
+        h.rig.pointerTilt(1f, -1f)
+        h.frames(2)
+        h.rig.pointerLeft()
+        h.frames(1)
+        assertTrue(h.rig.tiltX > 0f && h.rig.tiltX < 1f, "eases, no pop: ${h.rig.tiltX}")
+        h.frames(30)
+        assertEquals(0f, h.rig.tiltX, 1e-6f)
+        assertEquals(0f, h.rig.tiltY, 1e-6f)
+        h.rig.pointerTilt(0.5f, 0f)
+        h.frames(1)
+        assertEquals(0.5f, h.rig.tiltX, "back over the bell, the mouse leans it at once")
+    }
+
+    @Test
     fun motionIgnoresThePointerTilt() {
         val h = Harness(Phone())
         h.frames(30)

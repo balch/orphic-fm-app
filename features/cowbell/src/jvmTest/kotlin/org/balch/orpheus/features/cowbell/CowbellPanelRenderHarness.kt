@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.cowbell.bell3d.BellCamera
+import org.balch.orpheus.features.cowbell.dj.CowbellDjCollapseTag
+import org.balch.orpheus.features.cowbell.dj.CowbellDjPanel
 import org.balch.orpheus.features.cowbell.bell3d.BellTransition
 import org.balch.orpheus.features.cowbell.bell3d.FillPainter
 import org.balch.orpheus.features.cowbell.bell3d.LIQUID_SECONDS
@@ -73,6 +75,72 @@ class CowbellPanelRenderHarness {
         }.use { s ->
             s.save(name)
             println("[cowbell-render] build/cowbell-panel/$name.png")
+        }
+    }
+
+    /** The DJ panel with its controls open, then tucked away. */
+    @Test
+    fun renderDjPanels() {
+        for ((w, h, scale) in listOf(Triple(412, 290, 1f), Triple(412, 205, 1.3f))) {
+            CowbellScene(w, h, scale) {
+                CowbellDjPanel(CowbellViewModel.previewFeature(), Modifier.fillMaxSize())
+            }.use { s ->
+                s.frames(64)
+                s.save("dj-${w}x$h-open")
+                val at = s.tagged(CowbellDjCollapseTag).laidOut.center
+                s.press(at)
+                s.release(at)
+                s.frames(600)
+                s.save("dj-${w}x$h-collapsed")
+            }
+        }
+    }
+
+    /** The shaker over its Fill chip, open and tucked away. */
+    @Test
+    fun renderDjShaker() {
+        CowbellScene(412, 290) {
+            CowbellDjPanel(
+                CowbellViewModel.previewFeature(CowbellUiState(mode = CowbellMode.SHAKE, fill = CowbellFill.SEEDS)),
+                Modifier.fillMaxSize(),
+            )
+        }.use { s ->
+            s.frames(64)
+            s.save("dj-412x290-shake")
+            val at = s.tagged(CowbellDjCollapseTag).laidOut.center
+            s.press(at)
+            s.release(at)
+            s.frames(600)
+            s.save("dj-412x290-shake-collapsed")
+        }
+    }
+
+    /** A phone's first column, with Motion under the chips. */
+    @Test
+    fun renderDjMotion() {
+        CowbellScene(412, 290) {
+            CowbellDjPanel(
+                CowbellViewModel.previewFeature(CowbellUiState(motionAvailable = true, motion = true)),
+                Modifier.fillMaxSize(),
+            )
+        }.use { s ->
+            s.frames(64)
+            s.save("dj-412x290-motion")
+        }
+    }
+
+    /** The body menu open over the DJ panel. */
+    @Test
+    fun renderBodyMenu() {
+        CowbellScene(412, 290) {
+            CowbellDjPanel(CowbellViewModel.previewFeature(), Modifier.fillMaxSize())
+        }.use { s ->
+            s.frames(64)
+            val at = s.tagged(CowbellBodyTag).laidOut.center
+            s.press(at)
+            s.release(at)
+            s.frames(600)
+            s.save("dj-412x290-body-menu")
         }
     }
 

@@ -178,7 +178,7 @@ internal class ShardRenderer {
     fun DrawScope.draw(camera: BellCamera, scale: Float, m: Float, pull: Float) {
         aim(camera)
         val halfW = size.width / 2f
-        val halfH = size.height / 2f
+        val halfH = size.height / 2f + camera.shiftY
         val mix = 0.25f + 0.6f * m
         for (k in 0 until SHARD_COUNT) {
             val shard = SHARD_TABLE[k]

@@ -15,38 +15,58 @@ struct CowbellParams {
     int model;       // 0 modal, 1 sympathetic, 2 string, 3 FM
     int polyphony;   // 1, 2 or 4
     float structure, brightness, damping, strike_gain;
+    float level_trim;  // per-body makeup, times LEVEL
 };
+
+constexpr int kCowbellBodyCount = 4;  // 0 STRING, 1 SITAR, 2 METAL, 3 SYNTH
 
 namespace cowbell_detail {
 // NaN-safe clamp to 0..1 (NaN maps to 0).
 inline float unit(float x) { return x > 0.0f ? (x < 1.0f ? x : 1.0f) : 0.0f; }
+
+inline float lerp(float lo, float hi, float t) { return lo + (hi - lo) * t; }
+
+struct BodySpec {
+    int model, polyphony;
+    float structure_lo, structure_hi;
+    float damping_lo, damping_hi;
+    float brightness_lo, brightness_hi;
+    float level_trim;
+};
+
+inline const BodySpec& body_spec(int body) {
+    // Damping tops: the longest that a tap falls under -50 dBFS in 8 s (FM drones above 0.90, and
+    // STRING's tail stops growing at 0.84). METAL's lo ends keep its default bell where it was.
+    // SITAR's lo is 0: its sympathetic strings otherwise ring as long at RING 0 as at 0.5.
+    static const BodySpec kBodies[kCowbellBodyCount] = {
+        {2, 2, 0.25f, 0.90f, 0.30f, 0.84f, 0.37f, 0.87f, 3.2f},  // STRING
+        {1, 1, 0.10f, 0.70f, 0.00f, 0.95f, 0.30f, 0.85f, 1.6f},  // SITAR
+        {0, 1, 0.25f, 0.75f, 0.3156f, 0.76f, 0.44f, 0.84f, 1.0f},  // METAL
+        {3, 2, 0.30f, 0.90f, 0.35f, 0.90f, 0.25f, 0.75f, 1.25f},  // SYNTH
+    };
+    return kBodies[body < 0 ? 0 : (body >= kCowbellBodyCount ? kCowbellBodyCount - 1 : body)];
+}
 }  // namespace cowbell_detail
 
-// METAL picks one of five 0.2-wide segments and interpolates structure inside it.
-inline CowbellParams cowbell_macros(float metal, float ring, float intensity) {
+// BODY picks a row of the table; TONE sweeps structure, RING damping, INTENSITY brightness.
+inline CowbellParams cowbell_macros(int body, float tone, float ring, float intensity) {
+    using cowbell_detail::lerp;
     using cowbell_detail::unit;
-    static const int kModel[5] = {2, 1, 2, 0, 3};
-    static const float kFrom[5] = {0.27f, 0.15f, 0.55f, 0.30f, 0.30f};
-    static const float kTo[5] = {0.45f, 0.60f, 0.90f, 0.75f, 0.90f};
+    const cowbell_detail::BodySpec& b = cowbell_detail::body_spec(body);
 
-    metal = unit(metal);
+    tone = unit(tone);
     ring = unit(ring);
     intensity = unit(intensity);
 
-    const float pos = metal * 5.0f;
-    int seg = (int)pos;
-    if (seg > 4) seg = 4;
-    const float t = pos - (float)seg;
-
     CowbellParams p;
-    p.model = kModel[seg];
-    p.structure = kFrom[seg] + (kTo[seg] - kFrom[seg]) * t;
-    p.polyphony = ring < 0.4f ? 1 : (ring < 0.8f ? 2 : 4);
-    const float damping = 0.35f + 0.6f * ring;
-    p.damping = damping < 0.95f ? damping : 0.95f;
-    const float brightness = 0.30f + 0.60f * intensity - 0.15f * ring;
+    p.model = b.model;
+    p.polyphony = b.polyphony;
+    p.structure = lerp(b.structure_lo, b.structure_hi, tone);
+    p.damping = lerp(b.damping_lo, b.damping_hi, ring);
+    const float brightness = lerp(b.brightness_lo, b.brightness_hi, intensity) - 0.15f * ring;
     p.brightness = brightness < 0.0f ? 0.0f : (brightness > 0.9995f ? 0.9995f : brightness);
     p.strike_gain = 0.35f + 0.65f * intensity;
+    p.level_trim = b.level_trim;
     return p;
 }
 
@@ -54,7 +74,7 @@ inline CowbellParams cowbell_macros(float metal, float ring, float intensity) {
 // travels exactly as a float.
 constexpr uint32_t kCowbellStrikeValid = 1u << 18;
 
-struct CowbellStrike { float velocity; int kind; int color; };  // kind 0 = engine hit
+struct CowbellStrike { float velocity; int kind; int color; };  // kind 0 = a body hit
 
 // Velocity clamps to 0..1 before scaling: +inf is the loudest strike, NaN and -inf the softest.
 inline uint32_t cowbell_encode_strike(float velocity, int kind, int color) {
