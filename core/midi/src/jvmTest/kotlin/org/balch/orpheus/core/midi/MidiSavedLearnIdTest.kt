@@ -170,8 +170,8 @@ class MidiSavedLearnIdTest {
         lengths.forEachIndexed { index, port ->
             restoreCc("beats_euclid_len_$index")
             assertEquals(32f, cc(port, 127))
-            assertEquals(16f, cc(port, 64))
-            assertEquals(0f, cc(port, 0))
+            assertEquals(17f, cc(port, 64))
+            assertEquals(1f, cc(port, 0))
         }
     }
 

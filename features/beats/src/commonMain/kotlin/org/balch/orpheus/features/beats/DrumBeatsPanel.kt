@@ -204,7 +204,7 @@ private fun EuclideanLengthsDisplay(
                  Text("L${index+1}", style = MaterialTheme.typography.labelSmall, color = colors[index])
                  RotaryKnob(
                     value = len / 32f,
-                    onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt()) },
+                    onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt().coerceAtLeast(1)) },
                     size = 24.dp,
                     progressColor = colors[index],
                     controlId = BeatsSymbol.euclidean(index).controlId.key

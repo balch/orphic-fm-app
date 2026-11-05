@@ -75,7 +75,7 @@ class BeatsPlugin : DspPlugin {
                 floatType { default = 0.5f; get { _densities[i] }; set { _densities[i] = it } }
             }
             controlPort(BeatsSymbol.euclidean(i)) {
-                intType { default = 16; max = 32; get { _euclideanLengths[i] }; set { _euclideanLengths[i] = it } }
+                intType { default = 16; min = 1; max = 32; get { _euclideanLengths[i] }; set { _euclideanLengths[i] = it } }
             }
         }
     }
