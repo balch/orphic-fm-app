@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
@@ -26,6 +27,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
+import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
@@ -145,6 +147,7 @@ class DrumBeatsViewModel(
     private val randomnessFlow = synthController.controlFlow(BeatsSymbol.RANDOMNESS.controlId)
     private val swingFlow = synthController.controlFlow(BeatsSymbol.SWING.controlId)
     private val modeFlow = synthController.controlFlow(BeatsSymbol.MODE.controlId)
+    private val runFlow = synthController.controlFlow(BeatsSymbol.RUN.controlId)
     private val densityFlows = Array(3) { i -> synthController.controlFlow(BeatsSymbol.density(i).controlId) }
     private val euclideanFlows = Array(3) { i -> synthController.controlFlow(BeatsSymbol.euclidean(i).controlId) }
 
@@ -153,7 +156,7 @@ class DrumBeatsViewModel(
     }
     private var clockJob: Job? = null
 
-    // UI-only intents (Run, TickStep)
+    // UI-only intents (TickStep)
     private val uiIntents = MutableSharedFlow<DrumBeatsIntent>(extraBufferCapacity = 64)
 
     // Port-based control changes -> intents
@@ -169,6 +172,8 @@ class DrumBeatsViewModel(
                 else DrumBeatsGenerator.OutputMode.DRUMS
             DrumBeatsIntent.SetOutputMode(mode)
         },
+        // A knob writes many values past halfway; only a change of state restarts the clock.
+        runFlow.map { it.asBoolean() }.distinctUntilChanged().map { DrumBeatsIntent.Run(it) },
         densityFlows[0].map { DrumBeatsIntent.SetDensity(0, it.asFloat()) },
         densityFlows[1].map { DrumBeatsIntent.SetDensity(1, it.asFloat()) },
         densityFlows[2].map { DrumBeatsIntent.SetDensity(2, it.asFloat()) },
@@ -269,7 +274,7 @@ class DrumBeatsViewModel(
     }
 
     fun setRunning(running: Boolean) {
-        uiIntents.tryEmit(DrumBeatsIntent.Run(running))
+        runFlow.value = BoolValue(running)
     }
 
     fun setBpm(value: Float) {

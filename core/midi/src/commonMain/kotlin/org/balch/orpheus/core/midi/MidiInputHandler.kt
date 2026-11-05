@@ -9,10 +9,11 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dxLockEngineControl
 import org.balch.orpheus.core.audio.isDrumModControl
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PluginControlId
+import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
-import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.ports.PortRegistry
 import kotlin.math.roundToInt
 
 /**
@@ -30,13 +31,13 @@ import kotlin.math.roundToInt
 @Inject
 class MidiInputHandler(
     private val synthController: SynthController,
-    private val stateHolder: MidiMappingStateHolder
+    private val stateHolder: MidiMappingStateHolder,
+    private val portRegistry: PortRegistry,
 ) : MidiEventListener {
 
     // Track last CC values for button toggle detection
     private val lastCcValues = mutableMapOf<String, Float>()
     private val lastRawCcValues = mutableMapOf<String, Float>()
-    private val cowbellBodyKey = CowbellSymbol.BODY.controlId.key
 
     // ═══════════════════════════════════════════════════════════
     // MidiEventListener Implementation
@@ -59,9 +60,12 @@ class MidiInputHandler(
 
         // Control trigger (for buttons mapped to notes)
         stateHolder.getControlForNote(note)?.let { controlId ->
-            if (velocity > 0) {
-                if (isCycleControl(controlId)) {
-                    cycleControl(controlId, if (controlId == cowbellBodyKey) COWBELL_BODY_COUNT else 3)
+            if (isMomentary(controlId)) {
+                dispatchControlChange(controlId, if (velocity > 0) 1f else 0f)
+            } else if (velocity > 0) {
+                val port = steppedPort(controlId)
+                if (port != null) {
+                    cycleControl(controlId, port)
                 } else {
                     toggleControl(controlId)
                 }
@@ -75,6 +79,9 @@ class MidiInputHandler(
         )
         stateHolder.getVoiceForNote(note)?.let { voiceIndex ->
             synthController.emitPulseEnd(voiceIndex)
+        }
+        stateHolder.getControlForNote(note)?.takeIf(::isMomentary)?.let { controlId ->
+            dispatchControlChange(controlId, 0f)
         }
     }
 
@@ -102,15 +109,13 @@ class MidiInputHandler(
 
     private fun applyCCToControl(controlId: String, value: Float) {
         if (isDxLocked(controlId)) return
-        val isCycle = isCycleControl(controlId)
-
         var effectiveValue = value
 
-        if (!isCycle) {
+        if (steppedPort(controlId) == null && !isMomentary(controlId)) {
             val lastRaw = lastRawCcValues[controlId] ?: 0f
             val isJumpUp = value >= 0.9f && lastRaw < 0.5f
             val isJumpDown = value < 0.1f && lastRaw > 0.5f
-            val lastEffective = lastCcValues[controlId] ?: 0f
+            val lastEffective = lastToggleValue(controlId)
 
             effectiveValue = when {
                 isJumpUp -> if (lastEffective > 0.5f) 0f else 1f
@@ -134,37 +139,53 @@ class MidiInputHandler(
         return engine?.forcePinHarmonics == true
     }
 
+    /** The panel can change a port between presses, so a toggle starts from the port itself. */
+    private fun lastToggleValue(controlId: String): Float {
+        val port = portRegistry.controlPorts[controlId]?.second
+        val current = when {
+            port?.type == PortType.BOOLEAN -> livePortValue(controlId)?.asFloat()
+            port?.stateCount == 2 -> statePosition(controlId, port)?.toFloat()
+            else -> null
+        }
+        return current ?: lastCcValues[controlId] ?: 0f
+    }
+
+    private fun livePortValue(controlId: String): PortValue? =
+        PluginControlId.parse(controlId)?.let(synthController::getPluginControl)
+
+    /** Which of an int port's states it is in, counted from the port's min. */
+    private fun statePosition(controlId: String, port: ControlPort): Int? =
+        livePortValue(controlId)?.let { it.asInt() - port.min.toInt() }
+
     private fun toggleControl(controlId: String) {
-        val lastValue = lastCcValues[controlId] ?: 0f
+        val lastValue = lastToggleValue(controlId)
         val newValue = if (lastValue > 0.5f) 0f else 1f
         lastCcValues[controlId] = newValue
         dispatchControlChange(controlId, newValue)
     }
 
-    private fun cycleControl(controlId: String, numStates: Int) {
-        val lastValue = lastCcValues[controlId] ?: 0f
-        val currentIndex = (lastValue * (numStates - 1)).roundToInt()
-        val nextIndex = (currentIndex + 1) % numStates
+    private fun cycleControl(controlId: String, port: ControlPort) {
+        val numStates = port.stateCount
+        val currentIndex = statePosition(controlId, port)
+            ?: ((lastCcValues[controlId] ?: 0f) * (numStates - 1)).roundToInt()
+        val nextIndex = (currentIndex + 1).mod(numStates)
         val newValue = nextIndex.toFloat() / (numStates - 1)
         lastCcValues[controlId] = newValue
         dispatchControlChange(controlId, newValue)
     }
 
-    private fun isCycleControl(controlId: String): Boolean {
-        return controlId == DuoLfoSymbol.MODE.controlId.key || controlId == cowbellBodyKey
-    }
+    /** An int port with three or more states. Two-state ports stay buttons, and the CC toggles them. */
+    private fun steppedPort(controlId: String): ControlPort? =
+        portRegistry.controlPorts[controlId]?.second?.takeIf { it.stateCount > 2 }
+
+    private fun isMomentary(controlId: String): Boolean =
+        portRegistry.controlPorts[controlId]?.second?.momentary == true
 
     private fun dispatchControlChange(controlId: String, value: Float) {
-        // A float body truncates in Kotlin and rounds in C++, so a CC would reach only String and Sitar.
-        val portValue = if (controlId == cowbellBodyKey) {
-            PortValue.IntValue((value.coerceIn(0f, 1f) * (COWBELL_BODY_COUNT - 1)).roundToInt())
-        } else {
-            PortValue.FloatValue(value)
-        }
         // Try to route through the typed plugin control system first
         val routed = synthController.setPluginControlByKey(
             controlId,
-            portValue,
+            portValueFor(controlId, value),
             ControlEventOrigin.MIDI
         )
         // Fall back to legacy event emission for non-plugin controls
@@ -173,8 +194,14 @@ class MidiInputHandler(
         }
     }
 
-    private companion object {
-        /** CowbellBody's size; this module cannot see the enum. */
-        const val COWBELL_BODY_COUNT = 4
+    /** A 0..1 float truncates on an int port and strands a float port's wider range, so a CC spans the port. */
+    private fun portValueFor(controlId: String, value: Float): PortValue {
+        val port = portRegistry.controlPorts[controlId]?.second ?: return PortValue.FloatValue(value)
+        val position = value.coerceIn(0f, 1f)
+        return when {
+            port.stateCount >= 2 -> PortValue.IntValue(port.min.toInt() + (position * (port.stateCount - 1)).roundToInt())
+            port.type == PortType.FLOAT -> PortValue.FloatValue(port.min + position * (port.max - port.min))
+            else -> PortValue.FloatValue(value)
+        }
     }
 }

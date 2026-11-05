@@ -157,6 +157,7 @@ class VoicePlugin(
                     // min/max here are advisory metadata only — the setter does not clamp,
                     // and not every value in [min, max] is a valid id.
                     min = -1; max = 108
+                    sparse = true
                     get { _duoEngine[i] }
                     set {
                         updateEngine(i, it)

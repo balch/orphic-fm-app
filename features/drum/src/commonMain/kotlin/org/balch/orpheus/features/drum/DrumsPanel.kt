@@ -29,6 +29,7 @@ import org.balch.orpheus.core.audio.EngineCategory
 import org.balch.orpheus.core.audio.EngineChoice
 import org.balch.orpheus.core.audio.EngineSlotKind
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -94,6 +95,11 @@ fun DrumsPanel(
             // BD Row (Red) - I key
             DrumRow(
                 tag = "bd",
+                tunePort = DrumSymbol.BD_FREQ,
+                tonePort = DrumSymbol.BD_TONE,
+                decayPort = DrumSymbol.BD_DECAY,
+                modPort = DrumSymbol.BD_P4,
+                triggerPort = DrumSymbol.BD_TRIGGER,
                 color = OrpheusColors.ninersRed,
                 frequency = state.bdFrequency,
                 tone = state.bdTone,
@@ -116,6 +122,11 @@ fun DrumsPanel(
             // SD Row (Gold) - O key
             DrumRow(
                 tag = "sd",
+                tunePort = DrumSymbol.SD_FREQ,
+                tonePort = DrumSymbol.SD_TONE,
+                decayPort = DrumSymbol.SD_DECAY,
+                modPort = DrumSymbol.SD_P4,
+                triggerPort = DrumSymbol.SD_TRIGGER,
                 color = OrpheusColors.ninersGold,
                 frequency = state.sdFrequency,
                 tone = state.sdTone,
@@ -138,6 +149,11 @@ fun DrumsPanel(
             // HH Row (White) - P key
             DrumRow(
                 tag = "hh",
+                tunePort = DrumSymbol.HH_FREQ,
+                tonePort = DrumSymbol.HH_TONE,
+                decayPort = DrumSymbol.HH_DECAY,
+                modPort = DrumSymbol.HH_P4,
+                triggerPort = DrumSymbol.HH_TRIGGER,
                 color = Color.White,
                 frequency = state.hhFrequency,
                 tone = state.hhTone,
@@ -190,6 +206,11 @@ private fun LabelHeader(text: String, modifier: Modifier) {
 @Composable
 private fun DrumRow(
     tag: String,
+    tunePort: DrumSymbol,
+    tonePort: DrumSymbol,
+    decayPort: DrumSymbol,
+    modPort: DrumSymbol,
+    triggerPort: DrumSymbol,
     color: Color,
     frequency: Float,
     tone: Float,
@@ -208,7 +229,7 @@ private fun DrumRow(
     onTriggerEnd: () -> Unit
 ) {
     val learnState = org.balch.orpheus.ui.widgets.LocalLearnModeState.current
-    val triggerId = "drums_${tag}_trig"
+    val triggerId = triggerPort.controlId.key
     val isLearningTrigger = learnState.isLearning(triggerId)
     val controller = rememberEnginePickerController()
     val choices = remember(hasNativeEngine) { EngineCatalog.choices(EngineSlotKind.DRUM, hasNativeEngine) }
@@ -249,28 +270,28 @@ private fun DrumRow(
                 onValueChange = onFrequencyChange,
                 color = color,
                 modifier = Modifier.weight(1f),
-                controlId = "drums_${tag}_tune"
+                controlId = tunePort.controlId.key
             )
             KnobGroup(
                 value = tone,
                 onValueChange = onToneChange,
                 color = color,
                 modifier = Modifier.weight(1f),
-                controlId = "drums_${tag}_tone"
+                controlId = tonePort.controlId.key
             )
             KnobGroup(
                 value = decay,
                 onValueChange = onDecayChange,
                 color = color,
                 modifier = Modifier.weight(1f),
-                controlId = "drums_${tag}_decay"
+                controlId = decayPort.controlId.key
             )
             KnobGroup(
                 value = p4,
                 onValueChange = onP4Change,
                 color = color,
                 modifier = Modifier.weight(1f),
-                controlId = "drums_${tag}_mod",
+                controlId = modPort.controlId.key,
                 bottomLabel = patch?.name,
                 longLabel = patch?.let { EngineCatalog.labelFor(EngineChoice.Patch(it)) },
                 locked = patch != null,

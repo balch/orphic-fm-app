@@ -41,6 +41,11 @@ class MidiMappingStateHolder {
         _state.update(transform)
     }
     
+    /** Loads mappings from storage, where they may still hold ids from before panels used port keys. */
+    fun restoreSaved(saved: MidiMappingState) {
+        _state.value = saved.withPortKeys()
+    }
+
     fun setLearnModeActive(active: Boolean) {
         _isLearnModeActive.value = active
     }

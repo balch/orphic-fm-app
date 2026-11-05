@@ -65,6 +65,7 @@ class DrumPlugin(
     // kKotlinToEngine[] in orpheus_engine_routing.cpp maps it to a Plaits index, so
     // entry order is a contract with that table. Ordinals past its end are ignored.
     private val engineSlotIndices = IntArray(3) { i -> DEFAULT_ENGINES[i].ordinal }
+    private val triggersHeld = BooleanArray(3)
 
     // Routing state (facade for engine)
     private val triggerSources = IntArray(3)
@@ -197,6 +198,17 @@ class DrumPlugin(
                 set { setSlotEngine(2, it) }
             }
         }
+
+        listOf(DrumSymbol.BD_TRIGGER, DrumSymbol.SD_TRIGGER, DrumSymbol.HH_TRIGGER).forEachIndexed { slot, symbol ->
+            controlPort(symbol) {
+                boolType {
+                    momentary = true
+                    excludeFromPresets = true
+                    get { triggersHeld[slot] }
+                    set { setTriggerHeld(slot, it) }
+                }
+            }
+        }
     }
 
     private val audioPorts = ports {
@@ -305,5 +317,11 @@ class DrumPlugin(
     private fun setSlotEngine(slot: Int, engineSlotIndex: Int) {
         if (engineSlotIndex !in SELECTABLE_ENGINES.indices) return
         engineSlotIndices[slot] = engineSlotIndex
+    }
+
+    /** Hits on the press only, so a CC sweeping past halfway hits once. */
+    private fun setTriggerHeld(slot: Int, held: Boolean) {
+        if (held && !triggersHeld[slot]) audioEngine.triggerDrum(slot, 1f)
+        triggersHeld[slot] = held
     }
 }

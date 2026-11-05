@@ -41,6 +41,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.plugins.drumpatterns.DrumBeatsGenerator
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -96,7 +98,7 @@ fun DrumBeatsPanel(
                     verticalArrangement = Arrangement.Center
                 ) {
                     // Two-state toggle: Grids | Euclid
-                    Learnable(controlId = "beats_mode") {
+                    Learnable(controlId = BeatsSymbol.MODE.controlId.key) {
                         ModeToggle(
                             currentMode = outputMode,
                             onModeSelected = actions.setOutputMode
@@ -204,7 +206,7 @@ private fun EuclideanLengthsDisplay(
                     onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt()) },
                     size = 24.dp,
                     progressColor = colors[index],
-                    controlId = "beats_euclid_len_$index"
+                    controlId = BeatsSymbol.euclidean(index).controlId.key
                  )
                  Text("$len", style = MaterialTheme.typography.labelSmall, color = Color.White)
             }
@@ -229,7 +231,7 @@ private fun DensityKnobsRow(
             value = state.densities[0],
             onValueChange = { actions.setDensity(0, it) },
             color = OrpheusColors.seahawksGreen,
-            controlId = "beats_bd_density"
+            controlId = BeatsSymbol.DENSITY_0.controlId.key
         )
         KnobControlTopLabel(
             modifier = Modifier.padding(top = 42.dp),
@@ -238,7 +240,7 @@ private fun DensityKnobsRow(
             value = state.randomness,
             onValueChange = { actions.setRandomness(it) },
             color = OrpheusColors.seahawksGreen,
-            controlId = "beats_randomness"
+            controlId = BeatsSymbol.RANDOMNESS.controlId.key
         )
         KnobControlTopLabel(
             modifier = Modifier.padding(top = 4.dp),
@@ -246,7 +248,7 @@ private fun DensityKnobsRow(
             value = state.densities[1],
             onValueChange = { actions.setDensity(1, it) },
             color = OrpheusColors.seahawksGrey,
-            controlId = "beats_sd_density"
+            controlId = BeatsSymbol.DENSITY_1.controlId.key
         )
         KnobControlTopLabel(
             modifier = Modifier.padding(top = 42.dp),
@@ -255,7 +257,7 @@ private fun DensityKnobsRow(
             value = state.swing,
             onValueChange = { actions.setSwing(it) },
             color = OrpheusColors.seahawksGreen,
-            controlId = "beats_swing"
+            controlId = BeatsSymbol.SWING.controlId.key
         )
         KnobControlTopLabel(
             modifier = Modifier.padding(top = 4.dp),
@@ -263,7 +265,7 @@ private fun DensityKnobsRow(
             value = state.densities[2],
             onValueChange = { actions.setDensity(2, it) },
             color = Color.White,
-            controlId = "beats_hh_density"
+            controlId = BeatsSymbol.DENSITY_2.controlId.key
         )
     }
 }
@@ -282,7 +284,7 @@ private fun TransportControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // RUN/STOP
-        Learnable(controlId = "beats_run") {
+        Learnable(controlId = BeatsSymbol.RUN.controlId.key) {
             IconButton(
                 onClick = { actions.setRunning(!state.isRunning) },
                 modifier = Modifier
@@ -315,7 +317,7 @@ private fun TransportControls(
                     actions.setBpm(40f + (frac * 200f))
                 },
                 color = OrpheusColors.seahawksGreen,
-                controlId = "beats_bpm"
+                controlId = BeatsSymbol.BPM.controlId.key
             )
         }
 
@@ -324,7 +326,7 @@ private fun TransportControls(
             value = state.mix,
             onValueChange = { actions.setMix(it) },
             color = OrpheusColors.seahawksGreen,
-            controlId = "beats_mix"
+            controlId = DrumSymbol.MIX.controlId.key
         )
     }
 

@@ -199,8 +199,8 @@ class DrumsTool(
     private val rampSteps = 25
 
     /**
-     * Resolve a friendly AI control name to its PortSymbol.
-     * Returns null for special controls (triggers, run) or unknown IDs.
+     * Resolve a friendly AI control name to the PortSymbol it ramps.
+     * Returns null for switches (triggers, run) or unknown IDs.
      */
     private fun resolvePortSymbol(id: String): PortSymbol? = when (id) {
         // Analog Bass Drum controls
@@ -243,12 +243,18 @@ class DrumsTool(
     private suspend fun executeInternal(args: DrumsControlArgs): DrumsControlResult {
         val normalizedValue = args.value.coerceIn(0f, 1f)
         val id = args.controlId.uppercase()
+        val isOn = normalizedValue > 0.5f
 
-        // Special cases: triggers and run have no plugin port
-        if (id in LEGACY_CONTROLS) {
-            val legacyId = LEGACY_CONTROLS[id]!!
-            synthController.emitControlChange(legacyId, normalizedValue, ControlEventOrigin.AI)
-            return DrumsControlResult(success = true, message = "Set $id (legacy)")
+        // Switches, so they don't ramp
+        if (id == "BEATS_RUN") {
+            setSwitch(BeatsSymbol.RUN, isOn)
+            return DrumsControlResult(success = true, message = if (isOn) "Started the sequencer" else "Stopped the sequencer")
+        }
+        TRIGGERS[id]?.let { trigger ->
+            // Released straight away: a held trigger wouldn't hit again on the next call.
+            if (isOn) setSwitch(trigger, true)
+            setSwitch(trigger, false)
+            return DrumsControlResult(success = true, message = if (isOn) "Hit ${trigger.displayName}" else "Released ${trigger.displayName}")
         }
 
         val portSymbol = resolvePortSymbol(id)
@@ -310,13 +316,15 @@ class DrumsTool(
         )
     }
 
+    private fun setSwitch(symbol: PortSymbol, on: Boolean) {
+        synthController.setPluginControl(symbol.controlId, PortValue.BoolValue(on), ControlEventOrigin.AI)
+    }
+
     companion object {
-        /** Controls that have no PluginControlId — kept as legacy emitControlChange */
-        private val LEGACY_CONTROLS = mapOf(
-            "DRUM_BD_TRIGGER" to "drum_bd_trigger",
-            "DRUM_SD_TRIGGER" to "drum_sd_trigger",
-            "DRUM_HH_TRIGGER" to "drum_hh_trigger",
-            "BEATS_RUN" to "beats_run",
+        private val TRIGGERS = mapOf(
+            "DRUM_BD_TRIGGER" to DrumSymbol.BD_TRIGGER,
+            "DRUM_SD_TRIGGER" to DrumSymbol.SD_TRIGGER,
+            "DRUM_HH_TRIGGER" to DrumSymbol.HH_TRIGGER,
         )
     }
 }

@@ -7,7 +7,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -30,6 +29,7 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
+import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 
@@ -211,7 +211,6 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
  * ViewModel for the Drum Synth panel.
  *
  * Uses SynthController.controlFlow() for port-based engine interactions.
- * Keeps SynthEngine for triggerDrum() (imperative operation).
  */
 @Inject
 @SingleIn(FeatureScope::class)
@@ -219,7 +218,7 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<DrumFeature>())
 class DrumViewModel(
-    private val synthEngine: SynthEngine,
+    synthEngine: SynthEngine,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
@@ -254,8 +253,9 @@ class DrumViewModel(
 
     private val bypassId = synthController.controlFlow(DrumSymbol.BYPASS.controlId)
 
-    // UI-only intents for triggers (imperative, not port-based)
-    private val uiIntents = MutableSharedFlow<DrumIntent>(extraBufferCapacity = 64)
+    private val bdTriggerId = synthController.controlFlow(DrumSymbol.BD_TRIGGER.controlId)
+    private val sdTriggerId = synthController.controlFlow(DrumSymbol.SD_TRIGGER.controlId)
+    private val hhTriggerId = synthController.controlFlow(DrumSymbol.HH_TRIGGER.controlId)
 
     override val actions = DrumPanelActions(
         setBdFrequency = bdFreqId.floatSetter(),
@@ -359,11 +359,14 @@ class DrumViewModel(
         hhEngineId.map { DrumIntent.HhEngine(it.asInt()) },
 
         bypassId.map { DrumIntent.Bypass(it.asBoolean()) },
+        bdTriggerId.map { DrumIntent.BdTrigger(it.asBoolean()) },
+        sdTriggerId.map { DrumIntent.SdTrigger(it.asBoolean()) },
+        hhTriggerId.map { DrumIntent.HhTrigger(it.asBoolean()) },
         flowOf(DrumIntent.HasNativeEngine(synthEngine.hasNativeEngine))
     )
 
     override val stateFlow: StateFlow<DrumUiState> =
-        merge(controlIntents, uiIntents)
+        controlIntents
             .scan(DrumUiState()) { state, intent ->
                 reduce(state, intent)
             }
@@ -413,23 +416,14 @@ class DrumViewModel(
             is DrumIntent.HasNativeEngine -> state.copy(hasNativeEngine = intent.value)
         }
 
-    fun startBdTrigger() {
-        synthEngine.triggerDrum(0, 1.0f)
-        uiIntents.tryEmit(DrumIntent.BdTrigger(true))
-    }
-    fun stopBdTrigger() { uiIntents.tryEmit(DrumIntent.BdTrigger(false)) }
+    fun startBdTrigger() { bdTriggerId.value = BoolValue(true) }
+    fun stopBdTrigger() { bdTriggerId.value = BoolValue(false) }
 
-    fun startSdTrigger() {
-        synthEngine.triggerDrum(1, 1.0f)
-        uiIntents.tryEmit(DrumIntent.SdTrigger(true))
-    }
-    fun stopSdTrigger() { uiIntents.tryEmit(DrumIntent.SdTrigger(false)) }
+    fun startSdTrigger() { sdTriggerId.value = BoolValue(true) }
+    fun stopSdTrigger() { sdTriggerId.value = BoolValue(false) }
 
-    fun startHhTrigger() {
-        synthEngine.triggerDrum(2, 1.0f)
-        uiIntents.tryEmit(DrumIntent.HhTrigger(true))
-    }
-    fun stopHhTrigger() { uiIntents.tryEmit(DrumIntent.HhTrigger(false)) }
+    fun startHhTrigger() { hhTriggerId.value = BoolValue(true) }
+    fun stopHhTrigger() { hhTriggerId.value = BoolValue(false) }
 
     companion object {
         private const val GATE_ID_BD = 100

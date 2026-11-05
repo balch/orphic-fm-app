@@ -201,7 +201,7 @@ class MidiViewModel(
 
                 scope.launch(dispatcherProvider.io) {
                     midiRepository.load(deviceName)?.let { savedMapping ->
-                        stateHolder.updateState(savedMapping)
+                        stateHolder.restoreSaved(savedMapping)
                         log.debug { "Loaded saved MIDI mappings for $deviceName" }
                     }
                 }

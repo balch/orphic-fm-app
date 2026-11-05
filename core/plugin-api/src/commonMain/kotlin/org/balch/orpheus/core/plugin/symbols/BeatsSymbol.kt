@@ -21,7 +21,8 @@ enum class BeatsSymbol(
     DENSITY_2("density_2", displayName = "Density 2"),
     EUCLIDEAN_0("euclidean_0", displayName = "Euclidean 0"),
     EUCLIDEAN_1("euclidean_1", displayName = "Euclidean 1"),
-    EUCLIDEAN_2("euclidean_2", displayName = "Euclidean 2");
+    EUCLIDEAN_2("euclidean_2", displayName = "Euclidean 2"),
+    RUN("run", displayName = "Run");
 
     companion object {
         private val densities = arrayOf(DENSITY_0, DENSITY_1, DENSITY_2)

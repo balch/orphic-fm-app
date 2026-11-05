@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.BassEngine
 import org.balch.orpheus.core.audio.BassScale
 import org.balch.orpheus.core.audio.ClockDivision
+import org.balch.orpheus.core.plugin.symbols.BassSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -155,13 +156,13 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_clock_division",
+            controlId = BassSymbol.CLOCK_DIV.controlId.key,
             valueFormatter = { state.clockDivision.displayName },
         )
 
-        // Step count knob — discrete snap to 4, 8, 12, 16
+        // Step count knob — discrete snap to 4, 8, 12, 16. A learned CC can land between them.
         RotaryKnob(
-            value = stepCountPresets.indexOf(state.stepCount).coerceAtLeast(0).toFloat() / (stepCountPresets.size - 1).toFloat(),
+            value = ((state.stepCount - stepCountPresets.first()).toFloat() / (stepCountPresets.last() - stepCountPresets.first())).coerceIn(0f, 1f),
             onValueChange = { normalized ->
                 val index = (normalized * (stepCountPresets.size - 1)).roundToInt()
                     .coerceIn(0, stepCountPresets.size - 1)
@@ -173,7 +174,7 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_step_count",
+            controlId = BassSymbol.STEP_COUNT.controlId.key,
             valueFormatter = { state.stepCount.toString() },
         )
 
@@ -186,7 +187,7 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_jitter",
+            controlId = BassSymbol.JITTER.controlId.key,
         )
 
         RotaryKnob(
@@ -198,7 +199,7 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_accent_amount",
+            controlId = BassSymbol.ACCENT_AMOUNT.controlId.key,
         )
 
         RotaryKnob(
@@ -210,7 +211,7 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_lfo_mix",
+            controlId = BassSymbol.LFO_MIX.controlId.key,
         )
 
         // Mutation knob
@@ -223,7 +224,7 @@ private fun BassClockAndSequencerControlsRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_mutation",
+            controlId = BassSymbol.MUTATION.controlId.key,
         )
     }
 }
@@ -250,7 +251,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_cutoff",
+            controlId = BassSymbol.CUTOFF.controlId.key,
         )
         RotaryKnob(
             value = state.resonance,
@@ -261,7 +262,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_resonance",
+            controlId = BassSymbol.RESONANCE.controlId.key,
         )
         RotaryKnob(
             value = state.envelope,
@@ -272,7 +273,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_envelope",
+            controlId = BassSymbol.ENVELOPE.controlId.key,
         )
         RotaryKnob(
             value = state.overdrive,
@@ -283,7 +284,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_overdrive",
+            controlId = BassSymbol.OVERDRIVE.controlId.key,
         )
         RotaryKnob(
             value = state.compressor,
@@ -294,7 +295,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_compressor",
+            controlId = BassSymbol.COMPRESSOR.controlId.key,
         )
         RotaryKnob(
             value = state.fxSend,
@@ -305,7 +306,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_fx_send",
+            controlId = BassSymbol.FX_SEND.controlId.key,
         )
         RotaryKnob(
             value = state.mix,
@@ -316,7 +317,7 @@ private fun BassSoundAndOutputRow(
             progressColor = bassColors.knobProgressColor,
             knobColor = bassColors.knobColor,
             labelColor = bassColors.labelColor,
-            controlId = "bass_mix",
+            controlId = BassSymbol.MIX.controlId.key,
         )
     }
 }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.controller.MidiNoteEvent
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.ports.PortRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +18,7 @@ class MidiInputHandlerNoteEventTest {
     fun noteOnAndOffArePublished() = runTest(UnconfinedTestDispatcher()) {
         val controller = SynthController()
         val stateHolder = MidiMappingStateHolder()
-        val handler = MidiInputHandler(controller, stateHolder)
+        val handler = MidiInputHandler(controller, stateHolder, PortRegistry(emptySet()))
 
         val events = mutableListOf<MidiNoteEvent>()
         backgroundScope.launch { controller.onMidiNote.toList(events) }

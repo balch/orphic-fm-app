@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.beats.BeatsUiState
 import org.balch.orpheus.features.beats.DrumBeatsFeature
@@ -82,7 +83,7 @@ fun CenterControlSection(
                 value = beatsState.mix,
                 onValueChange = beatsActions.setMix,
                 label = "DRUM",
-                controlId = "drum_mix",
+                controlId = DrumSymbol.MIX.controlId.key,
                 size = 32.dp,
                 progressColor = OrpheusColors.warmGlow,
             )

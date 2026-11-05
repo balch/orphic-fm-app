@@ -102,7 +102,9 @@ data class ControlPort(
     val isLogarithmic: Boolean = false,
     val units: String? = null,
     val enumLabels: List<String>? = null,  // For IntPort with discrete choices
-    val excludeFromPresets: Boolean = false  // User-only control, not saved/loaded by presets
+    val excludeFromPresets: Boolean = false,  // User-only control, not saved/loaded by presets
+    val stateCount: Int = 0,  // Discrete values from min upward; 0 when the port doesn't list them
+    val momentary: Boolean = false  // On while held, like a pad: MIDI presses and releases it instead of toggling
 ) : Port() {
     fun qualifiedSymbol(pluginUri: String): String = "$pluginUri:$symbol"
 }

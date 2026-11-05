@@ -42,6 +42,7 @@ class BeatsPlugin : DspPlugin {
     private var _randomness = 0f
     private var _swing = 0f
     private var _mode = 0
+    private var _running = false
     private val _densities = FloatArray(3) { 0.5f }
     private val _euclideanLengths = IntArray(3) { 16 }
 
@@ -62,14 +63,17 @@ class BeatsPlugin : DspPlugin {
             floatType { default = 0f; get { _swing }; set { _swing = it } }
         }
         controlPort(BeatsSymbol.MODE) {
-            intType { get { _mode }; set { _mode = it } }
+            intType { max = 1; get { _mode }; set { _mode = it } }
+        }
+        controlPort(BeatsSymbol.RUN) {
+            boolType { excludeFromPresets = true; get { _running }; set { _running = it } }
         }
         for (i in 0 until 3) {
             controlPort(BeatsSymbol.density(i)) {
                 floatType { default = 0.5f; get { _densities[i] }; set { _densities[i] = it } }
             }
             controlPort(BeatsSymbol.euclidean(i)) {
-                intType { default = 16; get { _euclideanLengths[i] }; set { _euclideanLengths[i] = it } }
+                intType { default = 16; max = 32; get { _euclideanLengths[i] }; set { _euclideanLengths[i] = it } }
             }
         }
     }

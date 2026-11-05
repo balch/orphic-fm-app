@@ -59,9 +59,13 @@ class IntPortBuilder(override val symbol: Symbol) : PortDef<Int>() {
     var default: Int = 0
     var min: Int = 0
     var max: Int = 100
+        set(value) { field = value; maxDeclared = true }
     var options: List<String>? = null  // Enum labels
     var excludeFromPresets: Boolean = false
+    /** Not every value in min..max is valid, so the range isn't a list of states. */
+    var sparse: Boolean = false
 
+    private var maxDeclared = false
     private var _getter: (() -> Int)? = null
     private var _setter: ((Int) -> Unit)? = null
 
@@ -72,9 +76,14 @@ class IntPortBuilder(override val symbol: Symbol) : PortDef<Int>() {
         index, symbol, name, PortType.INT,
         default.toFloat(), min.toFloat(), max.toFloat(),
         enumLabels = options,
-        excludeFromPresets = excludeFromPresets
+        excludeFromPresets = excludeFromPresets,
+        stateCount = when {
+            sparse -> 0
+            maxDeclared -> max - min + 1
+            else -> options?.size ?: 0
+        }
     )
-    
+
     override fun getValue() = PortValue.IntValue(_getter?.invoke() ?: default)
     override fun setValue(value: PortValue) { _setter?.invoke(value.asInt()) }
 }
@@ -87,6 +96,7 @@ class BoolPortBuilder(override val symbol: Symbol) : PortDef<Boolean>() {
     override var name: String = symbol.replaceFirstChar { it.uppercase() }
     var default: Boolean = false
     var excludeFromPresets: Boolean = false
+    var momentary: Boolean = false
 
     private var _getter: (() -> Boolean)? = null
     private var _setter: ((Boolean) -> Unit)? = null
@@ -97,7 +107,8 @@ class BoolPortBuilder(override val symbol: Symbol) : PortDef<Boolean>() {
     override fun toControlPort(index: Int) = ControlPort(
         index, symbol, name, PortType.BOOLEAN,
         if (default) 1f else 0f, 0f, 1f,
-        excludeFromPresets = excludeFromPresets
+        excludeFromPresets = excludeFromPresets,
+        momentary = momentary
     )
     
     override fun getValue() = PortValue.BoolValue(_getter?.invoke() ?: default)

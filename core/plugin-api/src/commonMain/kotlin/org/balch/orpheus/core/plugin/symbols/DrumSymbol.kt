@@ -33,5 +33,8 @@ enum class DrumSymbol(
     BYPASS("bypass", displayName = "Bypass"),
     BD_ENGINE("bd_engine", displayName = "BD Engine"),
     SD_ENGINE("sd_engine", displayName = "SD Engine"),
-    HH_ENGINE("hh_engine", displayName = "HH Engine")
+    HH_ENGINE("hh_engine", displayName = "HH Engine"),
+    BD_TRIGGER("bd_trigger", displayName = "BD Trigger"),
+    SD_TRIGGER("sd_trigger", displayName = "SD Trigger"),
+    HH_TRIGGER("hh_trigger", displayName = "HH Trigger")
 }

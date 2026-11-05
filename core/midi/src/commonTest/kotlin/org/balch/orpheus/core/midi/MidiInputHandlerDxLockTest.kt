@@ -6,6 +6,7 @@ import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
+import org.balch.orpheus.core.ports.PortRegistry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ class MidiInputHandlerDxLockTest {
         )
     }
     private val stateHolder = MidiMappingStateHolder()
-    private val handler = MidiInputHandler(controller, stateHolder)
+    private val handler = MidiInputHandler(controller, stateHolder, PortRegistry(emptySet()))
 
     private val harmonicsId = VoiceSymbol.duoHarmonics(2).controlId
     private val engineId = VoiceSymbol.duoEngine(2).controlId
@@ -53,15 +54,24 @@ class MidiInputHandlerDxLockTest {
 
     @Test
     fun drumModCcIgnoredOnDxOrdinalAndAppliesOtherwise() = runTest(UnconfinedTestDispatcher()) {
+        val modKey = DrumSymbol.BD_P4.controlId.key
         val events = mutableListOf<ControlEvent>()
         backgroundScope.launch { controller.onControlChange.toList(events) }
 
         values[DrumSymbol.BD_ENGINE.controlId] = PortValue.IntValue(OrpheusEngineId.DX.ordinal)
-        cc("drums_bd_mod", 100)
-        assertEquals(emptyList(), events.filter { it.controlId == "drums_bd_mod" })
+        cc(modKey, 100)
+        assertEquals(emptyList(), events.filter { it.controlId == modKey })
 
         values[DrumSymbol.BD_ENGINE.controlId] = PortValue.IntValue(OrpheusEngineId.VA.ordinal)
-        cc("drums_bd_mod", 100)
-        assertEquals(1, events.count { it.controlId == "drums_bd_mod" })
+        cc(modKey, 100)
+        assertEquals(1, events.count { it.controlId == modKey })
+    }
+
+    @Test
+    fun aSavedDrumModCcKeepsItsDxLock() {
+        values[DrumSymbol.BD_ENGINE.controlId] = PortValue.IntValue(OrpheusEngineId.DX.ordinal)
+        stateHolder.restoreSaved(MidiMappingState(ccMappings = mapOf(21 to "drums_bd_mod")))
+        handler.onControlChange(21, 100)
+        assertEquals(null, values[DrumSymbol.BD_P4.controlId])
     }
 }

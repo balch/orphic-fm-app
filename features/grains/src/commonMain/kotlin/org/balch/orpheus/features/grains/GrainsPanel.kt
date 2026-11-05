@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
 import org.balch.orpheus.plugins.grains.GrainsMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -128,7 +129,7 @@ private fun GrainsModeSelector(
             inactiveContainerColor = OrpheusColors.lakersPurpleDark
         )
         Learnable(
-            controlId = "clouds_mode",
+            controlId = GrainsSymbol.MODE.controlId.key,
             modifier = Modifier.fillMaxWidth()
         ) {
             SingleChoiceSegmentedButtonRow(
@@ -181,9 +182,9 @@ private fun GrainsKnobBank(
             val knobColor = OrpheusColors.fadedCyan
             val labelColor = panelColor
 
-            RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_position")
-            RotaryKnob(state.size, actions.setSize, label = "SIZE", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_size")
-            RotaryKnob(state.pitch, actions.setPitch, label = "PITCH", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_pitch")
+            RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.POSITION.controlId.key)
+            RotaryKnob(state.size, actions.setSize, label = "SIZE", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.SIZE.controlId.key)
+            RotaryKnob(state.pitch, actions.setPitch, label = "PITCH", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.PITCH.controlId.key)
         }
 
         // Knobs row 2
@@ -196,11 +197,11 @@ private fun GrainsKnobBank(
             val knobColor = OrpheusColors.fadedCyan
             val labelColor = panelColor
 
-            RotaryKnob(state.density, actions.setDensity, label = "DENS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_density")
-            RotaryKnob(state.texture, actions.setTexture, label = "TEX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_texture")
-            RotaryKnob(state.feedback, actions.setFeedback, label = "FB", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_feedback")
-            RotaryKnob(state.reverb, actions.setReverb, label = "REV", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_reverb")
-            RotaryKnob(state.dryWet, actions.setDryWet, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_mix")
+            RotaryKnob(state.density, actions.setDensity, label = "DENS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.DENSITY.controlId.key)
+            RotaryKnob(state.texture, actions.setTexture, label = "TEX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.TEXTURE.controlId.key)
+            RotaryKnob(state.feedback, actions.setFeedback, label = "FB", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.FEEDBACK.controlId.key)
+            RotaryKnob(state.reverb, actions.setReverb, label = "REV", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.REVERB.controlId.key)
+            RotaryKnob(state.dryWet, actions.setDryWet, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = GrainsSymbol.DRY_WET.controlId.key)
         }
     }
 }
@@ -224,7 +225,7 @@ private fun GrainsTrigFreezeButtons(
             active = false,
             onClick = { actions.trigger() },
             accentColor = OrpheusColors.fadedCyan,
-            controlId = "clouds_trigger"
+            controlId = GrainsSymbol.TRIGGER.controlId.key
         )
 
         // Freeze Toggle - BELOW
@@ -233,7 +234,7 @@ private fun GrainsTrigFreezeButtons(
             active = state.freeze,
             onClick = { actions.setFreeze(!state.freeze) },
             accentColor = panelColor,
-            controlId = "clouds_freeze"
+            controlId = GrainsSymbol.FREEZE.controlId.key
         )
     }
 }

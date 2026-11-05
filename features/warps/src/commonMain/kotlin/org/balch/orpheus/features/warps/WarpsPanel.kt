@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.WarpsSource
+import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -90,7 +91,7 @@ fun WarpsPanel(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 ChannelSourceWidget(
-                    controlId = "warps_carrier_level",
+                    controlId = WarpsSymbol.LEVEL1.controlId.key,
                     label = "CARRIER",
                     level = state.carrierLevel,
                     onLevelChange = actions.setCarrierLevel,
@@ -104,11 +105,11 @@ fun WarpsPanel(
                     modifier = Modifier.size(150.dp),
                     value = state.algorithm,
                     onValueChange = actions.setAlgorithm,
-                    controlId = "warps_algo"
+                    controlId = WarpsSymbol.ALGORITHM.controlId.key
                 )
 
                 ChannelSourceWidget(
-                    controlId = "warps_modulator_level",
+                    controlId = WarpsSymbol.LEVEL2.controlId.key,
                     label = "MODULATOR",
                     level = state.modulatorLevel,
                     onLevelChange = actions.setModulatorLevel,
@@ -132,7 +133,7 @@ fun WarpsPanel(
                     progressColor = warpsColors.knobProgressColor,
                     knobColor = warpsColors.knobColor,
                     labelColor = warpsColors.labelColor,
-                    controlId = "warps_timbre"
+                    controlId = WarpsSymbol.TIMBRE.controlId.key
                 )
 
                 RotaryKnob(
@@ -145,7 +146,7 @@ fun WarpsPanel(
                     progressColor = warpsColors.knobProgressColor,
                     knobColor = warpsColors.knobColor,
                     labelColor = warpsColors.labelColor,
-                    controlId = "warps_mix"
+                    controlId = WarpsSymbol.MIX.controlId.key
                 )
             }
         }

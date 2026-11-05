@@ -4,6 +4,8 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.CowbellSymbol
+import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.plugins.cowbell.CowbellPlugin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -18,7 +20,7 @@ class MidiInputHandlerCowbellBodyTest {
         )
     }
     private val stateHolder = MidiMappingStateHolder()
-    private val handler = MidiInputHandler(controller, stateHolder)
+    private val handler = MidiInputHandler(controller, stateHolder, PortRegistry(setOf(CowbellPlugin())))
     private val bodyId = CowbellSymbol.BODY.controlId
 
     private fun cc(value: Int): PortValue? {
@@ -34,6 +36,16 @@ class MidiInputHandlerCowbellBodyTest {
         assertEquals(PortValue.IntValue(0), cc(0))
         assertEquals(PortValue.IntValue(2), cc(64))
         assertEquals(PortValue.IntValue(3), cc(127))
+    }
+
+    @Test
+    fun theCcRangesOfEachBodyHoldExactly() {
+        learnCc()
+        val bodies = (0..127).groupBy { ordinalOf(cc(it)) }
+        assertEquals(0..21, bodies.getValue(0).first()..bodies.getValue(0).last())
+        assertEquals(22..63, bodies.getValue(1).first()..bodies.getValue(1).last())
+        assertEquals(64..105, bodies.getValue(2).first()..bodies.getValue(2).last())
+        assertEquals(106..127, bodies.getValue(3).first()..bodies.getValue(3).last())
     }
 
     @Test

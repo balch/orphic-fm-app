@@ -71,6 +71,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DjDrop
 import org.balch.orpheus.core.plugin.symbols.DjSource
+import org.balch.orpheus.core.plugin.symbols.DjSymbol
 import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -639,7 +640,7 @@ private fun FaderAndSendKnobsRow(
                 progressColor = djColors.knobProgressColor,
                 knobColor = djColors.knobColor,
                 labelColor = djColors.labelColor,
-                controlId = "dj_delay_send",
+                controlId = DjSymbol.DELAY_SEND.controlId.key,
                 valueFormatter = null,
             )
             RotaryKnob(
@@ -651,7 +652,7 @@ private fun FaderAndSendKnobsRow(
                 progressColor = djColors.knobProgressColor,
                 knobColor = djColors.knobColor,
                 labelColor = djColors.labelColor,
-                controlId = "dj_reverb_send",
+                controlId = DjSymbol.REVERB_SEND.controlId.key,
                 valueFormatter = null,
             )
         }

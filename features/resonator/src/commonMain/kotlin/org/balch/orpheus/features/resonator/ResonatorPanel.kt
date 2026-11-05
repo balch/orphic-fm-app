@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -108,7 +109,7 @@ private fun ModeSelectorRow(
         inactiveContainerColor = OrpheusColors.lakersPurpleDark
     )
     Learnable(
-        controlId = "resonator_mode",
+        controlId = ResonatorSymbol.MODE.controlId.key,
         modifier = Modifier.padding(horizontal = 8.dp)
     ) {
         SingleChoiceSegmentedButtonRow(
@@ -158,7 +159,7 @@ private fun KnobRow(
             progressColor = knobProgressColor,
             knobColor = knobColor,
             labelColor = labelColor,
-            controlId = "resonator_structure"
+            controlId = ResonatorSymbol.STRUCTURE.controlId.key
         )
         RotaryKnob(
             state.brightness,
@@ -169,7 +170,7 @@ private fun KnobRow(
             progressColor = knobProgressColor,
             knobColor = knobColor,
             labelColor = labelColor,
-            controlId = "resonator_brightness"
+            controlId = ResonatorSymbol.BRIGHTNESS.controlId.key
         )
         RotaryKnob(
             state.damping,
@@ -180,7 +181,7 @@ private fun KnobRow(
             progressColor = knobProgressColor,
             knobColor = knobColor,
             labelColor = labelColor,
-            controlId = "resonator_damping"
+            controlId = ResonatorSymbol.DAMPING.controlId.key
         )
         RotaryKnob(
             state.position,
@@ -191,7 +192,7 @@ private fun KnobRow(
             progressColor = knobProgressColor,
             knobColor = knobColor,
             labelColor = labelColor,
-            controlId = "resonator_position"
+            controlId = ResonatorSymbol.POSITION.controlId.key
         )
         RotaryKnob(
             state.mix,
@@ -202,7 +203,7 @@ private fun KnobRow(
             progressColor = knobProgressColor,
             knobColor = knobColor,
             labelColor = labelColor,
-            controlId = "resonator_mix"
+            controlId = ResonatorSymbol.MIX.controlId.key
         )
     }
 }
@@ -236,14 +237,14 @@ private fun DrumSynthMixRow(
                 onValueChange = actions.setTargetMix,
                 snapBack = state.snapBack,
                 accentColor = RingsPanelColor,
-                controlId = "resonator_target_mix"
+                controlId = ResonatorSymbol.TARGET_MIX.controlId.key
             )
 
             SnapBackButton(
                 enabled = state.snapBack,
                 onClick = { actions.setSnapBack(!state.snapBack) },
                 accentColor = RingsPanelColor,
-                controlId = "resonator_snap_back"
+                controlId = ResonatorSymbol.SNAP_BACK.controlId.key
             )
         }
 
