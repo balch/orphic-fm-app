@@ -14,6 +14,8 @@ val showTuning = providers.gradleProperty("showTuning").orNull?.toBoolean() ?: t
 // -PtrackEdit=true lets the Pulsar grid select a track and open its detail strip
 // (DjBuildKonfig.SHOW_TRACK_EDIT). Local builds only, refused by the same store tasks as showKraken.
 val trackEdit = providers.gradleProperty("trackEdit").orNull.toBoolean()
+// -PnavLongPressTour=true teaches the nav bar's long press on the first launches (DjBuildKonfig.NAV_LONG_PRESS_TOUR).
+val navLongPressTour = providers.gradleProperty("navLongPressTour").orNull.toBoolean()
 
 buildkonfig {
     packageName = "org.balch.orpheus.djapp"
@@ -22,6 +24,7 @@ buildkonfig {
         buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_KRAKEN", showKraken.toString())
         buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_TUNING", showTuning.toString())
         buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_TRACK_EDIT", trackEdit.toString())
+        buildConfigField(FieldSpec.Type.BOOLEAN, "NAV_LONG_PRESS_TOUR", navLongPressTour.toString())
     }
 }
 

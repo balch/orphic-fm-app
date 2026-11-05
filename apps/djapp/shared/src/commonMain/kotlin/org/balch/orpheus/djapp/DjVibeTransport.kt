@@ -525,10 +525,11 @@ internal fun VibeTransportItem(
             }
         }
         // "Swipe me": once a launch, a beat after the dome shows, until a swipe has ever committed.
+        // A launch that shows the bar's long press goes without: one hint a launch.
         LaunchedEffect(cues, dome) {
-            if (cues.everSwiped()) return@LaunchedEffect
+            if (!cues.wiggleDue()) return@LaunchedEffect
             delay(DomeWiggleDelayMillis)
-            if (cues.takeWiggle()) {
+            cues.takeWiggle {
                 dome.wiggle { dragDp ->
                     cueDrag.floatValue = dragDp
                     showPeek()

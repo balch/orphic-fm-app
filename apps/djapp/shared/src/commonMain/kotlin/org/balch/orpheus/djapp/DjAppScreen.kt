@@ -472,7 +472,7 @@ fun DjAppScreen(
                 }
             }
 
-            // A tab's tap in the single-panel and pair layouts; a chip's double-tap opens through it too.
+            // A tab's tap in the single-panel and pair layouts; a chip's tap opens through it too.
             val onItemClick: (DjRoute) -> Unit = { route ->
                 activeSheet = sheetAfterBarTab(activeSheet, route)
                 when {

@@ -193,22 +193,22 @@ class NavChipRowTest {
     }
 
     @Test
-    fun `chip tap swaps after the double tap window`() = runComposeUiTest {
+    fun `chip tap opens after the double tap window`() = runComposeUiTest {
         val recorder = Recorder()
         show(recorder)
         tab("Timer").performTouchInput { longClick() }
         waitForIdle()
         mainClock.autoAdvance = false
         chip("Horn").performClick()
-        assertTrue(recorder.swaps.isEmpty(), "the swap fired before the double tap window closed")
+        assertTrue(recorder.opened.isEmpty(), "the panel opened before the double tap window closed")
         mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
-        assertEquals(listOf<Pair<DjRoute, DjRoute>>(TimerTab to HornTab), recorder.swaps)
-        assertTrue(recorder.opened.isEmpty())
+        assertEquals(listOf<DjRoute>(HornTab), recorder.opened)
+        assertTrue(recorder.swaps.isEmpty(), "a tap also swapped")
         onAllNodes(hasTestTag(NavChipTag)).assertCountEquals(0)
     }
 
     @Test
-    fun `chip double tap opens without swapping`() = runComposeUiTest {
+    fun `chip double tap swaps without opening`() = runComposeUiTest {
         val recorder = Recorder()
         show(recorder)
         tab("Timer").performTouchInput { longClick() }
@@ -218,8 +218,8 @@ class NavChipRowTest {
         mainClock.advanceTimeBy(100)
         chip("Horn").performClick()
         mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
-        assertEquals(listOf<DjRoute>(HornTab), recorder.opened)
-        assertTrue(recorder.swaps.isEmpty(), "a double tap also swapped")
+        assertEquals(listOf<Pair<DjRoute, DjRoute>>(TimerTab to HornTab), recorder.swaps)
+        assertTrue(recorder.opened.isEmpty(), "a double tap also opened")
     }
 
     @Test

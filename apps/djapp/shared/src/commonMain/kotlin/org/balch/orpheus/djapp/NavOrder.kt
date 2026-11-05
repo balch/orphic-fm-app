@@ -70,6 +70,9 @@ data class NavBar(
     val offBar: List<DjRoute>,
 ) {
     val full: Boolean get() = offBar.isNotEmpty()
+
+    /** The tabs on the bar, left to right, skipping the open slot. */
+    val panels: List<DjRoute> get() = (left + right).filterIsInstance<NavEntry.Panel>().map { it.route }
 }
 
 /** An even slot count, rounding odd panel counts up to leave one open slot. */

@@ -2,7 +2,9 @@ package org.balch.orpheus.djapp
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector2D
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +13,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
@@ -66,14 +71,26 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.roundToIntRect
 import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.layout.offset
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.balch.orpheus.core.onboarding.OnboardingSequencer
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.widgets.CalloutCaret
+import org.balch.orpheus.ui.widgets.OnboardingCallout
 
-/** How long a chip's single tap waits for a second tap before it counts as a swap. */
+/** How long a chip's single tap waits for a second tap before it counts as an open. */
 internal const val ChipDoubleTapWindowMs = 300L
 
 /** The test tag on each chip in the row. */
@@ -81,6 +98,9 @@ internal const val NavChipTag = "navChip"
 
 private val ChipGap = 8.dp
 private val ChipRowGap = 8.dp
+
+/** What's left between a callout's caret and what it points at. */
+private val CalloutCaretGap = 2.dp
 private val ChipFill = Color(0xFF10141C)
 private val ChipShape = RoundedCornerShape(8.dp)
 
@@ -103,6 +123,7 @@ internal class NavGestureHost {
     var vertical: Boolean = false
     var anchor: LayoutCoordinates? = null
     var haptics: HapticFeedback? = null
+    var onboarding: OnboardingSequencer? = null
     val slots = HashMap<NavEntry, LayoutCoordinates>()
 
     var chipRow by mutableStateOf<NavChipRowState?>(null)
@@ -116,6 +137,22 @@ internal class NavGestureHost {
     var dragOffset by mutableStateOf(Offset.Zero)
         private set
 
+    /** The tab the preview's pretend finger is pressing, before it lifts. */
+    var pressing by mutableStateOf<NavEntry?>(null)
+        private set
+
+    /** The pressed tab's size and glow, 0 to 1; read only in its draw. */
+    val pressScale = Animatable(1f)
+    val pressGlow = Animatable(0f)
+
+    /** Where the "long press" callout sits while it shows; null with no callout up. */
+    var tabCallout by mutableStateOf<NavChipRowState?>(null)
+        private set
+
+    /** Whether that callout is fading in or out. */
+    var tabCalloutVisible by mutableStateOf(false)
+        private set
+
     var scope: CoroutineScope? = null
 
     /** The slot a drop would trade with right now. */
@@ -126,12 +163,20 @@ internal class NavGestureHost {
 
     fun previewOffset(entry: NavEntry): Offset = previews[entry]?.value ?: Offset.Zero
 
+    /** Whether [openChips] would open: the bar and [slot] laid out, and a chip to offer. */
+    fun canOpenChips(slot: DjRoute): Boolean =
+        anchor?.isAttached == true && slots[NavEntry.Panel(slot)]?.isAttached == true && offBar.isNotEmpty()
+
     /** Opens the row for [slot]; a bar with every panel on it has no chips to offer. */
     fun openChips(slot: DjRoute) {
-        val anchor = anchor?.takeIf { it.isAttached } ?: return
-        val tab = slots[NavEntry.Panel(slot)]?.takeIf { it.isAttached } ?: return
         if (offBar.isEmpty()) return
-        chipRow = NavChipRowState(
+        chipRow = rowFor(slot) ?: return
+    }
+
+    private fun rowFor(slot: DjRoute): NavChipRowState? {
+        val anchor = anchor?.takeIf { it.isAttached } ?: return null
+        val tab = slots[NavEntry.Panel(slot)]?.takeIf { it.isAttached } ?: return null
+        return NavChipRowState(
             slot = slot,
             chips = offBar,
             anchor = anchor.boundsInWindow().roundToIntRect(),
@@ -145,12 +190,65 @@ internal class NavGestureHost {
 
     fun swapChip(row: NavChipRowState, chip: DjRoute) {
         closeChips()
+        onboarding?.learn(NavChipRowStep)
         actions?.onChipSwap(row.slot, chip)
     }
 
     fun openChip(chip: DjRoute) {
         closeChips()
+        onboarding?.learn(NavChipRowStep)
         actions?.onOpenOffBar(chip)
+    }
+
+    /**
+     * The preview's pretend long press on [route]: the tab sinks and glows under a finger that is not
+     * there, then buzzes, lifts and opens its chip row as a real press does, and eases back with the
+     * row left open. Cancelling it settles the tab at once.
+     */
+    suspend fun previewLongPress(route: DjRoute) {
+        pressScale.snapTo(1f)
+        pressGlow.snapTo(0f)
+        pressing = NavEntry.Panel(route)
+        tabCallout = rowFor(route)
+        tabCalloutVisible = true
+        try {
+            animatePress(PressedScale, 1f, NavChipsPreviewPressMillis)
+            haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+            tabCalloutVisible = false
+            openChips(route)
+            animatePress(RaisedScale, 1f, NavChipsPreviewLiftMillis)
+            delay(NavChipsPreviewHoldMillis)
+            animatePress(1f, 0f, NavChipsPreviewSettleMillis)
+        } finally {
+            pressing = null
+            tabCallout = null
+            tabCalloutVisible = false
+        }
+    }
+
+    private suspend fun animatePress(scale: Float, glow: Float, millis: Long) = coroutineScope {
+        launch { pressScale.animateTo(scale, tween(millis.toInt(), easing = FastOutSlowInEasing)) }
+        launch { pressGlow.animateTo(glow, tween(millis.toInt(), easing = FastOutSlowInEasing)) }
+    }
+
+    /** The reminder on a later launch: the callout alone, which a real press fades early. */
+    suspend fun showLongPressHint(route: DjRoute) {
+        tabCallout = rowFor(route)
+        tabCalloutVisible = true
+        try {
+            delay(NavLongPressHintMillis)
+            tabCalloutVisible = false
+            delay(NavCalloutClearMillis)
+        } finally {
+            tabCallout = null
+            tabCalloutVisible = false
+        }
+    }
+
+    /** A real long press landed: it is learned, and the callout asking for one has done its job. */
+    fun longPressLearned() {
+        tabCalloutVisible = false
+        onboarding?.learn(NavLongPressStep)
     }
 
     /** Raises [entry] under the finger once its long press lands, before any drag. */
@@ -206,6 +304,7 @@ internal fun rememberNavGestureHost(actions: NavActions?, offBar: List<DjRoute>,
     val host = remember { NavGestureHost() }
     host.actions = actions
     host.haptics = LocalHapticFeedback.current
+    host.onboarding = LocalOnboarding.current
     host.scope = rememberCoroutineScope()
     host.offBar = offBar
     host.vertical = vertical
@@ -232,7 +331,7 @@ internal fun Modifier.navTabGestures(host: NavGestureHost?, route: DjRoute): Mod
     return this
         .onGloballyPositioned { host.slots[entry] = it }
         .pointerInput(host, route) { detectNavTabGestures(host, route) }
-        .zIndex(if (lifted) 1f else 0f)
+        .zIndex(if (lifted || host.pressing == entry) 1f else 0f)
         .graphicsLayer {
             if (lifted) {
                 val offset = host.dragOffset
@@ -245,12 +344,30 @@ internal fun Modifier.navTabGestures(host: NavGestureHost?, route: DjRoute): Mod
                 val offset = host.previewOffset(entry)
                 translationX = offset.x
                 translationY = offset.y
+                if (host.pressing == entry) {
+                    scaleX = host.pressScale.value
+                    scaleY = host.pressScale.value
+                }
             }
+        }
+        // The pretend finger: a glow spreading over the tab as the press lands, fading as it settles.
+        .drawBehind {
+            if (host.pressing != entry) return@drawBehind
+            val glow = host.pressGlow.value
+            val radius = size.minDimension / 2 * (PressGlowStart + (PressGlowEnd - PressGlowStart) * glow)
+            val core = OrpheusColors.neonCyan.copy(alpha = PressGlowAlpha * glow)
+            drawCircle(Brush.radialGradient(listOf(core, Color.Transparent), center, radius), radius)
         }
 }
 
 private const val LiftedScale = 1.1f
 private const val LiftedAlpha = 0.9f
+/** How far the pretend press sinks the tab, then raises it; further than a real press, to be seen. */
+private const val PressedScale = 0.82f
+private const val RaisedScale = 1.15f
+private const val PressGlowAlpha = 0.8f
+private const val PressGlowStart = 0.4f
+private const val PressGlowEnd = 1.2f
 
 private suspend fun PointerInputScope.detectNavTabGestures(host: NavGestureHost, route: DjRoute) {
     awaitEachGesture {
@@ -262,6 +379,7 @@ private suspend fun PointerInputScope.detectNavTabGestures(host: NavGestureHost,
         if (down.type == PointerType.Mouse && currentEvent.buttons.isSecondaryPressed) {
             down.consume()
             consumeUntilLift(down)
+            host.longPressLearned()
             host.openChips(route)
             return@awaitEachGesture
         }
@@ -273,6 +391,7 @@ private suspend fun PointerInputScope.detectNavTabGestures(host: NavGestureHost,
 
         // Answer the press at the timeout, not on lift, so the user knows it landed.
         host.haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+        host.longPressLearned()
         host.lift(NavEntry.Panel(route))
         host.openChips(route)
         try {
@@ -337,6 +456,14 @@ internal class ChipRowPositioner(
     private val vertical: Boolean,
     private val gapPx: Int,
 ) : PopupPositionProvider {
+    private var placedAt by mutableStateOf<IntOffset?>(null)
+
+    /** How far along the popup's facing edge the pressed tab's centre falls, once placed. */
+    val tabCentreAlong: Float?
+        get() = placedAt?.let {
+            (if (vertical) row.slotBounds.center.y - it.y else row.slotBounds.center.x - it.x).toFloat()
+        }
+
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -344,7 +471,7 @@ internal class ChipRowPositioner(
         popupContentSize: IntSize,
     ): IntOffset {
         val window = windowSize.toIntRect()
-        return if (vertical) {
+        val placed = if (vertical) {
             val y = (row.slotBounds.center.y - popupContentSize.height / 2)
                 .coerceIn(window.top, (window.bottom - popupContentSize.height).coerceAtLeast(window.top))
             IntOffset(row.anchor.right + gapPx, y)
@@ -353,13 +480,22 @@ internal class ChipRowPositioner(
                 .coerceIn(window.left, (window.right - popupContentSize.width).coerceAtLeast(window.left))
             IntOffset(x, (row.anchor.top - popupContentSize.height - gapPx).coerceAtLeast(window.top))
         }
+        placedAt = placed
+        return placed
     }
 }
+
+/** Centres a callout over its chip, as far as the [columnWidth] it lives in allows. */
+internal fun chipCalloutLeft(chipCentre: Float?, calloutWidth: Int, columnWidth: Int): Int =
+    ((chipCentre ?: (columnWidth / 2f)) - calloutWidth / 2f).roundToInt()
+        .coerceIn(0, (columnWidth - calloutWidth).coerceAtLeast(0))
 
 /** The chip row, floating in a popup while [NavGestureHost.chipRow] is set. No scrim: a tap outside closes it. */
 @Composable
 internal fun NavChipPopup(host: NavGestureHost?) {
-    val row = host?.chipRow ?: return
+    if (host == null) return
+    NavTabCalloutPopup(host)
+    val row = host.chipRow ?: return
     val density = LocalDensity.current
     val gapPx = with(density) { ChipRowGap.roundToPx() }
     val positioner = remember(row, host.vertical, gapPx) { ChipRowPositioner(row, host.vertical, gapPx) }
@@ -371,31 +507,82 @@ internal fun NavChipPopup(host: NavGestureHost?) {
         // The bar's glass frames the row; each chip sits on a fill of its own, so no glass is behind text.
         // As wide as its chips, scrolling only when they outgrow the bar.
         val width = if (host.vertical) Modifier else Modifier.widthIn(max = with(density) { row.anchor.width.toDp() })
-        Box(Modifier.then(width).tvBarGlass(true).padding(ChipGap)) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(ChipGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                NavChip(row.slot, current = true, onClick = host::closeChips)
-                row.chips.forEach { chip ->
-                    DoubleTapChip(
-                        route = chip,
-                        onTap = { host.swapChip(row, chip) },
-                        onDoubleTap = { host.openChip(chip) },
-                    )
+        val hint by remember(host.onboarding) {
+            host.onboarding?.pending(NavChipRowStep) ?: flowOf(false)
+        }.collectAsStateWithLifecycle(false)
+        // The callout sits over the first chip the user can pick, measured in this popup's own root.
+        var chipCentreInRoot by remember(row) { mutableStateOf<Float?>(null) }
+        var columnLeft by remember { mutableFloatStateOf(0f) }
+        var columnWidth by remember { mutableIntStateOf(0) }
+        var calloutWidth by remember { mutableIntStateOf(0) }
+        val chipCentre = { chipCentreInRoot?.minus(columnLeft) }
+        val calloutLeft = { chipCalloutLeft(chipCentre(), calloutWidth, columnWidth) }
+        val chipMarginPx = with(density) { ChipGap.toPx() }
+        Column(
+            modifier = width.onGloballyPositioned {
+                columnLeft = it.positionInRoot().x
+                columnWidth = it.size.width
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(CalloutCaretGap),
+        ) {
+            if (hint) {
+                OnboardingCallout(
+                    text = navChipRowHint(isDesktopPlatform()),
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .offset { IntOffset(calloutLeft(), 0) }
+                        .onSizeChanged { calloutWidth = it.width }
+                        .padding(horizontal = ChipGap),
+                    caret = CalloutCaret.Down,
+                    caretAlong = { chipCentre()?.minus(calloutLeft() + chipMarginPx) },
+                )
+            }
+            Box(Modifier.tvBarGlass(true).padding(ChipGap)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(ChipGap),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NavChip(row.slot, current = true, onClick = host::closeChips)
+                    row.chips.forEachIndexed { index, chip ->
+                        DoubleTapChip(
+                            route = chip,
+                            onTap = { host.openChip(chip) },
+                            onDoubleTap = { host.swapChip(row, chip) },
+                            modifier = if (index != 0) Modifier else Modifier.onGloballyPositioned {
+                                chipCentreInRoot = it.positionInRoot().x + it.size.width / 2f
+                            },
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** The "long press" callout above the tab. Takes no focus, so it leaves the app playing under it. */
+@Composable
+private fun NavTabCalloutPopup(host: NavGestureHost) {
+    val at = host.tabCallout ?: return
+    val gapPx = with(LocalDensity.current) { CalloutCaretGap.roundToPx() }
+    val positioner = remember(at, host.vertical, gapPx) { ChipRowPositioner(at, host.vertical, gapPx) }
+    Popup(popupPositionProvider = positioner, properties = PopupProperties(focusable = false)) {
+        OnboardingCallout(
+            text = NavLongPressHint,
+            visible = host.tabCalloutVisible,
+            caret = if (host.vertical) CalloutCaret.Left else CalloutCaret.Down,
+            caretAlong = { positioner.tabCentreAlong },
+        )
+    }
+}
+
 /** A chip that waits [ChipDoubleTapWindowMs] for a second tap before its single tap fires. */
 @Composable
-private fun DoubleTapChip(route: DjRoute, onTap: () -> Unit, onDoubleTap: () -> Unit) {
+private fun DoubleTapChip(route: DjRoute, onTap: () -> Unit, onDoubleTap: () -> Unit, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var pending by remember { mutableStateOf<Job?>(null) }
-    NavChip(route, current = false) {
+    NavChip(route, current = false, modifier) {
         val waiting = pending
         if (waiting != null) {
             waiting.cancel()
@@ -412,10 +599,10 @@ private fun DoubleTapChip(route: DjRoute, onTap: () -> Unit, onDoubleTap: () -> 
 }
 
 @Composable
-private fun NavChip(route: DjRoute, current: Boolean, onClick: () -> Unit) {
+private fun NavChip(route: DjRoute, current: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val tint = if (current) OrpheusColors.neonCyan else Color.White.copy(alpha = 0.85f)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .testTag(NavChipTag)
             .semantics { selected = current }
             .background(if (current) NavIndicatorColor.compositeOver(ChipFill) else ChipFill, ChipShape)

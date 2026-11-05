@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.balch.orpheus.core.onboarding.OnboardingSequencer
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.media.PlaybackProgress
@@ -425,7 +426,7 @@ class VibeDomeCueTest {
     private class Launch(val preferences: MemoryPreferences, scheduler: TestCoroutineScheduler) {
         val swipes = mutableListOf<Boolean>()
         private val scope = CoroutineScope(UnconfinedTestDispatcher(scheduler))
-        val cues = VibeDomeCues(emptyFlow(), { swipes += it }, preferences, scope, DomeWiggleLaunch())
+        val cues = VibeDomeCues(emptyFlow(), { swipes += it }, OnboardingSequencer(listOf(DomeSwipeStep), preferences, scope))
 
         fun close() = scope.cancel()
     }
@@ -479,7 +480,7 @@ class VibeDomeCueTest {
             assertFalse(dome.stillAsksForFrames, "a settled wiggle still asks for frames")
             assertEquals(emptyList<Boolean>(), launch.swipes)
             assertEquals(0, dome.nexts + dome.previouses + dome.toggles)
-            assertFalse(preferences.prefs.domeSwiped, "a wiggle is not a swipe")
+            assertFalse(preferences.swipeLearned, "a wiggle is not a swipe")
         } finally {
             dome.close()
             launch.close()
@@ -536,7 +537,7 @@ class VibeDomeCueTest {
             dome.swipeRight(48)
             dome.frames(40)
             assertEquals(listOf(true), first.swipes, "the swipe asked for no vibe")
-            assertTrue(preferences.prefs.domeSwiped, "the swipe was not remembered")
+            assertTrue(preferences.swipeLearned, "the swipe was not remembered")
         } finally {
             dome.close()
             first.close()
@@ -558,7 +559,7 @@ class VibeDomeCueTest {
             dome.frames(40)
             val after = dome.watch(150)
             assertEquals(emptyList<Watched>(), after.moving(), "it wiggled after a swipe")
-            assertTrue(preferences.prefs.domeSwiped)
+            assertTrue(preferences.swipeLearned)
         } finally {
             dome.close()
             launch.close()
@@ -577,7 +578,7 @@ class VibeDomeCueTest {
                 dome.frames(10)
                 dome.act(label)
                 assertEquals(1, dome.nexts + dome.previouses, "sanity: \"$label\" moved nothing")
-                assertTrue(preferences.prefs.domeSwiped, "\"$label\" was not taken for the swipe learned")
+                assertTrue(preferences.swipeLearned, "\"$label\" was not taken for the swipe learned")
                 assertEquals(emptyList<Watched>(), dome.watch(150).moving(), "the dome wiggled after \"$label\"")
             } finally {
                 dome.close()
@@ -602,7 +603,7 @@ class VibeDomeCueTest {
             dome.frames(40)
             assertEquals(1, dome.toggles, "sanity: the tap never toggled playback")
             assertEquals(emptyList<Boolean>(), launch.swipes, "a 20dp drag committed")
-            assertFalse(preferences.prefs.domeSwiped, "a tap or a short drag was taken for a swipe")
+            assertFalse(preferences.swipeLearned, "a tap or a short drag was taken for a swipe")
         } finally {
             dome.close()
             launch.close()
@@ -702,9 +703,10 @@ class VibeDomeCueTest {
     fun aRecreatedRootDoesNotWiggleAgain() {
         val preferences = MemoryPreferences()
         val feature = RigPulsarFeature()
-        val process = DomeWiggleLaunch()
-        fun activity(wiggle: DomeWiggleLaunch): List<Watched> {
-            val dome = Dome(null, TestCoroutineScheduler(), rootCues = { rememberVibeDomeCues(feature, preferences, wiggle) })
+        fun newProcess() = OnboardingSequencer(listOf(DomeSwipeStep), preferences, CoroutineScope(UnconfinedTestDispatcher()))
+        val process = newProcess()
+        fun activity(onboarding: OnboardingSequencer): List<Watched> {
+            val dome = Dome(null, TestCoroutineScheduler(), rootCues = { rememberVibeDomeCues(feature, onboarding) })
             try {
                 return dome.watch(200)
             } finally {
@@ -714,7 +716,7 @@ class VibeDomeCueTest {
         assertTrue(activity(process).moving().isNotEmpty(), "sanity: the first activity never wiggled")
         assertEquals(emptyList<Watched>(), activity(process).moving(), "the recreated activity wiggled again")
         // Control: a new process, the swipe never having committed, wiggles again.
-        assertTrue(activity(DomeWiggleLaunch()).moving().isNotEmpty(), "a new process never wiggled")
+        assertTrue(activity(newProcess()).moving().isNotEmpty(), "a new process never wiggled")
     }
 
     @Test
@@ -750,7 +752,7 @@ class VibeDomeCueTest {
         private val scheduler = TestCoroutineScheduler()
         private var nowMs = 1_000L
         private val feature = RigPulsarFeature()
-        private val cues = VibeDomeCues(moves, {}, preferences, CoroutineScope(UnconfinedTestDispatcher(scheduler)), DomeWiggleLaunch())
+        private val cues = VibeDomeCues(moves, {}, OnboardingSequencer(listOf(DomeSwipeStep), preferences, CoroutineScope(UnconfinedTestDispatcher(scheduler))))
         val scopes = ScopeCounter()
         val scene = ImageComposeScene(widthDp * 2, heightDp * 2, Density(density), UnconfinedTestDispatcher(scheduler)) {
             ObserveScopes(scopes)

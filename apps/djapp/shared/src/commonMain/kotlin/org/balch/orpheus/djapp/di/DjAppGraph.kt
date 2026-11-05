@@ -9,7 +9,7 @@ import org.balch.orpheus.core.features.StartupInitializer
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
-import org.balch.orpheus.djapp.DomeWiggleLaunch
+import org.balch.orpheus.djapp.DjOnboarding
 import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.djapp.variant.DjEdition
 import org.balch.orpheus.djapp.variant.DjTabContribution
@@ -46,8 +46,8 @@ interface DjAppGraph : ViewModelGraph {
     /** Persists the TV-mode docked-panel set, which has no ViewModel of its own. */
     val appPreferencesRepository: AppPreferencesRepository
 
-    /** The dome's "swipe me" wiggle, spent once a process: it outlives an Android activity's recreation. */
-    val domeWiggleLaunch: DomeWiggleLaunch
+    /** What this launch has taught: it outlives an Android activity's recreation. */
+    val onboarding: DjOnboarding
 
     /** The Mix Bench (desktop, `-Pbench=true`) drives these three directly. */
     val pulsarFeature: PulsarFeature

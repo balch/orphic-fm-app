@@ -322,6 +322,7 @@ fun DjAppNavScaffold(
                         .consumeWindowInsets(NavigationRailDefaults.windowInsets.only(WindowInsetsSides.Start)),
                 ) { content() }
                 NavChipPopup(gestures)
+                NavChipsPreviewRunner(gestures) { tabs }
             }
         } else {
             // The bar's own width, not the screen's, sets how many tabs fit; four until it is measured.
@@ -379,6 +380,7 @@ fun DjAppNavScaffold(
                         bar.right.forEach { slot(it) }
                     }
                     NavChipPopup(gestures)
+                    NavChipsPreviewRunner(gestures) { bar.panels }
                 }
             }
         }

@@ -369,6 +369,7 @@ fun DjTvBottomBar(
         // Over the stage above the bar, taking no room of its own.
         if (customize != null) TvNavChipRow(customize, Modifier.align(Alignment.TopCenter).floatAboveParent(TvChipRowGap))
         NavChipPopup(gestures)
+        NavChipsPreviewRunner(gestures) { nav.panels }
     }
 }
 

@@ -96,7 +96,7 @@ fun DjApp(
             // Pick a new random visualization on each vibe transition
             val pulsarFeature: PulsarFeature = registry.feature<PulsarFeature>()
             // Every play/pause dome below takes its cues from here, whichever chrome holds it.
-            val domeCues = rememberVibeDomeCues(pulsarFeature, graph.appPreferencesRepository, graph.domeWiggleLaunch)
+            val domeCues = rememberVibeDomeCues(pulsarFeature, graph.onboarding)
             // The scope their rings trace, polled only while one of them plays.
             val scopeFeed = rememberScopeFeed(graph.synthEngine)
             val engineRecents = rememberEngineRecents(graph.appPreferencesRepository)
@@ -151,6 +151,7 @@ fun DjApp(
                     LocalVizStage provides vizStage,
                     LocalPanelIdleFade provides panelFade,
                     LocalVibeDomeCues provides domeCues,
+                    LocalOnboarding provides graph.onboarding,
                     LocalScopeFeed provides scopeFeed,
                     LocalEngineRecents provides engineRecents,
                 ) {

@@ -53,9 +53,11 @@ data class AppPreferences(
     val navOrder: List<String>? = null,
     /**
      * Whether the DJ app's user has ever committed a swipe on its play/pause dome. Until then the
-     * dome wiggles once a launch to show that it swipes.
+     * dome wiggles once a launch to show that it swipes. Read only: new swipes land in [onboarding].
      */
     val domeSwiped: Boolean = false,
+    /** What [org.balch.orpheus.core.onboarding.OnboardingSequencer] has shown and taught, by step id. */
+    val onboarding: Map<String, OnboardingProgress> = emptyMap(),
     /** The DJ app's vibe rotation: order and set-aside vibes. Null means catalog order. */
     val vibePlaylist: VibePlaylistPrefs? = null,
     /** Serialized effect UI states for DJ app cross-session persistence. */
@@ -86,4 +88,6 @@ data class AppPreferences(
     val lastCowbellJson: String? = null,
 )
 
-
+/** One onboarding step: how many launches have shown it, and whether the user has it now. */
+@Serializable
+data class OnboardingProgress(val shows: Int = 0, val learned: Boolean = false)

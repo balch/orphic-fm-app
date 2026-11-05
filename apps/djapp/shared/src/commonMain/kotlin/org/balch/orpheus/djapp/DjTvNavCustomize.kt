@@ -314,7 +314,7 @@ internal fun TvNavChipRow(customize: TvNavCustomize, modifier: Modifier = Modifi
     }
 }
 
-/** A chip that waits [ChipDoubleTapWindowMs] for a second press before its single press swaps. */
+/** A chip that waits [ChipDoubleTapWindowMs] for a second press before its single press opens. */
 @Composable
 private fun DoublePressChip(
     chip: DjRoute,
@@ -330,12 +330,12 @@ private fun DoublePressChip(
         if (waiting != null) {
             waiting.cancel()
             pending = null
-            onOpen()
+            onSwap()
         } else {
             pending = scope.launch {
                 delay(ChipDoubleTapWindowMs)
                 pending = null
-                onSwap()
+                onOpen()
             }
         }
     }

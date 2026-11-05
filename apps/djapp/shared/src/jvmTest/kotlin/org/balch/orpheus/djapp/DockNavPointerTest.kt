@@ -44,11 +44,12 @@ class DockNavPointerTest {
     private class Recorder {
         val toggled = mutableListOf<DjRoute>()
         val swaps = mutableListOf<Pair<DjRoute, DjRoute>>()
+        val opened = mutableListOf<DjRoute>()
         val exchanges = mutableListOf<Pair<NavEntry, NavEntry>>()
         val actions = NavActions(
             onChipSwap = { slot, chip -> swaps += slot to chip },
             onExchange = { a, b -> exchanges += a to b },
-            onOpenOffBar = {},
+            onOpenOffBar = { opened += it },
         )
     }
 
@@ -108,7 +109,7 @@ class DockNavPointerTest {
     }
 
     @Test
-    fun `a held press opens the chips and a chip swaps`() = runComposeUiTest {
+    fun `a held press opens the chips and a chip opens its panel`() = runComposeUiTest {
         val recorder = Recorder()
         show(recorder, navBar(aiOrder, drops, maxEvenSlots = 4))
         tab("Mix").performMouseInput {
@@ -123,7 +124,7 @@ class DockNavPointerTest {
         onNode(hasTestTag(NavChipTag) and hasText("Horn")).performClick()
         mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
         waitForIdle()
-        assertEquals(listOf<Pair<DjRoute, DjRoute>>(MixTab to HornTab), recorder.swaps)
+        assertEquals(listOf<DjRoute>(HornTab), recorder.opened)
     }
 
     @Test

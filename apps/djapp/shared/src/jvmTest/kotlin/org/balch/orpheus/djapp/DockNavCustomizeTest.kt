@@ -276,7 +276,7 @@ class DockNavCustomizeTest {
 
     // A narrow window holds four tabs, so Horn is off the bar and offered as a chip.
     @Test
-    fun `OK on a chip swaps it in`() {
+    fun `OK on a chip opens it`() {
         val dock = Dock(aiOrder, widthDp = 800)
         try {
             assertNull(dock.toggle("Horn"), "sanity: Horn fits on the bar")
@@ -286,18 +286,18 @@ class DockNavCustomizeTest {
             dock.press(Key.DirectionRight)
             assertEquals("Horn", dock.focusedLabel)
             dock.press(Key.DirectionCenter)
-            assertTrue(dock.swaps.isEmpty(), "the swap did not wait out the double-press window")
+            assertTrue(dock.opened.isEmpty(), "the open did not wait out the double-press window")
             dock.idle(ChipDoubleTapWindowMs + 100)
-            assertEquals(listOf<Pair<DjRoute, DjRoute>>(MixTab to HornTab), dock.swaps)
-            assertTrue(dock.opened.isEmpty())
-            assertTrue(dock.chips.isEmpty(), "the row stayed open after the swap")
+            assertEquals(listOf<DjRoute>(HornTab), dock.opened)
+            assertTrue(dock.swaps.isEmpty())
+            assertTrue(dock.chips.isEmpty(), "the row stayed open after the open")
         } finally {
             dock.close()
         }
     }
 
     @Test
-    fun `double press OK on a chip opens it without swapping`() {
+    fun `double press OK on a chip swaps it in without opening`() {
         val dock = Dock(aiOrder, widthDp = 800)
         try {
             dock.focusToggle("Mix")
@@ -307,8 +307,8 @@ class DockNavCustomizeTest {
             dock.idle(100)
             dock.press(Key.DirectionCenter)
             dock.idle(ChipDoubleTapWindowMs + 100)
-            assertEquals(listOf<DjRoute>(HornTab), dock.opened)
-            assertTrue(dock.swaps.isEmpty(), "the double press also swapped")
+            assertEquals(listOf<Pair<DjRoute, DjRoute>>(MixTab to HornTab), dock.swaps)
+            assertTrue(dock.opened.isEmpty(), "the double press also opened")
             assertTrue(dock.chips.isEmpty())
         } finally {
             dock.close()

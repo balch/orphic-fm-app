@@ -5,6 +5,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.onboarding.OnboardingSequencer
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
@@ -60,6 +61,8 @@ internal class MemoryPreferences(domeSwiped: Boolean = false) : BaseAppPreferenc
     var loads = 0
         private set
 
+    val swipeLearned get() = prefs.onboarding[DomeSwipeStep.id]?.learned == true
+
     override suspend fun load(): AppPreferences {
         loads++
         return prefs
@@ -100,9 +103,7 @@ internal class VibeDomeRig(
     val cues = VibeDomeCues(
         moves = session.vibeMoves,
         requestSwipe = { next -> session.requestVibe(VibeRequest.DomeSwipe(next)) },
-        preferences = preferences,
-        scope = scope,
-        wiggle = DomeWiggleLaunch(),
+        onboarding = OnboardingSequencer(listOf(DomeSwipeStep), preferences, scope),
     )
 
     /** Every move the navigator announced, in order. */
