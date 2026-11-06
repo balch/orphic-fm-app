@@ -44,9 +44,10 @@ static constexpr int kMaxSectionTransitions = 8;
 static constexpr int kMaxSectionVolumePoints = 6;
 static constexpr int kSectionFogSlot = 38 + kMaxSectionVolumePoints * 2;   // 50: SectionFog, 5 slots
 static constexpr int kSectionDelaySlot = kSectionFogSlot + 5;   // 55: SectionDelay, 3 slots
-static constexpr int kSectionDataFields = 58;   // pulsar_section_data, pulsar_section_tension_data
-static_assert(kSectionDataFields == kSectionDelaySlot + 3,
-              "slot 37 is the volume envelope count, its pairs follow it, then 5 fog and 3 delay slots");
+static constexpr int kSectionJamFreeformSlot = kSectionDelaySlot + 3;   // 58: SoloMode.Jam.freeform
+static constexpr int kSectionDataFields = 59;   // pulsar_section_data, pulsar_section_tension_data
+static_assert(kSectionDataFields == kSectionJamFreeformSlot + 1,
+              "slot 37 is the volume envelope count, its pairs follow it, then 5 fog, 3 delay and the jam freeform slot");
 // pulsar_section_tension_data's stride: the 21 vibe-level tension fields plus the arc.
 static constexpr int kSectionTensionFields = 22;
 static_assert(kSectionTensionFields <= kSectionDataFields,

@@ -363,7 +363,7 @@ static bool test_drone_interval_preset() {
 // solo_mode = JAM instead of LICK_BUILDER.  The vibe has NO authored lick
 // (pulsar_lick_length = 0), so the fallback path must synthesize one from
 // the lead member's melodic track.
-static void push_jam_band_arrangement(OrpheusEngine* engine, int lead_track) {
+static void push_jam_band_arrangement(OrpheusEngine* engine, int lead_track, bool freeform = false) {
     engine->pulsar_arrangement_active.store(1, std::memory_order_relaxed);
     engine->pulsar_arrangement_section_count.store(2, std::memory_order_relaxed);
     engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
@@ -401,6 +401,7 @@ static void push_jam_band_arrangement(OrpheusEngine* engine, int lead_track) {
     section_data[s1 + 12] = 0.5f; // solo_lick_influence
     section_data[s1 + 13] = 2;    // solo_bars_min
     section_data[s1 + 14] = 4;    // solo_bars_max
+    section_data[s1 + kSectionJamFreeformSlot] = freeform ? 1.0f : 0.0f;
     for (int i = 0; i < 8 * kSectionStride; i++)
         engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
 
@@ -1411,7 +1412,8 @@ struct JamBarCapture {
 // Drive the JAM fixture and snapshot the lead's pattern once per solo bar.
 // nr_low/nr_high > 0 push a per-track authored note range before the vibe loads.
 static JamBarCapture run_jam_capture(int lead_track, bool with_hook, uint32_t seed,
-                                     int want_bars, int nr_low = 0, int nr_high = 0) {
+                                     int want_bars, int nr_low = 0, int nr_high = 0,
+                                     bool freeform = false) {
     JamBarCapture out;
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
@@ -1429,7 +1431,7 @@ static JamBarCapture run_jam_capture(int lead_track, bool with_hook, uint32_t se
         nr_low, std::memory_order_relaxed);
     if (nr_high > 0) engine->pulsar_track_note_range_high[lead_track].store(
         nr_high, std::memory_order_relaxed);
-    push_jam_band_arrangement(engine, lead_track);
+    push_jam_band_arrangement(engine, lead_track, freeform);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
 
@@ -1486,6 +1488,39 @@ static bool test_jam_ornaments_authored_hook() {
     printf("  bars=%zu hook_intact=%s authored_pitches=%s ornaments_in_rests=%d -- %s\n",
            cap.bars.size(), hook_intact ? "YES" : "NO",
            authored_pitches ? "YES" : "NO", ornaments, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// A freeform Jam improvises over a lick-driven lead instead of ornamenting its hook:
+// the hook's gated steps stop surviving, while the same run without the flag keeps
+// every bare-hook gate.
+static bool test_jam_freeform_drops_authored_hook() {
+    printf("\n=== Test: freeform Jam improvises over a lick-driven lead ===\n");
+    const int kLeadTrack = 4;
+    JamBarCapture riff = run_jam_capture(kLeadTrack, /*with_hook=*/true, 4242, 12);
+    JamBarCapture free = run_jam_capture(kLeadTrack, /*with_hook=*/true, 4242, 12,
+                                         0, 0, /*freeform=*/true);
+    bool sampled = riff.bars.size() >= 8 && free.bars.size() >= 8;
+
+    bool riff_gates_kept = sampled;
+    for (const auto& bar : riff.bars)
+        for (int k = 0; k < 8; k++)
+            if (!bar[kHookGatedSteps[k]].gate) riff_gates_kept = false;
+
+    // Bar 0 is still the bare hook in both runs; compare later bars to it.
+    int differing = 0, free_notes = 0;
+    if (sampled)
+        for (size_t b = 1; b < free.bars.size(); b++)
+            for (int s = 0; s < 16; s++) {
+                const PulsarStep& f = free.bars[b][s];
+                const PulsarStep& h = riff.bars[0][s];
+                if (f.gate) free_notes++;
+                if (f.gate != h.gate || (f.gate && f.note != h.note)) differing++;
+            }
+    bool pass = sampled && riff_gates_kept && free_notes > 0 && differing > 16;
+    printf("  bars=%zu/%zu riff_gates_kept=%s free_notes=%d differing_steps=%d -- %s\n",
+           riff.bars.size(), free.bars.size(), riff_gates_kept ? "YES" : "NO",
+           free_notes, differing, pass ? "PASS" : "FAIL");
     return pass;
 }
 
@@ -1598,6 +1633,7 @@ bool run_pulsar_solos_tests() {
     tally(test_handoff_bar_fires_a_kit_fill());
     tally(test_jam_builds_over_its_section());
     tally(test_jam_ornaments_authored_hook());
+    tally(test_jam_freeform_drops_authored_hook());
     tally(test_jam_ornament_density_builds());
     tally(test_jam_no_lick_line_unchanged());
     tally(test_jam_notes_respect_track_note_range());

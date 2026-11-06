@@ -2580,7 +2580,8 @@ class PulsarViewModel(
      *   31=volume+1, 32..36=rampTo energy/complexity/space/mood/volume +1 (0 = unset),
      *   37=volumeEnvelope point count, 38..49=(bar, level) pairs,
      *   50=fog_level, 51=fog_interval_bars, 52=fog_pattern, 53=fog_pitch, 54=fog_distance (SectionFog),
-     *   55=delay_time_a+1, 56=delay_time_b+1, 57=delay_feedback+1 (SectionDelay, 0 = the vibe's)
+     *   55=delay_time_a+1, 56=delay_time_b+1, 57=delay_feedback+1 (SectionDelay, 0 = the vibe's),
+     *   58=jam_freeform (SoloMode.Jam.freeform, 0/1)
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -2791,6 +2792,8 @@ class PulsarViewModel(
             setSection(55, sectionDelay?.timeA?.plus(1f) ?: 0f)
             setSection(56, sectionDelay?.timeB?.plus(1f) ?: 0f)
             setSection(57, sectionDelay?.feedback?.plus(1f) ?: 0f)
+            // Slot 58: a freeform Jam improvises even on a lick-driven soloist.
+            setSection(58, if ((section.soloMode as? SoloMode.Jam)?.freeform == true) 1f else 0f)
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.

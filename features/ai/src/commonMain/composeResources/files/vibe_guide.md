@@ -373,9 +373,10 @@ anomaly is at most 8.
   transitionBars 1-2, or a hard cut with transitionBars 0 (Orphic Lore's storm slams back home).
 - The modes. soloMode rolls its probability once at section entry, so use 0.9-1 for a jam that
   must happen.
-  - Jam(probability, lickInfluence): in the scale, with its on-beat notes snapped to chord tones.
+  - Jam(probability, lickInfluence, freeform): in the scale, with its on-beat notes snapped to chord tones.
     A lead that plays a line keeps it and fills the rests, sparse at first and busier as the
-    section goes on; a lead with no line gets a new one. Its phrase passes to the next soloist,
+    section goes on; a lead with no line gets a new one. freeform true drops the line for that
+    section and improvises a new one even over a lead that plays a lick. Its phrase passes to the next soloist,
     weighted by lickInfluence, and jamCarry true on the next jam section carries the same solo
     across the seam instead of starting over.
   - LickBuilder(probability, mutationRate): builds on the line, mutating it every bar, and passes

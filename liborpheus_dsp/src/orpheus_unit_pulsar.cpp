@@ -2083,6 +2083,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             sec.solo_probability = engine->pulsar_section_data[base + 10].load(std::memory_order_relaxed);
             sec.solo_mutation_rate = engine->pulsar_section_data[base + 11].load(std::memory_order_relaxed);
             sec.solo_lick_influence = engine->pulsar_section_data[base + 12].load(std::memory_order_relaxed);
+            sec.solo_jam_freeform =
+                engine->pulsar_section_data[base + kSectionJamFreeformSlot].load(std::memory_order_relaxed) > 0.5f;
             sec.solo_bars_min    = static_cast<int>(engine->pulsar_section_data[base + 13].load(std::memory_order_relaxed));
             sec.solo_bars_max    = static_cast<int>(engine->pulsar_section_data[base + 14].load(std::memory_order_relaxed));
 
@@ -5110,7 +5112,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 LickMode mt_lick_mode = static_cast<LickMode>(
                                     engine->pulsar_track_lick_mode[mt].load(std::memory_order_relaxed));
                                 LickChannel mt_ch = track_lick_channel(state, engine, mt);
-                                bool hook_driven = (mt_ch.length > 0 && mt_lick_mode != LickMode::NONE);
+                                const bool lick_track = (mt_ch.length > 0 && mt_lick_mode != LickMode::NONE);
+                                // A freeform Jam drops the hook and improvises on a lick track too.
+                                bool hook_driven = lick_track && !sec_adv.solo_jam_freeform;
                                 bass_solo_authored = hook_driven && (mt == kBassTrack);
                                 // Re-render the bare hook (load/déjà-vu recipe + seed) so last
                                 // bar's ornaments can't compound into the riff. GENRE range, as
@@ -5194,6 +5198,39 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                         state->track_solo_behavior[mt].markov_current_degree,
                                         jam_progress, jam_nr_low, jam_nr_high,
                                         state->mutation_seed);
+                                    // Freeform on a lick-driven member: its other lick tracks double
+                                    // the free line at their lickDegreeOffset, as they double the
+                                    // ornaments above, rather than repeat a riff the lead dropped.
+                                    if (lick_track) {
+                                        const int mt_off = engine->pulsar_track_lick_degree_offset[mt].load(
+                                            std::memory_order_relaxed);
+                                        for (int ti = 0; ti < lm.track_count; ti++) {
+                                            const int xt = lm.tracks[ti];
+                                            if (xt == mt || xt < 0 || xt >= kNumPulsarTracks ||
+                                                state->tracks[xt].role != TrackRole::MELODIC) continue;
+                                            const LickChannel xch = track_lick_channel(state, engine, xt);
+                                            if (xch.length <= 0 || static_cast<LickMode>(engine->pulsar_track_lick_mode[xt].load(
+                                                    std::memory_order_relaxed)) == LickMode::NONE) continue;
+                                            PulsarTrackState& xts = state->tracks[xt];
+                                            const int delta = engine->pulsar_track_lick_degree_offset[xt].load(
+                                                std::memory_order_relaxed) - mt_off;
+                                            int x_low  = engine->pulsar_track_note_range_low[xt].load(std::memory_order_relaxed);
+                                            int x_high = engine->pulsar_track_note_range_high[xt].load(std::memory_order_relaxed);
+                                            if (x_low <= 0) x_low = engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed);
+                                            if (x_high <= 0) x_high = engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed);
+                                            const int n = std::min(std::min(lts.step_count, kMaxPulsarSteps), xts.step_count);
+                                            for (int s = 0; s < n; s++) {
+                                                PulsarStep st = lts.steps[s];
+                                                if (st.gate) {
+                                                    const int note = shift_jam_note_degrees(
+                                                        st.note, delta, static_cast<int>(live_root), sc, x_low, x_high);
+                                                    st.note = static_cast<uint8_t>(note);
+                                                    st.raw_note = static_cast<uint8_t>(note);
+                                                }
+                                                xts.steps[s] = st;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

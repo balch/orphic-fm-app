@@ -942,6 +942,7 @@ struct SectionParam {
     float solo_probability = 0.0f;
     float solo_mutation_rate = 0.5f;    // LickBuilder only
     float solo_lick_influence = 0.5f;   // Jam only
+    bool solo_jam_freeform = false;     // Jam only: improvise even on a lick-driven lead
     int solo_bars_min = 2;              // LongFill only
     int solo_bars_max = 4;              // LongFill only
     // Section-level overrides (-1 = no override, keep track defaults)

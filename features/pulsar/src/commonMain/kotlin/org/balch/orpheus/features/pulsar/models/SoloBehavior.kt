@@ -202,5 +202,7 @@ sealed class SoloMode {
     data class Jam(
         val probability: Float = 0.8f,
         val lickInfluence: Float = 0.5f,
+        /** True: the soloist plays the free chord-anchored line even when its track is lick-driven. */
+        val freeform: Boolean = false,
     ) : SoloMode()
 }

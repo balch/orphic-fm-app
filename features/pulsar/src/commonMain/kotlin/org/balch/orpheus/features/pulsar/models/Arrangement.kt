@@ -534,7 +534,7 @@ data class Arrangement(
          * reuses this constant only for its C++-side allocation size; its per-section
          * stride is [TENSION_DATA_FIELDS].
          */
-        const val SECTION_DATA_FIELDS = 58
+        const val SECTION_DATA_FIELDS = 59
 
         /**
          * Per-section stride of `pulsar_section_tension_data`: the 21 tension fields plus
