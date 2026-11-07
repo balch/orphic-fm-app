@@ -8,7 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +78,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.layout.offset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -89,7 +88,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.CalloutCaret
 import org.balch.orpheus.ui.widgets.OnboardingCallout
 
-/** How long a chip's single tap waits for a second tap before it counts as an open. */
+/** How long a TV chip's single press waits for a second press before it counts as an open. */
 internal const val ChipDoubleTapWindowMs = 300L
 
 /** The test tag on each chip in the row. */
@@ -545,13 +544,14 @@ internal fun NavChipPopup(host: NavGestureHost?) {
                 ) {
                     NavChip(row.slot, current = true, onClick = host::closeChips)
                     row.chips.forEachIndexed { index, chip ->
-                        DoubleTapChip(
+                        NavChip(
                             route = chip,
-                            onTap = { host.openChip(chip) },
-                            onDoubleTap = { host.swapChip(row, chip) },
+                            current = false,
                             modifier = if (index != 0) Modifier else Modifier.onGloballyPositioned {
                                 chipCentreInRoot = it.positionInRoot().x + it.size.width / 2f
                             },
+                            onLongClick = { host.swapChip(row, chip) },
+                            onClick = { host.openChip(chip) },
                         )
                     }
                 }
@@ -576,29 +576,14 @@ private fun NavTabCalloutPopup(host: NavGestureHost) {
     }
 }
 
-/** A chip that waits [ChipDoubleTapWindowMs] for a second tap before its single tap fires. */
 @Composable
-private fun DoubleTapChip(route: DjRoute, onTap: () -> Unit, onDoubleTap: () -> Unit, modifier: Modifier = Modifier) {
-    val scope = rememberCoroutineScope()
-    var pending by remember { mutableStateOf<Job?>(null) }
-    NavChip(route, current = false, modifier) {
-        val waiting = pending
-        if (waiting != null) {
-            waiting.cancel()
-            pending = null
-            onDoubleTap()
-        } else {
-            pending = scope.launch {
-                delay(ChipDoubleTapWindowMs)
-                pending = null
-                onTap()
-            }
-        }
-    }
-}
-
-@Composable
-private fun NavChip(route: DjRoute, current: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun NavChip(
+    route: DjRoute,
+    current: Boolean,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val tint = if (current) OrpheusColors.neonCyan else Color.White.copy(alpha = 0.85f)
     Row(
         modifier = modifier
@@ -606,7 +591,7 @@ private fun NavChip(route: DjRoute, current: Boolean, modifier: Modifier = Modif
             .semantics { selected = current }
             .background(if (current) NavIndicatorColor.compositeOver(ChipFill) else ChipFill, ChipShape)
             .then(if (current) Modifier.border(BorderStroke(1.dp, OrpheusColors.neonCyan), ChipShape) else Modifier)
-            .clickable(role = Role.Tab, onClick = onClick)
+            .combinedClickable(role = Role.Tab, onLongClick = onLongClick, onClick = onClick)
             .heightIn(min = 40.dp)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

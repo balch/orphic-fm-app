@@ -122,7 +122,6 @@ class DockNavPointerTest {
         assertEquals(listOf("Mix", "Horn", "Cowbell"), chipLabels())
         assertTrue(recorder.toggled.isEmpty(), "the held press also toggled: ${recorder.toggled}")
         onNode(hasTestTag(NavChipTag) and hasText("Horn")).performClick()
-        mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
         waitForIdle()
         assertEquals(listOf<DjRoute>(HornTab), recorder.opened)
     }

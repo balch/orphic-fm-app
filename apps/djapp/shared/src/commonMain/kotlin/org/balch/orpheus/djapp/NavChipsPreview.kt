@@ -44,7 +44,7 @@ internal const val NavLongPressHint = "Long press to open"
 
 /** What the chips do, in the words of the pointer in hand. */
 internal fun navChipRowHint(desktop: Boolean): String =
-    if (desktop) "Click to open, double click to replace" else "Tap to open, double tap to replace"
+    if (desktop) "Click to open, long press to replace" else "Tap to open, long press to replace"
 
 /**
  * The first launch presses a tab for the user; the second reminds, unless a real press came first.
@@ -54,7 +54,7 @@ internal fun navChipRowHint(desktop: Boolean): String =
 internal val NavLongPressStep = OnboardingStep("nav-long-press", maxShows = 2, ownsLaunch = true)
 
 /** The callout over an open chip row, until the user has picked a chip. */
-internal val NavChipRowStep = OnboardingStep("nav-chip-row")
+internal val NavChipRowStep = OnboardingStep("nav-chip-row-long-press")
 
 /** The dome's "swipe me" wiggle, each launch until a swipe has ever committed. */
 internal val DomeSwipeStep = OnboardingStep("dome-swipe", learnedAlready = { it.domeSwiped })

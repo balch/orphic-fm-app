@@ -193,33 +193,29 @@ class NavChipRowTest {
     }
 
     @Test
-    fun `chip tap opens after the double tap window`() = runComposeUiTest {
+    fun `chip tap opens at once`() = runComposeUiTest {
         val recorder = Recorder()
         show(recorder)
         tab("Timer").performTouchInput { longClick() }
         waitForIdle()
-        mainClock.autoAdvance = false
         chip("Horn").performClick()
-        assertTrue(recorder.opened.isEmpty(), "the panel opened before the double tap window closed")
-        mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
+        waitForIdle()
         assertEquals(listOf<DjRoute>(HornTab), recorder.opened)
         assertTrue(recorder.swaps.isEmpty(), "a tap also swapped")
         onAllNodes(hasTestTag(NavChipTag)).assertCountEquals(0)
     }
 
     @Test
-    fun `chip double tap swaps without opening`() = runComposeUiTest {
+    fun `chip long press swaps without opening`() = runComposeUiTest {
         val recorder = Recorder()
         show(recorder)
         tab("Timer").performTouchInput { longClick() }
         waitForIdle()
-        mainClock.autoAdvance = false
-        chip("Horn").performClick()
-        mainClock.advanceTimeBy(100)
-        chip("Horn").performClick()
-        mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
+        chip("Horn").performTouchInput { longClick() }
+        waitForIdle()
         assertEquals(listOf<Pair<DjRoute, DjRoute>>(TimerTab to HornTab), recorder.swaps)
-        assertTrue(recorder.opened.isEmpty(), "a double tap also opened")
+        assertTrue(recorder.opened.isEmpty(), "a long press also opened")
+        onAllNodes(hasTestTag(NavChipTag)).assertCountEquals(0)
     }
 
     @Test
@@ -229,7 +225,6 @@ class NavChipRowTest {
         tab("Timer").performTouchInput { longClick() }
         waitForIdle()
         chip("Timer").performClick()
-        mainClock.advanceTimeBy(ChipDoubleTapWindowMs + 50)
         waitForIdle()
         onAllNodes(hasTestTag(NavChipTag)).assertCountEquals(0)
         assertTrue(recorder.swaps.isEmpty() && recorder.opened.isEmpty() && recorder.exchanges.isEmpty())

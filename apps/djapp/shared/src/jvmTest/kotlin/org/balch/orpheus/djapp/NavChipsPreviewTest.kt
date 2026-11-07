@@ -179,7 +179,7 @@ class NavChipsPreviewTest {
         show(launchOf(preferences), hornBar)
         advance(toTheLift + toTheSettle)
         onNode(hasText("Cowbell") and hasTestTag(NavChipTag)).performClick()
-        advance(ChipDoubleTapWindowMs + 100)
+        advance(100)
         assertEquals(true, preferences.progress(NavChipRowStep)?.learned)
         assertNull(preferences.progress(NavLongPressStep)?.learned?.takeIf { it }, "a chip taught the long press")
     }
@@ -414,7 +414,7 @@ class NavChipsPreviewTest {
 
     @Test
     fun `the row's callout speaks for the pointer in hand`() {
-        assertEquals("Tap to open, double tap to replace", navChipRowHint(desktop = false))
-        assertEquals("Click to open, double click to replace", navChipRowHint(desktop = true))
+        assertEquals("Tap to open, long press to replace", navChipRowHint(desktop = false))
+        assertEquals("Click to open, long press to replace", navChipRowHint(desktop = true))
     }
 }
