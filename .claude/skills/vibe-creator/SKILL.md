@@ -227,7 +227,7 @@ Vibe(
 )
 ```
 
-Omit the field, or pass `emptyList()` (the default), for a vibe with no anomalies. Working example: `FireSky05Vibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLick`, with a rare `ogLick` `LickAnomaly`).
+Omit the field, or pass `emptyList()` (the default), for a vibe with no anomalies. Working example: `FireSkyVibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLick`, with a rare `ogLick` `LickAnomaly`).
 
 To hear one while testing: a long-press on the VIBE dropdown force-fires every anomaly the vibe **declares**, all at once, at the next bar. A vibe with an empty `anomalies` list ignores the gesture.
 

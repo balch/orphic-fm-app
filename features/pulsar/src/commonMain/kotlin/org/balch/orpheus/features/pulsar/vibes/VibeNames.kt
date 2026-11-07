@@ -8,7 +8,6 @@ import org.balch.orpheus.features.pulsar.models.VibeName
  */
 object VibeNames {
     val AETHER_NATALIS = VibeName("Aether Natalis")
-    val ALBATROSS_SONAR = VibeName("Albatross Sonar")
     val ARMY_STOMP = VibeName("Army Stomp")
     val BELL_TOLLS = VibeName("Bell Tolls")
     val COSMIC_TECHNO = VibeName("Cosmic Techno")
@@ -17,8 +16,6 @@ object VibeNames {
     val DUST_GROOVE = VibeName("Dust Groove")
     val FILTER_FUNK = VibeName("Filter Funk")
     val FIRE_SKY = VibeName("Fire Sky")
-    val FIRE_SKY_05F = VibeName("Fire Sky .5f")
-    val FIRE_SKY_OG = VibeName("Fire Sky OG")
     val JUPITER = VibeName("Jupiter, the Bringer of Jollity")
     val KALEIDOSCOPE_DRIFT = VibeName("Kaleidoscope Drift")
     val LOST_IN_SPACE = VibeName("Lost In Space")
@@ -29,7 +26,6 @@ object VibeNames {
     val RUNNING_OUT = VibeName("Running Out")
     val RUST_BELT = VibeName("Rust Belt")
     val RUST_BELT_OG = VibeName("Rust Belt OG")
-    val SIMIAN_SWAGGER = VibeName("Simian Swagger")
     val SIXTIES_REBEL = VibeName("Sixties Rebel")
     val SPACE_AND_DRUMS = VibeName("Space & Drums")
     val STAY_ASLEEP = VibeName("Stay Asleep")

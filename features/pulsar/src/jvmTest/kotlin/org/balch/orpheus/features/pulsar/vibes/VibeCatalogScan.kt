@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
  * authoring guards.
  *
  * A hand-maintained list enforces nothing about the vibe someone adds tomorrow, which is
- * the only vibe a guard needed to catch. Filenames are no better: `FireSkyBackupVibes.kt` declares
- * two providers and no class named `FireSkyBackupVibes`. Compiled class files are ground truth.
+ * the only vibe a guard needed to catch. Filenames are no better: one file can declare several
+ * providers, none named after it. Compiled class files are ground truth.
  *
  * Constructing every provider also runs every `Vibe.init` and `EvolutionTension.init`
  * require for the whole catalog — most vibes are never otherwise force-instantiated.

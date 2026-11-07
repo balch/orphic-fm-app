@@ -68,7 +68,7 @@ import kotlin.test.Test
 class PlaylistSheetRenderHarness {
     private val outDir = File("build/djapp-render")
     private val order = listOf(
-        "Rust Belt", "Dog House", "Fire Sky .5f", "Filter Funk", "Bell Tolls", "Fire Sky",
+        "Rust Belt", "Dog House", "Orphic Lore", "Filter Funk", "Bell Tolls", "Fire Sky",
         "Space & Drums", "Techno Wobble", "Velvet Leash", "Voltage Strut", "Lost In Space", "Stay Asleep",
     )
     // The shipped albums, as the app shows them.

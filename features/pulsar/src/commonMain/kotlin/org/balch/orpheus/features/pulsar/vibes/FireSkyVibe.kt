@@ -52,8 +52,7 @@ import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
-// Base 2-bar hook used for
-// reference and Fire Sky .5f's rare anomaly flash.
+// Base 2-bar hook: Fire Sky's rare anomaly flash.
 internal val ogLick by lazy {
     Lick(
         steps = listOf(
@@ -288,7 +287,7 @@ internal class FireSkyVibeBase(
                 bpmMultiplier = halfTimeMult,      // same ~60 BPM half-time as the cold open
                 transitions = listOf(
                     // -> verse = THE DROP (tempo snaps to 84); scratch out of the build's tail,
-                    // into the drop (buildScratchMs = 0 in FireSky05Vibe drops the effect).
+                    // into the drop (buildScratchMs = 0 drops the effect).
                     SectionTransition(
                         targetIndex = 2, weight = 1.0f, transitionBars = liftBars,
                         effects = if (buildScratchMs > 0) listOf(ScratchEffect(ms = buildScratchMs)) else emptyList(),

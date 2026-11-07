@@ -60,7 +60,6 @@ class AlbumCatalog(
             listed = listOf(
                 Album.ZERO_TO_ONE to listOf(
                     VibeNames.DOG_HOUSE,
-                    VibeNames.FIRE_SKY_05F,
                     VibeNames.VELVET_LEASH,
                     VibeNames.FILTER_FUNK
                 ),

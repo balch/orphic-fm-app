@@ -110,8 +110,6 @@ object VibeCatalog {
 
 // -----------------------------
         VibeNames.WHALES_DREAM to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
-        VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        VibeNames.FIRE_SKY_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.RUST_BELT_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.DUST_GROOVE to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
@@ -131,8 +129,6 @@ object VibeCatalog {
         // ── Classical adaptations ──
         VibeNames.SYMPHONY_NO_5 to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "electro", "riff")),
         VibeNames.JUPITER to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
-        VibeNames.SIMIAN_SWAGGER to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
-        VibeNames.ALBATROSS_SONAR to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
     )
 
     /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */

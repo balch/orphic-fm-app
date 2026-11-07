@@ -43,8 +43,7 @@ class CaptureWriterTest {
         assertTrue(missing.isEmpty(), "no source file found for: $missing")
     }
 
-    @Test fun findsVibeInMultiVibeFile() {
-        assertEquals("FireSkyBackupVibes.kt", findVibeSource(vibesDir, "Fire Sky .5f")?.name)
+    @Test fun findsVibeWhoseFileIsNamedDifferently() {
         assertEquals("FifthSymphonyVibe.kt", findVibeSource(vibesDir, "Symphony No. 5 in C Minor")?.name)
         assertNull(findVibeSource(vibesDir, "No Such Vibe"))
     }
