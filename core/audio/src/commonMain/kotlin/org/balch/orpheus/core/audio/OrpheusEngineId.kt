@@ -21,9 +21,9 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
     // Declaration order is stable — do not reorder without migrating preset/save data.
 
     // Drums (ordinals 0..3)
-    @SerialName("BD")  BD(21, "Analog Bass Drum"),
-    @SerialName("SD")  SD(22, "Analog Snare Drum"),
-    @SerialName("HH")  HH(23, "Analog Hi-Hat"),
+    @SerialName("BD")  BD(21, "Bass Drum"),
+    @SerialName("SD")  SD(22, "Snare Drum"),
+    @SerialName("HH")  HH(23, "Hi-Hat"),
     @SerialName("FM_DRUM") FM_DRUM(21, "FM Drum"),  // aliases BD on C++ side
 
     // Plaits v1 pitched (ordinals 4..16)
